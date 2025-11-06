@@ -1,0 +1,10 @@
+{
+  "git.autofetch": true,
+  "git.autofetchPeriod": 180,
+  "git.postCommitCommand": "push",
+  "git.enableSmartCommit": true,
+  "git.confirmSync": false,
+  "files.autoSave": "onFocusChange",
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode"
+}
