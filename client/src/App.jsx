@@ -1,5 +1,20 @@
 import { useEffect, useState } from 'react';
 
+const formatDate = (value) => {
+  if (!value) return '';
+  const d = new Date(value);
+
+  //If backend sends something weird, don't break the UI
+  if (Number.isNaN(d.getTime())) return String(value);
+
+  //UK/EU friendly: 07 Nov 2025
+  return d.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
 const API =
   import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL !== ''
     ? import.meta.env.VITE_API_URL
