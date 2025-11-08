@@ -1,16 +1,30 @@
 import { useEffect, useState } from 'react';
 
+const API =
+  import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL !== ''
+    ? import.meta.env.VITE_API_URL
+    : '';
+
 export default function App() {
   const [health, setHealth] = useState(null);
   const [freq, setFreq] = useState(null);
 
   useEffect(() => {
-    fetch('/api/health')
+    const base = API; // "" in dev -> proxy, full URL in production
+
+    fetch(`${base}/api/health`)
       .then((r) => r.json())
-      .then(setHealth);
-    fetch('/api/frequency')
+      .then((data) => setHealth(data))
+      .catch((err) => {
+        console.error('Error fetching health:', err);
+      });
+
+    fetch(`${base}/api/frequency`)
       .then((r) => r.json())
-      .then(setFreq);
+      .then((data) => setFreq(data))
+      .catch((err) => {
+        console.error('Error fetching frequency:', err);
+      });
   }, []);
 
   return (
@@ -52,7 +66,11 @@ export default function App() {
 
       <section style={{ marginTop: 24 }}>
         <div
-          style={{ padding: 16, border: '1px solid #eee', borderRadius: 12 }}
+          style={{
+            padding: 16,
+            border: '1px solid #eee',
+            borderRadius: 12,
+          }}
         >
           <strong>API status:</strong>{' '}
           {health ? JSON.stringify(health) : '…checking'}
@@ -65,7 +83,7 @@ export default function App() {
             <p>Loading…</p>
           ) : (
             <>
-              <h3>Most frequent main number (top 10)</h3>
+              <h3>Main Numbers (top 10)</h3>
               <ul style={{ columns: 2, paddingLeft: 18 }}>
                 {freq.main.slice(0, 10).map((x) => (
                   <li key={x.number}>
@@ -74,7 +92,7 @@ export default function App() {
                 ))}
               </ul>
 
-              <h3 style={{ marginTop: 16 }}>Most frequent star (top 5)</h3>
+              <h3 style={{ marginTop: 16 }}>Stars (top 5)</h3>
               <ul style={{ columns: 2, paddingLeft: 18 }}>
                 {freq.stars.slice(0, 5).map((x) => (
                   <li key={x.number}>
@@ -89,7 +107,13 @@ export default function App() {
         </div>
       </section>
 
-      <footer style={{ marginTop: 32, fontSize: 12, opacity: 0.7 }}>
+      <footer
+        style={{
+          marginTop: 32,
+          fontSize: 12,
+          opacity: 0.7,
+        }}
+      >
         For educational & entertainment use only. No ticket sales or betting.
       </footer>
     </main>
