@@ -1,76 +1,76 @@
-import express from 'express';
-import cors from 'cors';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+function parseEuDate(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+  // 1) Format: 07-Nov-25 (dd-MMM-yy)
+  // e.g. from your Excel export
+  let m = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2})$/);
+  if (m) {
+    const [_, dd, monStr, yy] = m;
+    const months = {
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11,
+    };
+    const month = months[monStr.toLowerCase()];
+    if (month === undefined) throw new Error('Bad month in date: ' + s);
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+    // EuroMillions starts 2004; all your data is 20xx
+    const year2 = parseInt(yy, 10);
+    const year = year2 >= 4 ? 2000 + year2 : 2100 + year2; // paranoid, but safe
 
-app.get('/', (_, res) => res.send('Drawlytics API is running'));
-app.get('/api/health', (_, res) => res.json({ ok: true }));
+    const day = parseInt(dd, 10);
+    return new Date(Date.UTC(year, month, day));
+  }
 
-// --- Load CSV (simple parser) ---
+  // 2) Format: 07/11/2025 or 07.11.2025 (dd/mm/yyyy or dd.mm.yyyy)
+  m = s.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})$/);
+  if (m) {
+    const [_, dd, mm, yyyy] = m;
+    const day = parseInt(dd, 10);
+    const month = parseInt(mm, 10) - 1;
+    const year = parseInt(yyyy, 10);
+    return new Date(Date.UTC(year, month, day));
+  }
+
+  // 3) ISO: 2025-11-07 → still support if you ever use it
+  const iso = Date.parse(s);
+  if (!Number.isNaN(iso)) {
+    return new Date(iso);
+  }
+
+  throw new Error('Unrecognized date format: ' + s);
+}
+
 function parseCSV(text) {
   const [header, ...rows] = text.trim().split(/\r?\n/);
   const keys = header.split(',');
-  return rows.map((line) => {
-    const vals = line.split(',');
-    const obj = {};
-    keys.forEach((k, i) => (obj[k] = vals[i]));
-    obj.date = new Date(obj.date);
-    ['n1', 'n2', 'n3', 'n4', 'n5', 's1', 's2'].forEach(
-      (k) => (obj[k] = Number(obj[k])),
-    );
-    return obj;
-  });
+  return rows
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      const vals = line.split(',');
+      const obj = {};
+      keys.forEach((k, i) => {
+        obj[k] = vals[i];
+      });
+
+      // use EU-aware parser for dates
+      obj.date = parseEuDate(obj.date);
+
+      // convert numbers
+      ['n1', 'n2', 'n3', 'n4', 'n5', 's1', 's2'].forEach((k) => {
+        obj[k] = Number(obj[k]);
+      });
+
+      return obj;
+    });
 }
-
-const dataPath = path.join(__dirname, 'data', 'euromillions.csv');
-let DRAWS = [];
-try {
-  const csv = fs.readFileSync(dataPath, 'utf8');
-  DRAWS = parseCSV(csv);
-} catch (e) {
-  console.error('No CSV found or parse error:', e.message);
-  DRAWS = [];
-}
-
-// --- Helpers: compute frequencies ---
-function frequencies(draws, maxMain = 50, maxStars = 12) {
-  const main = Array.from({ length: maxMain }, (_, i) => ({
-    number: i + 1,
-    count: 0,
-  }));
-  const stars = Array.from({ length: maxStars }, (_, i) => ({
-    number: i + 1,
-    count: 0,
-  }));
-  for (const d of draws) {
-    [d.n1, d.n2, d.n3, d.n4, d.n5].forEach((n) => main[n - 1].count++);
-    [d.s1, d.s2].forEach((s) => stars[s - 1].count++);
-  }
-  main.sort((a, b) => b.count - a.count || a.number - b.number);
-  stars.sort((a, b) => b.count - a.count || a.number - b.number);
-  return { main, stars, totalDraws: draws.length };
-}
-
-// --- API: frequency (optional since=YYYY-MM-DD) ---
-app.get('/api/frequency', (req, res) => {
-  const { since } = req.query;
-  const subset = since ? DRAWS.filter((d) => d.date >= new Date(since)) : DRAWS;
-  res.json(frequencies(subset));
-});
-
-// --- API: last draw ---
-app.get('/api/last-draw', (_, res) => {
-  if (!DRAWS.length) return res.status(404).json({ error: 'no data' });
-  const last = [...DRAWS].sort((a, b) => b.date - a.date)[0];
-  res.json(last);
-});
-
-app.listen(3000, () => console.log('API http://localhost:3000'));
