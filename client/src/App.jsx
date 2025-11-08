@@ -65,7 +65,7 @@ export default function App() {
             <p>Loading…</p>
           ) : (
             <>
-              <h3>Main Numbers (top 10)</h3>
+              <h3>Most frequent main number (top 10)</h3>
               <ul style={{ columns: 2, paddingLeft: 18 }}>
                 {freq.main.slice(0, 10).map((x) => (
                   <li key={x.number}>
@@ -74,7 +74,7 @@ export default function App() {
                 ))}
               </ul>
 
-              <h3 style={{ marginTop: 16 }}>Stars (top 5)</h3>
+              <h3 style={{ marginTop: 16 }}>Most frequent star (top 5)</h3>
               <ul style={{ columns: 2, paddingLeft: 18 }}>
                 {freq.stars.slice(0, 5).map((x) => (
                   <li key={x.number}>
