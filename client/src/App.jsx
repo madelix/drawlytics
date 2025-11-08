@@ -1,22 +1,97 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
+
 export default function App() {
   const [health, setHealth] = useState(null);
   const [freq, setFreq] = useState(null);
+
   useEffect(() => {
-    fetch("/api/health").then(r=>r.json()).then(setHealth);
-    fetch("/api/frequency").then(r=>r.json()).then(setFreq);
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then(setHealth);
+    fetch('/api/frequency')
+      .then((r) => r.json())
+      .then(setFreq);
   }, []);
+
   return (
-    <div style={{fontFamily:"system-ui", padding:20, maxWidth:740, margin:"0 auto"}}>
-      <h1>Drawlytics (MVP)</h1>
-      <p>API status: {health ? JSON.stringify(health) : "…checking"}</p>
-      <h2 style={{marginTop:16}}>Demo Frequency</h2>
-      {!freq ? <p>Loading…</p> : (
-        <ul>{freq.numbers.map((n,i)=><li key={n}>Number {n}: {freq.counts[i]}</li>)}</ul>
-      )}
-      <p style={{opacity:.7,fontSize:12,marginTop:24}}>
-        For educational & entertainment use only. No ticket sales or betting.
+    <main
+      style={{
+        fontFamily: 'Inter, system-ui, sans-serif',
+        padding: 28,
+        maxWidth: 860,
+        margin: '0 auto',
+      }}
+    >
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+        }}
+      >
+        <h1 style={{ margin: 0 }}>Drawlytics</h1>
+        <a
+          href="https://forms.gle/"
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            padding: '8px 12px',
+            border: '1px solid #ddd',
+            borderRadius: 10,
+            textDecoration: 'none',
+          }}
+        >
+          Join the Beta
+        </a>
+      </header>
+
+      <p style={{ opacity: 0.75, marginTop: 8 }}>
+        Analytics for every draw. See frequency, gaps and trends.
       </p>
-    </div>
+
+      <section style={{ marginTop: 24 }}>
+        <div
+          style={{ padding: 16, border: '1px solid #eee', borderRadius: 12 }}
+        >
+          <strong>API status:</strong>{' '}
+          {health ? JSON.stringify(health) : '…checking'}
+        </div>
+
+        <div style={{ marginTop: 20 }}>
+          <h2 style={{ margin: '12px 0' }}>Number Frequency</h2>
+
+          {!freq ? (
+            <p>Loading…</p>
+          ) : (
+            <>
+              <h3>Main Numbers (top 10)</h3>
+              <ul style={{ columns: 2, paddingLeft: 18 }}>
+                {freq.main.slice(0, 10).map((x) => (
+                  <li key={x.number}>
+                    #{x.number} → {x.count}
+                  </li>
+                ))}
+              </ul>
+
+              <h3 style={{ marginTop: 16 }}>Stars (top 5)</h3>
+              <ul style={{ columns: 2, paddingLeft: 18 }}>
+                {freq.stars.slice(0, 5).map((x) => (
+                  <li key={x.number}>
+                    ★{x.number} → {x.count}
+                  </li>
+                ))}
+              </ul>
+
+              <p style={{ opacity: 0.7 }}>Based on {freq.totalDraws} draws.</p>
+            </>
+          )}
+        </div>
+      </section>
+
+      <footer style={{ marginTop: 32, fontSize: 12, opacity: 0.7 }}>
+        For educational & entertainment use only. No ticket sales or betting.
+      </footer>
+    </main>
   );
 }
