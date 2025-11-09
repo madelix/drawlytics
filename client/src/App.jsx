@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './App.css';
 
 const API = import.meta.env.VITE_API_URL || '';
 
@@ -9,11 +10,13 @@ export default function App() {
   useEffect(() => {
     const base = API;
 
+    // Health
     fetch(`${base}/api/health`)
       .then((r) => r.json())
       .then((d) => setStatus(d.ok ? 'Online' : 'Issue'))
       .catch(() => setStatus('Offline'));
 
+    // Frequency
     fetch(`${base}/api/frequency`)
       .then((r) => r.json())
       .then(setFreq)
@@ -33,7 +36,7 @@ export default function App() {
       {/* HEADER */}
       <header className="dl-header">
         <div className="dl-logo">
-          {/* update path/name if your exported file differs */}
+          {/* If your file is named differently, adjust this path */}
           <img
             src="/Drawlytics.svg"
             alt="Drawlytics"

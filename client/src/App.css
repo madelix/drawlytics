@@ -21,10 +21,6 @@ body {
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
-    'SF Pro Text',
-    -system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
   background: var(--dl-bg);
@@ -41,15 +37,22 @@ body {
   align-items: center;
 }
 
-.dl-header {
+/* Centered column */
+
+.dl-header,
+.dl-main {
   width: 100%;
   max-width: 960px;
+  margin: 0 auto;
+}
+
+/* HEADER / LOGO */
+
+.dl-header {
   display: flex;
   justify-content: center;
   margin-bottom: 24px;
 }
-
-/* LOGO */
 
 .dl-logo {
   display: flex;
@@ -58,14 +61,13 @@ body {
 }
 
 .dl-logo-mark {
-  height: clamp(40px, 7vw, 56px); /* bigger, scales on mobile/desktop */
+  height: clamp(40px, 7vw, 56px);
   display: block;
 }
 
 .dl-logo-text {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
 }
 
 .dl-logo-title {
@@ -79,12 +81,9 @@ body {
   color: var(--dl-muted);
 }
 
-/* MAIN COLUMN */
+/* MAIN */
 
 .dl-main {
-  width: 100%;
-  max-width: 960px;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -111,7 +110,7 @@ body {
   color: var(--dl-muted);
 }
 
-/* CTA BUTTON */
+/* CTA */
 
 .dl-cta {
   display: inline-flex;
@@ -126,7 +125,7 @@ body {
   font-size: 16px;
   text-decoration: none;
   border: none;
-  box-shadow: none; /* no drop shadow */
+  box-shadow: none;
   transition:
     transform 0.15s ease,
     opacity 0.15s ease;
@@ -152,7 +151,7 @@ body {
   margin-top: 4px;
 }
 
-/* PREVIEW CARD */
+/* PREVIEW */
 
 .dl-preview {
   width: 100%;
@@ -161,7 +160,7 @@ body {
   border-radius: var(--dl-radius-xl);
   background: #ffffff;
   border: 1px solid var(--dl-border);
-  box-shadow: none; /* no shadow */
+  box-shadow: none;
 }
 
 .dl-preview-header {
@@ -189,7 +188,7 @@ body {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: #9ca3af; /* default */
+  background: #9ca3af;
 }
 
 .dl-status-ok::before {
@@ -240,11 +239,10 @@ body {
   text-align: center;
 }
 
-/* SMALL SCREEN TWEAKS */
+/* MOBILE TWEAKS */
 
 @media (max-width: 600px) {
   .dl-bullets {
-    align-self: flex-start;
     margin-left: 4px;
   }
 
