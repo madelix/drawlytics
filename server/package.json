@@ -1,3 +1,14 @@
-{ "name":"drawlytics-server","type":"module","version":"0.1.0",
-  "scripts":{"start":"node index.js","dev":"node index.js"},
-  "dependencies":{"cors":"^2.8.5","express":"^4.19.2"} }
+{
+  "name": "drawlytics-server",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node index.js",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "csv-parse": "^5.5.6",
+    "express": "^4.21.2"
+  }
+}
