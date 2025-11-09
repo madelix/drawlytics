@@ -4,143 +4,153 @@ import './App.css';
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export default function App() {
-  const [health, setHealth] = useState(null);
   const [freq, setFreq] = useState(null);
+  const [health, setHealth] = useState(null);
 
   useEffect(() => {
-    // Health
-    fetch(`${API_BASE}/api/health`)
+    const base = API_BASE; // "" in dev (Vite proxy), full URL in prod
+
+    fetch(`${base}/api/health`)
       .then((r) => r.json())
       .then(setHealth)
-      .catch(() => setHealth({ ok: false }));
+      .catch((err) => {
+        console.error('Health check failed', err);
+        setHealth(null);
+      });
 
-    // Frequency (EuroMillions sample)
-    fetch(`${API_BASE}/api/frequency`)
+    fetch(`${base}/api/frequency`)
       .then((r) => r.json())
       .then(setFreq)
-      .catch(() => setFreq(null));
+      .catch((err) => {
+        console.error('Frequency fetch failed', err);
+        setFreq(null);
+      });
   }, []);
 
+  // simple helper: top N main numbers
   const topMain = freq?.main
     ? [...freq.main].sort((a, b) => b.count - a.count).slice(0, 5)
-    : null;
+    : [];
 
   const topStars = freq?.stars
-    ? [...freq.stars].sort((a, b) => b.count - a.count).slice(0, 5)
-    : null;
+    ? [...freq.stars].sort((a, b) => b.count - a.count).slice(0, 3)
+    : [];
 
   return (
-    <div className="page">
-      {/* Top bar */}
-      <header className="hero">
-        <div className="brand">
-          <div className="brand-icon">
-            <span className="brand-node" />
-            <span className="brand-node" />
-            <span className="brand-node" />
-          </div>
-          <div className="brand-text">
-            <div className="brand-name">Drawlytics</div>
-            <div className="brand-tagline">
+    <div className="dl-page">
+      {/* HEADER */}
+      <header className="dl-header">
+        <div className="dl-logo-wrap">
+          <img
+            src="/Drawlytics.svg"
+            alt="Drawlytics logo"
+            className="dl-logo-img"
+          />
+          <div classNName="dl-logo-text">
+            <div className="dl-logo-name">Drawlytics</div>
+            <div className="dl-logo-tagline">
               Data-driven insight for every draw
             </div>
           </div>
         </div>
 
         <a
-          className="beta-pill beta-pill--desktop"
           href="https://forms.gle/YOUR_REAL_FORM_ID"
           target="_blank"
           rel="noreferrer"
+          className="dl-cta"
         >
-          Join the Beta
+          Join the beta
         </a>
       </header>
 
-      {/* Main content */}
-      <main className="content">
-        <section className="hero-copy">
-          <h1>Where lottery data meets meaningful insight</h1>
-          <p>
+      {/* MAIN CONTENT */}
+      <main className="dl-main">
+        <section className="dl-hero">
+          <h1 className="dl-hero-title">
+            Where lottery data
+            <br />
+            meets meaningful insight
+          </h1>
+
+          <p className="dl-hero-body">
             Drawlytics transforms official EuroMillions, UK Lotto and Set For
-            Life results into measurable insights – analysing draw history,
-            numerical behaviour, and model performance. Designed for those who
+            Life results into measurable insight&nbsp;— analysing draw history,
+            numerical behaviour and model performance. Designed for players who
             value understanding over luck.
           </p>
 
           <a
-            className="beta-pill beta-pill--primary"
             href="https://forms.gle/YOUR_REAL_FORM_ID"
             target="_blank"
             rel="noreferrer"
+            className="dl-cta dl-cta-large"
           >
-            Join the Beta
+            Join the beta
           </a>
 
-          <ul className="feature-list">
-            <li>Multi-lottery support.</li>
-            <li>Number frequency &amp; gap analysis.</li>
+          <ul className="dl-bullets">
+            <li>
+              Multi-lottery support: EuroMillions, UK Lotto, Set For Life.
+            </li>
+            <li>Number frequency and gap analysis.</li>
             <li>Model playground &amp; performance tracking.</li>
             <li>“My predictions” (coming in beta).</li>
           </ul>
         </section>
 
-        <aside className="preview-card">
-          <div className="preview-header">
-            <span>Preview from the live API</span>
-            <span
-              className={`status-dot ${
-                health?.ok ? 'status-dot--online' : 'status-dot--offline'
-              }`}
-            />
-            <span className="status-label">
-              {health?.ok ? 'Online' : 'Checking'}
+        {/* LIVE PREVIEW */}
+        <section className="dl-preview">
+          <div className="dl-preview-header">
+            <span className="dl-preview-label">Preview from the live API</span>
+            <span className="dl-status-dot" />{' '}
+            <span className="dl-status-text">
+              {health?.ok ? 'Online' : 'Checking…'}
             </span>
           </div>
 
-          <div className="preview-body">
-            <div className="preview-title">
+          <div className="dl-preview-content">
+            <div className="dl-preview-title">
               EuroMillions: top numbers (sample)
             </div>
 
-            {!topMain ? (
-              <div className="preview-loading">Loading…</div>
-            ) : (
-              <div className="preview-grid">
+            {!freq && <div className="dl-preview-loading">Loading…</div>}
+
+            {freq && (
+              <div className="dl-preview-grid">
                 <div>
+                  <div className="dl-preview-sub">Main numbers</div>
                   {topMain.map((n) => (
-                    <div key={`m-${n.number}`} className="preview-row">
-                      <span className="num-label">#{n.number}</span>
-                      <span className="num-arrow">➜</span>
-                      <span className="num-count">{n.count}</span>
+                    <div key={n.number} className="dl-preview-row">
+                      <span className="dl-num">#{n.number}</span>
+                      <span className="dl-arrow">→</span>
+                      <span>{n.count}</span>
                     </div>
                   ))}
                 </div>
-                {topStars && (
-                  <div>
-                    {topStars.map((n) => (
-                      <div key={`s-${n.number}`} className="preview-row">
-                        <span className="num-label num-label--star">
-                          ★{n.number}
-                        </span>
-                        <span className="num-arrow">➜</span>
-                        <span className="num-count">{n.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div>
+                  <div className="dl-preview-sub">Stars</div>
+                  {topStars.map((n) => (
+                    <div key={n.number} className="dl-preview-row">
+                      <span className="dl-num">★{n.number}</span>
+                      <span className="dl-arrow">→</span>
+                      <span>{n.count}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
-            <p className="preview-note">
+            <p className="dl-preview-note">
               Beta users will get full history per lottery, more models, and
               saved predictions — this is just a small live preview.
             </p>
           </div>
-        </aside>
+        </section>
       </main>
 
-      <footer className="legal">
+      {/* FOOTER DISCLAIMER */}
+      <footer className="dl-footer">
         Drawlytics does not sell tickets or guarantee winnings. Analytics only —
         for informed, responsible play.
       </footer>
