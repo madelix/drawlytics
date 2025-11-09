@@ -61,7 +61,7 @@ export default function App() {
       >
         <h1 style={{ margin: 0 }}>Drawlytics</h1>
         <a
-          href="https://forms.gle/"
+          href="https://tally.so/r/OD1k5g"
           target="_blank"
           rel="noreferrer"
           style={{
