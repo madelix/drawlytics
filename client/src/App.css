@@ -1,4 +1,10 @@
-/* Base */
+/* Base reset-ish */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   font-family:
@@ -11,101 +17,104 @@ body {
   color: #111827;
 }
 
+/* Page wrapper */
+
 .dl-page {
   min-height: 100vh;
+  padding: 40px 16px 32px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40px 16px;
 }
 
 /* HEADER / LOGO */
+
 .dl-header {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .dl-logo-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .dl-logo-mark {
-  width: 64px;
+  width: 220px;
   height: auto;
-}
-
-.dl-logo-wordmark {
-  font-weight: 700;
-  font-size: 22px;
-  color: #111827;
-  margin-top: 6px;
+  display: block;
 }
 
 .dl-logo-tagline {
   font-size: 14px;
   color: #6b7280;
-  margin-top: 2px;
 }
 
-/* HERO SECTION */
+/* HERO */
+
 .dl-main {
+  max-width: 720px;
   text-align: center;
-  max-width: 700px;
 }
 
 .dl-hero-title {
-  font-size: 32px;
+  margin: 0 0 14px;
+  font-size: 30px;
   line-height: 1.2;
   font-weight: 700;
   color: #111827;
-  margin-bottom: 16px;
 }
 
 .dl-hero-body {
+  margin: 0 0 22px;
   font-size: 16px;
-  color: #4b5563;
   line-height: 1.6;
-  margin-bottom: 24px;
+  color: #4b5563;
 }
 
 /* CTA BUTTON */
+
 .dl-cta {
   display: inline-block;
-  padding: 12px 32px;
+  padding: 11px 30px;
   border-radius: 999px;
   background: linear-gradient(90deg, #21409a, #804198);
   color: #ffffff;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 15px;
   text-decoration: none;
+  border: none;
   transition: opacity 0.15s ease;
 }
 
 .dl-cta:hover {
-  opacity: 0.85;
+  opacity: 0.86;
 }
 
-/* BULLET LIST */
+/* BULLETS */
+
 .dl-bullets {
+  list-style: disc;
+  padding-left: 22px;
+  margin: 24px auto 0;
   text-align: left;
   display: inline-block;
-  margin: 32px auto;
-  padding-left: 20px;
-  font-size: 15px;
+  font-size: 14px;
   color: #374151;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
-/* LIVE PREVIEW */
+/* PREVIEW BOX */
+
 .dl-preview {
+  margin-top: 28px;
+  padding: 20px 18px;
+  max-width: 720px;
+  width: 100%;
   background: #fafafa;
-  border-radius: 20px;
-  padding: 24px 20px;
-  margin-top: 12px;
-  max-width: 700px;
+  border-radius: 18px;
   text-align: left;
 }
 
@@ -113,9 +122,9 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: 13px;
   color: #374151;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .dl-preview-label {
@@ -125,72 +134,83 @@ body {
 .dl-status-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.dl-status-dot.ok {
   background: #10b981;
 }
 
+.dl-status-dot.bad {
+  background: #ef4444;
+}
+
 .dl-status-text {
-  font-size: 13px;
+  font-size: 12px;
   color: #10b981;
 }
 
-.dl-preview-body {
-  margin-top: 6px;
-}
-
 .dl-preview-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
+  margin: 6px 0 8px;
   color: #111827;
-  margin-bottom: 10px;
 }
 
 .dl-preview-grid {
   display: flex;
-  justify-content: flex-start;
-  gap: 40px;
+  gap: 36px;
   flex-wrap: wrap;
 }
 
 .dl-preview-subtitle {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #6b7280;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .dl-preview-row {
   display: flex;
   justify-content: space-between;
-  width: 100px;
-  font-size: 14px;
+  width: 110px;
+  font-size: 13px;
   color: #111827;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
+}
+
+.dl-preview-loading {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 4px 0 0;
 }
 
 .dl-preview-footnote {
   margin-top: 10px;
-  font-size: 11px;
+  font-size: 10px;
   color: #9ca3af;
 }
 
 /* FOOTER */
+
 .dl-footnote {
-  font-size: 11px;
+  margin-top: 30px;
+  font-size: 10px;
   color: #9ca3af;
   text-align: center;
-  margin-top: 36px;
-  max-width: 700px;
+  max-width: 720px;
 }
 
-/* Responsive tweaks */
+/* Desktop tweaks */
+
 @media (min-width: 900px) {
-  .dl-logo-mark {
-    width: 72px;
+  .dl-page {
+    padding-top: 56px;
   }
 
   .dl-hero-title {
-    font-size: 40px;
+    font-size: 38px;
   }
 
   .dl-hero-body {
@@ -198,6 +218,6 @@ body {
   }
 
   .dl-preview {
-    padding: 28px 24px;
+    padding: 22px 22px;
   }
 }
