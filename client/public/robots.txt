@@ -1,6 +1,4 @@
-# robots.txt for Drawlytics
 User-agent: *
 Allow: /
 
-# Optional: specify your sitemap location
 Sitemap: https://drawlytics.app/sitemap.xml
