@@ -1,10 +1,12 @@
 :root {
-  --dl-bg: #f8fafc;
-  --dl-text: #111827;
-  --dl-muted: #6b7280;
-  --dl-border: #e5e7eb;
-  --dl-radius-xl: 18px;
-  --dl-gradient: linear-gradient(90deg, #21409a, #804198);
+  --dl-purple: #804198;
+  --dl-blue: #21409a;
+  --dl-text-main: #111827;
+  --dl-text-subtle: #6b7280;
+  --dl-bg: #f5f6fb;
+  --dl-radius: 18px;
+  --dl-font:
+    system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
 }
 
 *,
@@ -14,220 +16,162 @@
 }
 
 html,
-body {
+body,
+#root {
   margin: 0;
   padding: 0;
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-  background: var(--dl-bg);
-  color: var(--dl-text);
+  height: 100%;
 }
 
-/* PAGE LAYOUT */
+body {
+  font-family: var(--dl-font);
+  background: var(--dl-bg);
+  color: var(--dl-text-main);
+}
+
+/* PAGE WRAP */
 
 .dl-page {
   min-height: 100vh;
+  max-width: 960px;
+  margin: 0 auto;
   padding: 32px 16px 40px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-/* Centered column */
+/* LOGO */
 
-.dl-header,
-.dl-main {
-  width: 100%;
-  max-width: 960px;
-  margin: 0 auto;
-}
-
-/* HEADER / LOGO */
-
-.dl-header {
+.dl-logo-wrap {
   display: flex;
-  justify-content: center;
-  margin-bottom: 24px;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 32px;
 }
 
 .dl-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.dl-logo-mark {
-  height: clamp(40px, 7vw, 56px);
+  height: 56px;
+  width: auto;
   display: block;
 }
 
-.dl-logo-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.dl-logo-title {
-  font-weight: 700;
-  font-size: clamp(26px, 4vw, 34px);
-  letter-spacing: 0.01em;
-}
-
-.dl-logo-tagline {
-  font-size: 13px;
-  color: var(--dl-muted);
-}
-
-/* MAIN */
-
-.dl-main {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.dl-tagline {
+  font-size: 14px;
+  color: var(--dl-text-subtle);
 }
 
 /* HERO */
 
-.dl-hero {
-  text-align: center;
-}
-
-.dl-title {
-  margin: 12px 0 16px;
-  font-size: clamp(26px, 4vw, 34px);
+.dl-hero-title {
+  font-size: clamp(26px, 4vw, 36px);
   font-weight: 700;
-  line-height: 1.25;
+  text-align: center;
+  margin: 0 0 16px;
 }
 
-.dl-subtitle {
-  margin: 0 auto;
-  max-width: 720px;
-  font-size: 15px;
+.dl-hero-copy {
+  font-size: 16px;
   line-height: 1.6;
-  color: var(--dl-muted);
+  text-align: center;
+  max-width: 720px;
+  margin: 0 0 24px;
+  color: var(--dl-text-subtle);
 }
 
 /* CTA */
 
-.dl-cta {
-  display: inline-flex;
-  align-items: center;
+.dl-cta-wrap {
+  display: flex;
   justify-content: center;
-  margin: 28px auto 24px;
-  padding: 12px 36px;
+  margin-bottom: 20px;
+}
+
+.dl-cta-btn {
+  padding: 14px 42px;
   border-radius: 999px;
-  background-image: var(--dl-gradient);
-  color: #ffffff;
+  border: none;
+  background: linear-gradient(90deg, var(--dl-blue), var(--dl-purple));
+  color: #fff;
   font-weight: 600;
   font-size: 16px;
   text-decoration: none;
-  border: none;
-  box-shadow: none;
-  transition:
-    transform 0.15s ease,
-    opacity 0.15s ease;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.dl-cta:hover {
-  transform: translateY(-1px);
-  opacity: 0.95;
-}
+/* FEATURES */
 
-/* BULLETS */
-
-.dl-bullets {
+.dl-feature-list {
   list-style: disc;
   padding-left: 22px;
-  margin: 0 0 24px;
-  font-size: 14px;
-  align-self: flex-start;
-  color: var(--dl-text);
+  margin: 0 auto 28px;
+  text-align: left;
+  color: var(--dl-text-main);
+  display: inline-block; /* shrink to fit content */
 }
 
-.dl-bullets li + li {
-  margin-top: 4px;
+.dl-feature-list li {
+  margin-bottom: 4px;
+  font-size: 15px;
 }
 
-/* PREVIEW */
+/* PREVIEW CARD */
 
-.dl-preview {
-  width: 100%;
-  margin-top: 12px;
-  padding: 18px 20px 16px;
-  border-radius: var(--dl-radius-xl);
+.dl-preview-card {
+  display: inline-block;
+  text-align: left;
+  margin-top: 8px;
+  padding: 18px 24px 16px;
+  border-radius: var(--dl-radius);
   background: #ffffff;
-  border: 1px solid var(--dl-border);
-  box-shadow: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  align-self: center;
+  min-width: 360px; /* keeps structure balanced */
 }
 
 .dl-preview-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--dl-muted);
-  margin-bottom: 6px;
-}
-
-.dl-preview-label {
-  font-weight: 500;
-}
-
-.dl-status {
-  display: inline-flex;
-  align-items: center;
   gap: 6px;
+  font-size: 13px;
+  color: var(--dl-text-subtle);
+  margin-bottom: 8px;
 }
 
-.dl-status::before {
-  content: '';
+.dl-status-dot {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: #9ca3af;
-}
-
-.dl-status-ok::before {
   background: #22c55e;
 }
 
 .dl-preview-title {
-  margin: 2px 0 10px;
+  font-weight: 600;
   font-size: 14px;
-  font-weight: 600;
-  color: var(--dl-text);
+  margin-bottom: 6px;
 }
 
-.dl-preview-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+.dl-preview-table {
+  width: auto;
+  margin: 0 auto 6px;
+  border-collapse: collapse;
   font-size: 13px;
 }
 
-.dl-preview-col-label {
-  font-weight: 600;
-  margin-bottom: 4px;
+.dl-preview-table th,
+.dl-preview-table td {
+  padding: 4px 10px; /* wider column spacing */
+  text-align: left;
 }
 
-.dl-preview-row + .dl-preview-row {
-  margin-top: 2px;
-}
-
-.dl-preview-loading {
-  font-size: 13px;
-  color: var(--dl-muted);
-  margin: 6px 0 0;
-}
-
-.dl-preview-footnote {
-  margin: 10px 0 0;
-  font-size: 10px;
-  color: var(--dl-muted);
+.dl-preview-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--dl-text-subtle);
 }
 
 /* FOOTNOTE */
@@ -235,18 +179,27 @@ body {
 .dl-footnote {
   margin-top: 18px;
   font-size: 10px;
-  color: var(--dl-muted);
+  color: var(--dl-text-subtle);
   text-align: center;
+  max-width: 960px;
 }
 
-/* MOBILE TWEAKS */
+/* RESPONSIVE TWEAKS */
 
-@media (max-width: 600px) {
-  .dl-bullets {
-    margin-left: 4px;
+@media (min-width: 768px) {
+  .dl-page {
+    padding-top: 40px;
   }
 
-  .dl-preview {
-    margin-top: 18px;
+  .dl-logo {
+    height: 64px;
+  }
+
+  .dl-hero-copy {
+    font-size: 17px;
+  }
+
+  .dl-feature-list {
+    font-size: 15px;
   }
 }

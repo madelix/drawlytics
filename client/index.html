@@ -2,10 +2,51 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>client</title>
+
+    <title>Drawlytics – Lottery data, not superstition</title>
+
+    <meta
+      name="description"
+      content="Drawlytics transforms EuroMillions, UK Lotto and Set For Life results into measurable insight — analysing draw history, numerical behaviour and model performance. Designed for players who value understanding over luck."
+    />
+
+    <!-- Open Graph tags for rich previews -->
+    <meta
+      property="og:title"
+      content="Drawlytics – Lottery data, not superstition"
+    />
+    <meta
+      property="og:description"
+      content="Analytics for EuroMillions, UK Lotto and Set For Life, backed by real draw history."
+    />
+    <meta property="og:url" content="https://drawlytics.app" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og-image.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/Drawlytics.svg" />
+
+    <!-- Optional theme colors -->
+    <meta name="theme-color" content="#21409a" />
+    <meta name="color-scheme" content="light only" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Drawlytics",
+        "url": "https://drawlytics.app",
+        "description": "Drawlytics turns official lottery results into measurable insight — analysing EuroMillions, UK Lotto and Set For Life data.",
+        "publisher": {
+          "@type": "Organization",
+          "name": "Drawlytics"
+        }
+      }
+    </script>
   </head>
+
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

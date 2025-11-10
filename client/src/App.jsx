@@ -1,141 +1,105 @@
-import { useEffect, useState } from 'react';
 import './App.css';
-
-const API = import.meta.env.VITE_API_URL || '';
+import logo from '/Drawlytics.png'; // or "./assets/Drawlytics.png" if that's where it lives
 
 export default function App() {
-  const [freq, setFreq] = useState(null);
-  const [status, setStatus] = useState('…checking');
+  const topMains = [
+    { n: 23, c: 215 },
+    { n: 42, c: 213 },
+    { n: 44, c: 212 },
+    { n: 19, c: 211 },
+    { n: 21, c: 209 },
+  ];
 
-  useEffect(() => {
-    const base = API;
-
-    // Health
-    fetch(`${base}/api/health`)
-      .then((r) => r.json())
-      .then((d) => setStatus(d.ok ? 'Online' : 'Issue'))
-      .catch(() => setStatus('Offline'));
-
-    // Frequency
-    fetch(`${base}/api/frequency`)
-      .then((r) => r.json())
-      .then(setFreq)
-      .catch(() => setFreq(null));
-  }, []);
-
-  const topMain = freq?.main
-    ? [...freq.main].sort((a, b) => b.count - a.count).slice(0, 5)
-    : null;
-
-  const topStars = freq?.stars
-    ? [...freq.stars].sort((a, b) => b.count - a.count).slice(0, 3)
-    : null;
+  const topStars = [
+    { n: 3, c: 376 },
+    { n: 2, c: 374 },
+    { n: 8, c: 362 },
+  ];
 
   return (
     <div className="dl-page">
-      {/* HEADER */}
-      <header className="dl-header">
-        <div className="dl-logo">
-          {/* If your file is named differently, adjust this path */}
-          <img
-            src="/Drawlytics.svg"
-            alt="Drawlytics"
-            className="dl-logo-mark"
-          />
-          <div className="dl-logo-text">
-            <div className="dl-logo-title">Drawlytics</div>
-            <div className="dl-logo-tagline">
-              Data-driven clarity for every draw
-            </div>
-          </div>
-        </div>
+      {/* LOGO */}
+      <header className="dl-logo-wrap">
+        <img src={logo} alt="Drawlytics" className="dl-logo" />
+        <div className="dl-tagline">Data-driven clarity for every draw</div>
       </header>
 
-      <main className="dl-main">
-        {/* HERO */}
-        <section className="dl-hero">
-          <h1 className="dl-title">
-            Where lottery data meets meaningful insight
-          </h1>
-          <p className="dl-subtitle">
-            Drawlytics transforms official EuroMillions, UK Lotto and Set For
-            Life results into measurable insight — analysing draw history,
-            numerical behaviour and model performance. Designed for players who
-            value understanding over luck.
-          </p>
+      {/* HERO */}
+      <h1 className="dl-hero-title">
+        Where lottery data meets meaningful insight
+      </h1>
 
-          <a
-            href="https://tally.so/r/OD1k5g"
-            target="_blank"
-            rel="noreferrer"
-            className="dl-cta"
-          >
-            Join the Beta
-          </a>
-        </section>
+      <p className="dl-hero-copy">
+        Drawlytics transforms official EuroMillions, UK Lotto and Set For Life
+        results into measurable insight — analysing draw history, numerical
+        behaviour and model performance. Designed for players who value
+        understanding over luck.
+      </p>
 
-        {/* BULLETS */}
-        <ul className="dl-bullets">
-          <li>Multi-lottery support: EuroMillions, UK Lotto, Set For Life.</li>
-          <li>Number frequency &amp; gap analysis.</li>
-          <li>Model playground &amp; performance tracking.</li>
-          <li>“My predictions” (coming in beta).</li>
-        </ul>
+      {/* CTA */}
+      <div className="dl-cta-wrap">
+        <a
+          href="https://tally.so/r/OD1k5g"
+          target="_blank"
+          rel="noreferrer"
+          className="dl-cta-btn"
+        >
+          Join the Beta
+        </a>
+      </div>
 
-        {/* LIVE PREVIEW */}
-        <section className="dl-preview">
-          <div className="dl-preview-header">
-            <span className="dl-preview-label">Preview from the live API</span>
-            <span
-              className={
-                'dl-status' + (status === 'Online' ? ' dl-status-ok' : '')
-              }
-            >
-              {status}
-            </span>
-          </div>
+      {/* FEATURES */}
+      <ul className="dl-feature-list">
+        <li>Multi-lottery support: EuroMillions, UK Lotto, Set For Life.</li>
+        <li>Number frequency &amp; gap analysis.</li>
+        <li>Model playground &amp; performance tracking.</li>
+        <li>&ldquo;My predictions&rdquo; (coming in beta).</li>
+      </ul>
 
-          <h2 className="dl-preview-title">
-            EuroMillions: top numbers (sample)
-          </h2>
+      {/* LIVE PREVIEW */}
+      <section className="dl-preview-card">
+        <div className="dl-preview-header">
+          <span>Preview from the live API</span>
+          <span className="dl-status-dot" />
+          <span>Online</span>
+        </div>
 
-          {topMain ? (
-            <div className="dl-preview-grid">
-              <div>
-                <div className="dl-preview-col-label">Main numbers</div>
-                {topMain.map((n) => (
-                  <div key={n.number} className="dl-preview-row">
-                    #{n.number} → {n.count}
-                  </div>
-                ))}
-              </div>
-              {topStars && (
-                <div>
-                  <div className="dl-preview-col-label">Stars</div>
-                  {topStars.map((s) => (
-                    <div key={s.number} className="dl-preview-row">
-                      ★ {s.number} → {s.count}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="dl-preview-loading">Loading sample data…</p>
-          )}
+        <div className="dl-preview-title">
+          EuroMillions: top numbers (sample)
+        </div>
 
-          <p className="dl-preview-footnote">
-            Beta users will get full history per lottery, more models, and saved
-            predictions — this is just a small live preview.
-          </p>
-        </section>
+        <table className="dl-preview-table">
+          <thead>
+            <tr>
+              <th>Main numbers</th>
+              <th>Stars</th>
+            </tr>
+          </thead>
+          <tbody>
+            {topMains.map((m, i) => (
+              <tr key={m.n}>
+                <td>
+                  #{m.n} → {m.c}
+                </td>
+                <td>
+                  {topStars[i] ? `★ ${topStars[i].n} → ${topStars[i].c}` : ''}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-        {/* FOOTNOTE */}
-        <footer className="dl-footnote">
-          Drawlytics does not sell tickets or guarantee winnings. Analytics only
-          — for informed, responsible play.
-        </footer>
-      </main>
+        <p className="dl-preview-note">
+          Beta users will get full history per lottery, more models, and saved
+          predictions — this is just a small live preview.
+        </p>
+      </section>
+
+      {/* FOOTNOTE */}
+      <footer className="dl-footnote">
+        Drawlytics does not sell tickets or guarantee winnings. Analytics only —
+        for informed, responsible play.
+      </footer>
     </div>
   );
 }
