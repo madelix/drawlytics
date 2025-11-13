@@ -4,6 +4,12 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from 'csv-parse/sync';
+import dotenv from 'dotenv';
+import pkg from 'pg';
+
+dotenv.config(); // load .env when running locally / on Railway
+
+const { Pool } = pkg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,11 +18,36 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+app.use(express.json());
+
+/**
+ * OPTIONAL: Postgres connection
+ * We only create the pool if DATABASE_URL is set.
+ * That way your API still runs even before the DB is wired.
+ */
+let pool = null;
+
+if (process.env.DATABASE_URL) {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl:
+      process.env.NODE_ENV === 'production'
+        ? { rejectUnauthorized: false }
+        : false,
+  });
+
+  pool.on('error', (err) => {
+    console.error('Unexpected PG client error', err);
+  });
+} else {
+  console.warn(
+    'DATABASE_URL not set. Running without Postgres connection for now.',
+  );
+}
 
 /**
  * Load EuroMillions CSV:
  * Expected headers: date,n1,n2,n3,n4,n5,s1,s2
- * Date can be in your EU style; we just treat it as a string here.
  */
 function loadEuromillions() {
   const filePath = path.join(__dirname, 'data', 'euromillions.csv');
@@ -73,12 +104,41 @@ function computeFrequency() {
   };
 }
 
-// Health check
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'drawlytics-api' });
+/**
+ * Health check
+ * - Always confirms API is running.
+ * - If DATABASE_URL is set, also tries a lightweight DB query.
+ */
+app.get('/api/health', async (_req, res) => {
+  if (!pool) {
+    return res.json({
+      ok: true,
+      service: 'drawlytics-api',
+      db: 'not_configured',
+    });
+  }
+
+  try {
+    const result = await pool.query('SELECT NOW()');
+    res.json({
+      ok: true,
+      service: 'drawlytics-api',
+      db: 'connected',
+      time: result.rows[0].now,
+    });
+  } catch (err) {
+    console.error('DB health check failed:', err);
+    res.status(500).json({
+      ok: false,
+      service: 'drawlytics-api',
+      db: 'connection_failed',
+    });
+  }
 });
 
-// Frequency endpoint (EuroMillions demo)
+/**
+ * Frequency endpoint (EuroMillions demo from CSV)
+ */
 app.get('/api/frequency', (_req, res) => {
   try {
     const freq = computeFrequency();
@@ -89,12 +149,16 @@ app.get('/api/frequency', (_req, res) => {
   }
 });
 
-// Simple root
+/**
+ * Root
+ */
 app.get('/', (_req, res) => {
   res.send('Drawlytics API is running');
 });
 
-// IMPORTANT: keep process alive
+/**
+ * Start server
+ */
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`API running on http://0.0.0.0:${PORT}`);
 });
