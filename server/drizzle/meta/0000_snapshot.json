@@ -1,0 +1,93 @@
+{
+  "id": "ef4656cc-ba68-4035-8ead-bc3928a8261c",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.euromillions_draws": {
+      "name": "euromillions_draws",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "draw_date": {
+          "name": "draw_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n1": {
+          "name": "n1",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n2": {
+          "name": "n2",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n3": {
+          "name": "n3",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n4": {
+          "name": "n4",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n5": {
+          "name": "n5",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "s1": {
+          "name": "s1",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "s2": {
+          "name": "s2",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
