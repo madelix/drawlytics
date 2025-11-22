@@ -203,3 +203,34 @@ body {
     font-size: 15px;
   }
 }
+
+.dl-api-status {
+  margin: 1.5rem auto 0;
+  max-width: 720px;
+  font-size: 0.85rem;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: flex-start;
+}
+
+.dl-api-status-time {
+  color: #9ca3af;
+}
+
+/* reuse / extend the existing status dot */
+.dl-status-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #22c55e;
+}
+
+.dl-status-ok {
+  background: #22c55e;
+}
+
+.dl-status-error {
+  background: #ef4444;
+}

@@ -1,20 +1,30 @@
 import './App.css';
-import logo from '/Drawlytics.png'; // or "./assets/Drawlytics.png" if that's where it lives
+import logo from '/Drawlytics.png';
+import FrequencyDebug from './components/FrequencyDebug';
+import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
 
 export default function App() {
-  const topMains = [
-    { n: 23, c: 215 },
-    { n: 42, c: 213 },
-    { n: 44, c: 212 },
-    { n: 19, c: 211 },
-    { n: 21, c: 209 },
+  // Live data from your Railway API
+  const { data, loading, error } = useEuromillionsFrequency();
+
+  // Fallback sample data (same shape as API: { number, count })
+  const fallbackMains = [
+    { number: 23, count: 215 },
+    { number: 42, count: 213 },
+    { number: 44, count: 212 },
+    { number: 19, count: 211 },
+    { number: 21, count: 209 },
   ];
 
-  const topStars = [
-    { n: 3, c: 376 },
-    { n: 2, c: 374 },
-    { n: 8, c: 362 },
+  const fallbackStars = [
+    { number: 3, count: 376 },
+    { number: 2, count: 374 },
+    { number: 8, count: 362 },
   ];
+
+  // Use live data if available, otherwise fall back
+  const mains = data?.main?.slice(0, 5) ?? fallbackMains;
+  const stars = data?.stars?.slice(0, 3) ?? fallbackStars;
 
   return (
     <div className="dl-page">
@@ -65,7 +75,7 @@ export default function App() {
         </div>
 
         <div className="dl-preview-title">
-          EuroMillions: top numbers (sample)
+          EuroMillions: top numbers (live sample)
         </div>
 
         <table className="dl-preview-table">
@@ -76,24 +86,37 @@ export default function App() {
             </tr>
           </thead>
           <tbody>
-            {topMains.map((m, i) => (
-              <tr key={m.n}>
+            {mains.map((m, i) => (
+              <tr key={m.number}>
                 <td>
-                  #{m.n} → {m.c}
+                  #{m.number} → {m.count}
                 </td>
                 <td>
-                  {topStars[i] ? `★ ${topStars[i].n} → ${topStars[i].c}` : ''}
+                  {stars[i] ? `★ ${stars[i].number} → ${stars[i].count}` : ''}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        <p className="dl-preview-note">
-          Beta users will get full history per lottery, more models, and saved
-          predictions — this is just a small live preview.
-        </p>
+        {/* Status messages for the preview */}
+        {loading && <p className="dl-preview-note">Loading live data…</p>}
+        {error && (
+          <p className="dl-preview-note" style={{ color: 'red' }}>
+            Live data unavailable, showing sample numbers.
+          </p>
+        )}
+
+        {!loading && !error && (
+          <p className="dl-preview-note">
+            Beta users will get full history per lottery, more models, and saved
+            predictions — this is just a small live preview.
+          </p>
+        )}
       </section>
+
+      {/* Small API status line */}
+      <FrequencyDebug />
 
       {/* FOOTNOTE */}
       <footer className="dl-footnote">
