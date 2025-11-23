@@ -1,6 +1,7 @@
 // client/src/api/draws.ts
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+// Fix: use `(import.meta as any).env` so TS stops complaining about ImportMeta.env
+const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || '';
 
 export type LatestDrawResponse = {
   ok: boolean;
@@ -62,11 +63,12 @@ export async function getDraws(
 ): Promise<DrawsListResponse> {
   const { limit = 20, offset = 0 } = params;
 
-  const url = new URL(`${API_BASE}/api/draws/all`, window.location.origin);
+  // Build full API URL using the API base, NOT window.location.origin
+  const url = new URL(`${API_BASE}/api/draws/all`);
   url.searchParams.set('limit', String(limit));
   url.searchParams.set('offset', String(offset));
 
-  const res = await fetch(url.toString().replace(window.location.origin, ''));
+  const res = await fetch(url.toString());
 
   if (!res.ok) {
     throw new Error(`Failed to fetch draws: ${res.status} ${res.statusText}`);

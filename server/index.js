@@ -16,8 +16,6 @@ app.use(express.json());
 
 /**
  * Health check
- * - Confirms API is running.
- * - Pings the DB using the shared pool from db.js.
  */
 app.get('/api/health', async (_req, res) => {
   try {
@@ -40,11 +38,11 @@ app.get('/api/health', async (_req, res) => {
 });
 
 /**
- * Frequency endpoint (EuroMillions) – full history
+ * Frequency – full history
+ * GET /api/frequency
  */
 app.get('/api/frequency', async (_req, res) => {
   try {
-    // Fetch all draws from the database
     const draws = await db.select().from(euromillions_draws);
 
     const main = new Map();
@@ -77,20 +75,16 @@ app.get('/api/frequency', async (_req, res) => {
 });
 
 /**
- * NEW: Frequency on the last N draws (most recent first)
+ * Frequency on last N draws
  * GET /api/frequency/latest-n?n=100
  */
 app.get('/api/frequency/latest-n', async (req, res) => {
   try {
-    // Parse n from query, with sane defaults and limits
-    const raw = req.query.n;
-    let n = parseInt(raw != null ? String(raw) : '100', 10);
-
+    const rawN = req.query.n;
+    let n = parseInt(rawN != null ? String(rawN) : '100', 10);
     if (Number.isNaN(n) || n <= 0) n = 100;
-    // Hard cap to avoid silly values hitting the DB
     if (n > 1000) n = 1000;
 
-    // Fetch last N draws ordered by date DESC
     const draws = await db
       .select()
       .from(euromillions_draws)
@@ -123,7 +117,7 @@ app.get('/api/frequency/latest-n', async (req, res) => {
     });
   } catch (err) {
     console.error('Frequency latest-n error:', err);
-    res.status(500).json({ ok: false, error: 'frequency_latest_n_db_failed' });
+    res.status(500).json({ ok: false, error: 'frequency_latest_n_failed' });
   }
 });
 
@@ -133,19 +127,17 @@ app.get('/api/frequency/latest-n', async (req, res) => {
  */
 app.get('/api/hot-cold', async (req, res) => {
   try {
-    // --- parse query params ---
     const rawN = req.query.n;
     const rawTop = req.query.top;
 
     let n = parseInt(rawN != null ? String(rawN) : '100', 10);
     if (Number.isNaN(n) || n <= 0) n = 100;
-    if (n > 1000) n = 1000; // hard cap
+    if (n > 1000) n = 1000;
 
     let top = parseInt(rawTop != null ? String(rawTop) : '5', 10);
     if (Number.isNaN(top) || top <= 0) top = 5;
-    if (top > 25) top = 25; // don’t return silly-long lists
+    if (top > 25) top = 25;
 
-    // --- get last N draws ---
     const draws = await db
       .select()
       .from(euromillions_draws)
@@ -172,11 +164,9 @@ app.get('/api/hot-cold', async (req, res) => {
     const mainArr = toSortedArray(main);
     const starsArr = toSortedArray(stars);
 
-    // hot = highest frequency first
     const hotMain = mainArr.slice(0, top);
     const hotStars = starsArr.slice(0, top);
 
-    // cold = lowest non-zero frequency (reverse, then unique)
     const coldMain = mainArr
       .slice()
       .reverse()
@@ -210,43 +200,38 @@ app.get('/api/hot-cold', async (req, res) => {
 });
 
 /**
- * Latest draw endpoint
+ * Latest draw
+ * GET /api/draws/latest
  */
 app.get('/api/draws/latest', async (_req, res) => {
   try {
-    const latestDraw = await db
+    const rows = await db
       .select()
       .from(euromillions_draws)
       .orderBy(desc(euromillions_draws.draw_date))
       .limit(1);
 
-    if (!latestDraw.length) {
-      return res.status(404).json({
-        ok: false,
-        error: 'no_draws_found',
-      });
+    const latest = rows[0] ?? null;
+
+    if (!latest) {
+      return res.json({ ok: true, draw: null });
     }
 
-    const d = latestDraw[0];
-
-    const numbers = [d.n1, d.n2, d.n3, d.n4, d.n5].filter(
-      (n) => n !== null && n !== undefined,
-    );
-    const stars = [d.s1, d.s2].filter((n) => n !== null && n !== undefined);
+    const { id, draw_date, n1, n2, n3, n4, n5, s1, s2, created_at } = latest;
 
     res.json({
       ok: true,
       draw: {
-        id: d.id,
-        draw_date: d.draw_date,
-        numbers,
-        stars,
-        raw: d,
+        id,
+        draw_date,
+        numbers: [n1, n2, n3, n4, n5],
+        stars: [s1, s2],
+        raw: latest,
       },
     });
   } catch (err) {
     console.error('Latest draw error:', err);
-    res.status(500).json({ ok: false, error: 'latest_draw_db_failed' });
+    res.status(500).json({ ok: false, error: 'latest_draw_failed' });
   }
 });
 
@@ -267,6 +252,7 @@ app.get('/api/draws/all', async (req, res) => {
 
     if (Number.isNaN(offset) || offset < 0) offset = 0;
 
+    // Page of draws (most recent first)
     const draws = await db
       .select()
       .from(euromillions_draws)
@@ -274,11 +260,10 @@ app.get('/api/draws/all', async (req, res) => {
       .limit(limit)
       .offset(offset);
 
-    const [{ count }] = await db
-      .select({ count: sql`COUNT(*)`.as('count') })
-      .from(euromillions_draws);
+    // Simple total count
+    const allRows = await db.select().from(euromillions_draws);
+    const total = allRows.length;
 
-    const total = Number(count);
     const hasMore = offset + draws.length < total;
 
     res.json({

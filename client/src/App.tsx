@@ -5,8 +5,9 @@ import { Routes, Route } from 'react-router-dom';
 import FrequencyDebug from './components/FrequencyDebug';
 import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
 import { AllDrawsPage } from './pages/AllDrawsPage';
+import { AnalysisPage } from './pages/AnalysisPage';
 
-// Use the public/ asset as a simple path string
+// Logo is served from /public – use a plain URL string
 const logo = '/Drawlytics.png';
 
 // ---- Types for landing page ----
@@ -32,17 +33,17 @@ export default function App() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/draws" element={<AllDrawsPage />} />
+      <Route path="/analysis" element={<AnalysisPage />} />
     </Routes>
   );
 }
 
 // ---------- LANDING PAGE ----------
 function LandingPage() {
-  // Cast the hook result so TS knows the shape
   const { data, loading, error } =
     useEuromillionsFrequency() as FrequencyHookResult;
 
-  // Fallback sample data (same shape as API: { number, count })
+  // Fallback sample data for preview card
   const fallbackMains: NumberCount[] = [
     { number: 23, count: 215 },
     { number: 42, count: 213 },
@@ -57,7 +58,6 @@ function LandingPage() {
     { number: 8, count: 362 },
   ];
 
-  // Use live data if available, otherwise fall back
   const mains: NumberCount[] = data?.main?.slice(0, 5) ?? fallbackMains;
   const stars: NumberCount[] = data?.stars?.slice(0, 3) ?? fallbackStars;
 
@@ -81,7 +81,7 @@ function LandingPage() {
         understanding over luck.
       </p>
 
-      {/* CTA */}
+      {/* CTA BUTTON */}
       <div className="dl-cta-wrap">
         <a
           href="https://tally.so/r/OD1k5g"
@@ -101,7 +101,7 @@ function LandingPage() {
         <li>&ldquo;My predictions&rdquo; (coming in beta).</li>
       </ul>
 
-      {/* LIVE PREVIEW */}
+      {/* LIVE PREVIEW CARD */}
       <section className="dl-preview-card">
         <div className="dl-preview-header">
           <span>Preview from the live API</span>
@@ -121,7 +121,7 @@ function LandingPage() {
             </tr>
           </thead>
           <tbody>
-            {mains.map((m: NumberCount, i: number) => (
+            {mains.map((m, i) => (
               <tr key={m.number}>
                 <td>
                   #{m.number} → {m.count}
@@ -134,8 +134,8 @@ function LandingPage() {
           </tbody>
         </table>
 
-        {/* Status messages for the preview */}
         {loading && <p className="dl-preview-note">Loading live data…</p>}
+
         {error && (
           <p className="dl-preview-note" style={{ color: 'red' }}>
             Live data unavailable, showing sample numbers.
@@ -150,7 +150,7 @@ function LandingPage() {
         )}
       </section>
 
-      {/* Small API status line */}
+      {/* SMALL API STATUS LINE */}
       <FrequencyDebug />
 
       {/* FOOTNOTE */}
