@@ -128,6 +128,88 @@ app.get('/api/frequency/latest-n', async (req, res) => {
 });
 
 /**
+ * Hot/Cold numbers on the last N draws
+ * GET /api/hot-cold?n=100&top=5
+ */
+app.get('/api/hot-cold', async (req, res) => {
+  try {
+    // --- parse query params ---
+    const rawN = req.query.n;
+    const rawTop = req.query.top;
+
+    let n = parseInt(rawN != null ? String(rawN) : '100', 10);
+    if (Number.isNaN(n) || n <= 0) n = 100;
+    if (n > 1000) n = 1000; // hard cap
+
+    let top = parseInt(rawTop != null ? String(rawTop) : '5', 10);
+    if (Number.isNaN(top) || top <= 0) top = 5;
+    if (top > 25) top = 25; // don’t return silly-long lists
+
+    // --- get last N draws ---
+    const draws = await db
+      .select()
+      .from(euromillions_draws)
+      .orderBy(desc(euromillions_draws.draw_date))
+      .limit(n);
+
+    const main = new Map();
+    const stars = new Map();
+
+    for (const d of draws) {
+      [d.n1, d.n2, d.n3, d.n4, d.n5].forEach((num) => {
+        if (num != null) main.set(num, (main.get(num) || 0) + 1);
+      });
+      [d.s1, d.s2].forEach((num) => {
+        if (num != null) stars.set(num, (stars.get(num) || 0) + 1);
+      });
+    }
+
+    const toSortedArray = (m) =>
+      Array.from(m.entries())
+        .map(([number, count]) => ({ number, count }))
+        .sort((a, b) => b.count - a.count || a.number - b.number);
+
+    const mainArr = toSortedArray(main);
+    const starsArr = toSortedArray(stars);
+
+    // hot = highest frequency first
+    const hotMain = mainArr.slice(0, top);
+    const hotStars = starsArr.slice(0, top);
+
+    // cold = lowest non-zero frequency (reverse, then unique)
+    const coldMain = mainArr
+      .slice()
+      .reverse()
+      .filter((item) => item.count > 0)
+      .slice(0, top);
+
+    const coldStars = starsArr
+      .slice()
+      .reverse()
+      .filter((item) => item.count > 0)
+      .slice(0, top);
+
+    res.json({
+      ok: true,
+      requestedN: n,
+      totalDrawsConsidered: draws.length,
+      top,
+      hot: {
+        main: hotMain,
+        stars: hotStars,
+      },
+      cold: {
+        main: coldMain,
+        stars: coldStars,
+      },
+    });
+  } catch (err) {
+    console.error('Hot/Cold error:', err);
+    res.status(500).json({ ok: false, error: 'hot_cold_db_failed' });
+  }
+});
+
+/**
  * Latest draw endpoint
  */
 app.get('/api/draws/latest', async (_req, res) => {
