@@ -5,6 +5,7 @@ import {
   type DrawsListResponse,
   type EuromillionsDraw,
 } from '../api/draws';
+import { LatestDraw } from '../components/LatestDraw';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
@@ -77,6 +78,11 @@ export function AllDrawsPage() {
       <p className="dl-hero-copy" style={{ marginBottom: '1.5rem' }}>
         Browsing {PAGE_SIZE} draws at a time. Most recent first.
       </p>
+
+      {/* Latest draw summary at top */}
+      <section style={{ marginBottom: '2rem' }}>
+        <LatestDraw />
+      </section>
 
       {status === 'loading' && <p>Loading draws…</p>}
       {status === 'error' && <p style={{ color: 'red' }}>Error: {error}</p>}

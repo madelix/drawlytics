@@ -1,12 +1,13 @@
 import './App.css';
-import logo from '/Drawlytics.png';
 
-import { Routes, Route, Link } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 
 import FrequencyDebug from './components/FrequencyDebug';
 import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
-import { LatestDraw } from './components/LatestDraw';
 import { AllDrawsPage } from './pages/AllDrawsPage';
+
+// Use the public/ asset as a simple path string
+const logo = '/Drawlytics.png';
 
 // ---- Types for landing page ----
 type NumberCount = {
@@ -91,18 +92,6 @@ function LandingPage() {
           Join the Beta
         </a>
       </div>
-
-      {/* Link to All Draws */}
-      <div style={{ textAlign: 'center', marginTop: '0.75rem' }}>
-        <Link to="/draws" className="dl-preview-note">
-          View all EuroMillions draws →
-        </Link>
-      </div>
-
-      {/* NEW: Latest Draw Component */}
-      <section style={{ marginTop: '2rem', marginBottom: '2rem' }}>
-        <LatestDraw />
-      </section>
 
       {/* FEATURES */}
       <ul className="dl-feature-list">
