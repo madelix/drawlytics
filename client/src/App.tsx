@@ -1,14 +1,34 @@
 import './App.css';
 import logo from '/Drawlytics.png';
+
 import FrequencyDebug from './components/FrequencyDebug';
 import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
+import { LatestDraw } from './components/LatestDraw';
+
+// ---- Types ----
+type NumberCount = {
+  number: number;
+  count: number;
+};
+
+type FrequencyData = {
+  main: NumberCount[];
+  stars: NumberCount[];
+};
+
+type FrequencyHookResult = {
+  data: FrequencyData | null;
+  loading: boolean;
+  error: boolean | null;
+};
 
 export default function App() {
-  // Live data from your Railway API
-  const { data, loading, error } = useEuromillionsFrequency();
+  // Cast the hook result so TS knows the shape
+  const { data, loading, error } =
+    useEuromillionsFrequency() as FrequencyHookResult;
 
   // Fallback sample data (same shape as API: { number, count })
-  const fallbackMains = [
+  const fallbackMains: NumberCount[] = [
     { number: 23, count: 215 },
     { number: 42, count: 213 },
     { number: 44, count: 212 },
@@ -16,15 +36,15 @@ export default function App() {
     { number: 21, count: 209 },
   ];
 
-  const fallbackStars = [
+  const fallbackStars: NumberCount[] = [
     { number: 3, count: 376 },
     { number: 2, count: 374 },
     { number: 8, count: 362 },
   ];
 
   // Use live data if available, otherwise fall back
-  const mains = data?.main?.slice(0, 5) ?? fallbackMains;
-  const stars = data?.stars?.slice(0, 3) ?? fallbackStars;
+  const mains: NumberCount[] = data?.main?.slice(0, 5) ?? fallbackMains;
+  const stars: NumberCount[] = data?.stars?.slice(0, 3) ?? fallbackStars;
 
   return (
     <div className="dl-page">
@@ -58,6 +78,11 @@ export default function App() {
         </a>
       </div>
 
+      {/* NEW: Latest Draw Component */}
+      <section style={{ marginTop: '2rem', marginBottom: '2rem' }}>
+        <LatestDraw />
+      </section>
+
       {/* FEATURES */}
       <ul className="dl-feature-list">
         <li>Multi-lottery support: EuroMillions, UK Lotto, Set For Life.</li>
@@ -86,7 +111,7 @@ export default function App() {
             </tr>
           </thead>
           <tbody>
-            {mains.map((m, i) => (
+            {mains.map((m: NumberCount, i: number) => (
               <tr key={m.number}>
                 <td>
                   #{m.number} → {m.count}
