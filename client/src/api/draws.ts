@@ -1,7 +1,5 @@
 // client/src/api/draws.ts
 
-// If you're deploying the frontend separately (e.g. Vercel) set VITE_API_BASE_URL
-// to your Railway URL. Locally you can leave it empty and use a Vite proxy.
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 export type LatestDrawResponse = {
@@ -26,5 +24,54 @@ export async function getLatestDraw(): Promise<LatestDrawResponse> {
   }
 
   const data = (await res.json()) as LatestDrawResponse;
+  return data;
+}
+
+// ---------- NEW: list types + getDraws ----------
+
+export type EuromillionsDraw = {
+  id: number;
+  draw_date: string;
+  n1: number;
+  n2: number;
+  n3: number;
+  n4: number;
+  n5: number;
+  s1: number;
+  s2: number;
+  created_at: string;
+};
+
+export type DrawsListResponse = {
+  ok: boolean;
+  draws: EuromillionsDraw[];
+  pagination: {
+    limit: number;
+    offset: number;
+    total: number;
+    hasMore: boolean;
+  };
+  error?: string;
+};
+
+export async function getDraws(
+  params: {
+    limit?: number;
+    offset?: number;
+  } = {},
+): Promise<DrawsListResponse> {
+  const { limit = 20, offset = 0 } = params;
+
+  const url = new URL(`${API_BASE}/api/draws/all`, window.location.origin);
+  url.searchParams.set('limit', String(limit));
+  url.searchParams.set('offset', String(offset));
+
+  const res = await fetch(url.toString().replace(window.location.origin, ''));
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch draws: ${res.status} ${res.statusText}`);
+  }
+
+  const data = (await res.json()) as DrawsListResponse;
   return data;
 }

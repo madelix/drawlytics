@@ -1,11 +1,14 @@
 import './App.css';
 import logo from '/Drawlytics.png';
 
+import { Routes, Route, Link } from 'react-router-dom';
+
 import FrequencyDebug from './components/FrequencyDebug';
 import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
 import { LatestDraw } from './components/LatestDraw';
+import { AllDrawsPage } from './pages/AllDrawsPage';
 
-// ---- Types ----
+// ---- Types for landing page ----
 type NumberCount = {
   number: number;
   count: number;
@@ -22,7 +25,18 @@ type FrequencyHookResult = {
   error: boolean | null;
 };
 
+// ---------- ROUTER ROOT ----------
 export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/draws" element={<AllDrawsPage />} />
+    </Routes>
+  );
+}
+
+// ---------- LANDING PAGE ----------
+function LandingPage() {
   // Cast the hook result so TS knows the shape
   const { data, loading, error } =
     useEuromillionsFrequency() as FrequencyHookResult;
@@ -76,6 +90,13 @@ export default function App() {
         >
           Join the Beta
         </a>
+      </div>
+
+      {/* Link to All Draws */}
+      <div style={{ textAlign: 'center', marginTop: '0.75rem' }}>
+        <Link to="/draws" className="dl-preview-note">
+          View all EuroMillions draws →
+        </Link>
       </div>
 
       {/* NEW: Latest Draw Component */}
