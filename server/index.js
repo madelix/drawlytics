@@ -4,7 +4,7 @@ import cors from 'cors';
 
 import { db, pool } from './db.js';
 import * as schema from './drizzle/schema.js';
-import { desc } from 'drizzle-orm';
+import { desc, count } from 'drizzle-orm';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -115,6 +115,80 @@ app.get('/api/draws/latest', async (_req, res) => {
     return res.status(500).json({
       ok: false,
       error: 'latest_draw_db_failed',
+    });
+  }
+});
+
+/**
+ * All draws endpoint – paginated EuroMillions draw history
+ *
+ * GET /api/draws/all?limit=100&offset=0
+ *
+ * - limit:  how many rows to return (default 100, max 500)
+ * - offset: how many rows to skip (default 0)
+ *
+ * Response shape:
+ * {
+ *   ok: true,
+ *   draws: [...],
+ *   pagination: {
+ *     limit: number,
+ *     offset: number,
+ *     total: number,
+ *     hasMore: boolean
+ *   }
+ * }
+ */
+app.get('/api/draws/all', async (req, res) => {
+  try {
+    // 1) Parse and sanitise query params
+    const limitParam = req.query.limit;
+    const offsetParam = req.query.offset;
+
+    let limit = parseInt(
+      typeof limitParam === 'string' ? limitParam : '100',
+      10,
+    );
+    let offset = parseInt(
+      typeof offsetParam === 'string' ? offsetParam : '0',
+      10,
+    );
+
+    if (Number.isNaN(limit) || limit <= 0) limit = 100;
+    if (limit > 500) limit = 500; // hard safety cap
+
+    if (Number.isNaN(offset) || offset < 0) offset = 0;
+
+    // 2) Fetch paginated draws (ordered by most recent first)
+    const draws = await db
+      .select()
+      .from(euromillions_draws)
+      .orderBy(desc(euromillions_draws.draw_date))
+      .limit(limit)
+      .offset(offset);
+
+    // 3) Get total count for pagination UI
+    const countResult = await db
+      .select({ value: count() })
+      .from(euromillions_draws);
+
+    const total = Number(countResult[0]?.value ?? 0);
+
+    res.json({
+      ok: true,
+      draws,
+      pagination: {
+        limit,
+        offset,
+        total,
+        hasMore: offset + draws.length < total,
+      },
+    });
+  } catch (err) {
+    console.error('Error fetching all draws:', err);
+    res.status(500).json({
+      ok: false,
+      error: 'draws_all_db_failed',
     });
   }
 });
