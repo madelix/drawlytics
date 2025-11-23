@@ -200,6 +200,96 @@ app.get('/api/hot-cold', async (req, res) => {
 });
 
 /**
+ * Gap / Overdue analysis (full history)
+ * For each number, how many draws since it last appeared?
+ *
+ * GET /api/gaps
+ *
+ * Response:
+ * {
+ *   ok: true,
+ *   main: [ { number, gap, lastSeen }, ... ],
+ *   stars: [ { number, gap, lastSeen }, ... ],
+ *   totalDrawsConsidered: number
+ * }
+ */
+app.get('/api/gaps', async (_req, res) => {
+  try {
+    // Most recent first
+    const draws = await db
+      .select()
+      .from(euromillions_draws)
+      .orderBy(desc(euromillions_draws.draw_date));
+
+    const totalDraws = draws.length;
+
+    // Maps: number -> { gap, lastSeen }
+    const mainLastSeen = new Map();
+    const starLastSeen = new Map();
+
+    // Walk draws from most recent (index 0) backwards
+    draws.forEach((d, index) => {
+      const drawDate = d.draw_date;
+
+      // Main numbers
+      [d.n1, d.n2, d.n3, d.n4, d.n5].forEach((num) => {
+        if (num != null && !mainLastSeen.has(num)) {
+          mainLastSeen.set(num, {
+            gap: index, // 0 = hit in latest draw, 1 = one draw ago, etc.
+            lastSeen: drawDate,
+          });
+        }
+      });
+
+      // Stars
+      [d.s1, d.s2].forEach((num) => {
+        if (num != null && !starLastSeen.has(num)) {
+          starLastSeen.set(num, {
+            gap: index,
+            lastSeen: drawDate,
+          });
+        }
+      });
+    });
+
+    // EuroMillions ranges: mains 1–50, stars 1–12
+    const mainGaps = [];
+    for (let n = 1; n <= 50; n++) {
+      const info = mainLastSeen.get(n);
+      mainGaps.push({
+        number: n,
+        gap: info ? info.gap : totalDraws, // if never seen, treat as max gap
+        lastSeen: info ? info.lastSeen : null,
+      });
+    }
+
+    const starGaps = [];
+    for (let n = 1; n <= 12; n++) {
+      const info = starLastSeen.get(n);
+      starGaps.push({
+        number: n,
+        gap: info ? info.gap : totalDraws,
+        lastSeen: info ? info.lastSeen : null,
+      });
+    }
+
+    // Sort by gap descending (most overdue first)
+    mainGaps.sort((a, b) => b.gap - a.gap || a.number - b.number);
+    starGaps.sort((a, b) => b.gap - a.gap || a.number - b.number);
+
+    res.json({
+      ok: true,
+      main: mainGaps,
+      stars: starGaps,
+      totalDrawsConsidered: totalDraws,
+    });
+  } catch (err) {
+    console.error('Gaps error:', err);
+    res.status(500).json({ ok: false, error: 'gaps_db_failed' });
+  }
+});
+
+/**
  * Latest draw
  * GET /api/draws/latest
  */
