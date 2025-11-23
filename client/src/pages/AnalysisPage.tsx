@@ -3,383 +3,293 @@ import { useEffect, useState } from 'react';
 import {
   getFrequencyLatestN,
   getHotCold,
-  type FrequencyLatestNResponse,
-  type HotColdResponse,
-  type NumberCount,
+  getGaps,
+  FrequencyLatestNResponse,
+  HotColdResponse,
+  GapsResponse,
+  NumberCount,
 } from '../api/analysis';
-
 import {
-  ResponsiveContainer,
   BarChart,
   Bar,
   XAxis,
   YAxis,
   Tooltip,
-  CartesianGrid,
+  ResponsiveContainer,
 } from 'recharts';
 
-type Status = 'idle' | 'loading' | 'success' | 'error';
-
 type RangeOption = {
-  value: number;
   label: string;
+  value: number;
 };
 
 const RANGE_OPTIONS: RangeOption[] = [
-  { value: 50, label: 'Last 50 draws' },
-  { value: 100, label: 'Last 100 draws' },
-  { value: 200, label: 'Last 200 draws' },
+  { label: 'Last 50 draws', value: 50 },
+  { label: 'Last 100 draws', value: 100 },
+  { label: 'Last 200 draws', value: 200 },
 ];
 
 const HOT_COLD_TOP = 5;
 
-// Simple little chip for numbers (main / star / cold)
-function NumberChip({
-  value,
-  variant,
-}: {
-  value: number;
-  variant: 'main' | 'star' | 'cold';
-}) {
-  const base: React.CSSProperties = {
-    display: 'inline-block',
-    minWidth: '2rem',
-    padding: '0.25rem 0.6rem',
-    marginRight: '0.4rem',
-    marginBottom: '0.3rem',
-    borderRadius: '999px',
-    fontSize: '0.9rem',
-    textAlign: 'center',
-    fontVariantNumeric: 'tabular-nums',
-  };
-
-  let style: React.CSSProperties = { ...base, border: '1px solid #ccc' };
-
-  if (variant === 'star') {
-    style = {
-      ...base,
-      border: '1px solid #ffd54f',
-      background: '#fffaf0',
-    };
-  } else if (variant === 'cold') {
-    style = {
-      ...base,
-      border: '1px solid #c5cae9',
-      background: '#eef2ff',
-    };
-  }
-
-  return <span style={style}>{value}</span>;
-}
-
 export function AnalysisPage() {
   const [range, setRange] = useState<number>(100);
-  const [status, setStatus] = useState<Status>('idle');
-  const [error, setError] = useState<string | null>(null);
 
-  const [frequency, setFrequency] = useState<FrequencyLatestNResponse | null>(
+  const [freqData, setFreqData] = useState<FrequencyLatestNResponse | null>(
     null,
   );
-  const [hotCold, setHotCold] = useState<HotColdResponse | null>(null);
+  const [freqLoading, setFreqLoading] = useState(false);
+  const [freqError, setFreqError] = useState<string | null>(null);
 
+  const [hotColdData, setHotColdData] = useState<HotColdResponse | null>(null);
+  const [hotColdLoading, setHotColdLoading] = useState(false);
+  const [hotColdError, setHotColdError] = useState<string | null>(null);
+
+  const [gapsData, setGapsData] = useState<GapsResponse | null>(null);
+  const [gapsLoading, setGapsLoading] = useState(false);
+  const [gapsError, setGapsError] = useState<string | null>(null);
+
+  // Fetch frequency + hot/cold when range changes
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchAll() {
-      try {
-        setStatus('loading');
-        setError(null);
+    async function load() {
+      setFreqLoading(true);
+      setFreqError(null);
+      setHotColdLoading(true);
+      setHotColdError(null);
 
-        const [freqRes, hotColdRes] = await Promise.all([
+      try {
+        const [freq, hotCold] = await Promise.all([
           getFrequencyLatestN(range),
           getHotCold(range, HOT_COLD_TOP),
         ]);
 
-        if (cancelled) return;
-
-        if (!freqRes.ok) {
-          throw new Error('Frequency API returned ok=false');
+        if (!cancelled) {
+          setFreqData(freq);
+          setHotColdData(hotCold);
         }
-        if (!hotColdRes.ok) {
-          throw new Error('Hot/Cold API returned ok=false');
+      } catch (err: any) {
+        if (!cancelled) {
+          setFreqError(err?.message ?? 'Failed to load frequency data');
+          setHotColdError(err?.message ?? 'Failed to load hot/cold data');
         }
-
-        setFrequency(freqRes);
-        setHotCold(hotColdRes);
-        setStatus('success');
-      } catch (err: unknown) {
-        if (cancelled) return;
-        console.error(err);
-        setStatus('error');
-        setError(
-          err instanceof Error ? err.message : 'Failed to load analysis data.',
-        );
+      } finally {
+        if (!cancelled) {
+          setFreqLoading(false);
+          setHotColdLoading(false);
+        }
       }
     }
 
-    fetchAll();
+    load();
 
     return () => {
       cancelled = true;
     };
   }, [range]);
 
-  const handleRangeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = parseInt(e.target.value, 10);
-    setRange(value);
-  };
+  // Fetch gaps once (full history)
+  useEffect(() => {
+    let cancelled = false;
 
-  const mainFreq: NumberCount[] = frequency?.main ?? [];
-  const starFreq: NumberCount[] = frequency?.stars ?? [];
+    async function load() {
+      setGapsLoading(true);
+      setGapsError(null);
 
-  const hotMain = hotCold?.hot.main ?? [];
-  const hotStars = hotCold?.hot.stars ?? [];
-  const coldMain = hotCold?.cold.main ?? [];
-  const coldStars = hotCold?.cold.stars ?? [];
+      try {
+        const gaps = await getGaps();
+        if (!cancelled) {
+          setGapsData(gaps);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setGapsError(err?.message ?? 'Failed to load gaps data');
+        }
+      } finally {
+        if (!cancelled) {
+          setGapsLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const mainFreq: NumberCount[] = freqData?.main ?? [];
+  const starFreq: NumberCount[] = freqData?.stars ?? [];
+
+  const overdueMain = gapsData?.main.slice(0, 5) ?? [];
+  const overdueStars = gapsData?.stars.slice(0, 3) ?? [];
 
   return (
-    <div
-      className="dl-page"
-      style={{ maxWidth: '960px', margin: '0 auto', padding: '2rem 1rem' }}
-    >
-      <h1 className="dl-hero-title" style={{ marginBottom: '0.25rem' }}>
-        Number Analysis
-      </h1>
-      <p className="dl-hero-copy" style={{ marginBottom: '1.5rem' }}>
-        Discover trends and hot / cold numbers from recent EuroMillions draws.
-      </p>
+    <div className="dl-page">
+      {/* PAGE TITLE */}
+      <header className="dl-analysis-header">
+        <h1 className="dl-hero-title">Number Analysis</h1>
+        <p className="dl-hero-copy">
+          Discover trends, hot &amp; cold numbers, and overdue numbers from
+          recent EuroMillions draws.
+        </p>
+      </header>
 
-      {/* Configuration Card */}
-      <section
-        className="dl-preview-card"
-        style={{ marginBottom: '2rem', padding: '1.25rem 1.5rem' }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '1.5rem',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: '0.85rem',
-                textTransform: 'uppercase',
-                opacity: 0.7,
-                marginBottom: '0.25rem',
-              }}
-            >
-              Lottery Type
+      {/* CONFIG BAR */}
+      <section className="dl-analysis-config">
+        <div className="dl-config-card">
+          <div className="dl-config-row">
+            <div>
+              <div className="dl-config-label">Lottery Type</div>
+              <div className="dl-config-value">EuroMillions</div>
             </div>
-            <div>EuroMillions</div>
+
+            <div>
+              <div className="dl-config-label">Number of draws to analyse</div>
+              <select
+                value={range}
+                onChange={(e) => setRange(Number(e.target.value))}
+                className="dl-config-select"
+              >
+                {RANGE_OPTIONS.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <div className="dl-config-hint">
+                Analysing {freqData?.totalDrawsConsidered ?? range} draws
+              </div>
+            </div>
           </div>
+        </div>
+      </section>
 
-          <div>
-            <div
-              style={{
-                fontSize: '0.85rem',
-                textTransform: 'uppercase',
-                opacity: 0.7,
-                marginBottom: '0.25rem',
-              }}
-            >
-              Number of draws to analyse
-            </div>
-            <select
-              value={range}
-              onChange={handleRangeChange}
-              style={{
-                padding: '0.35rem 0.75rem',
-                borderRadius: '999px',
-                border: '1px solid #ccc',
-                fontSize: '0.95rem',
-              }}
-            >
-              {RANGE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
+      {/* HOT / COLD SUMMARY + OVERDUE */}
+      <section className="dl-analysis-grid">
+        {/* Hot/Cold Main */}
+        <div className="dl-analysis-card">
+          <h2>Hot Numbers (Main)</h2>
+          {hotColdLoading && <p>Loading hot numbers…</p>}
+          {hotColdError && (
+            <p style={{ color: 'red' }}>Error: {hotColdError}</p>
+          )}
+          {!hotColdLoading && hotColdData && (
+            <div className="dl-chip-row">
+              {hotColdData.hot.main.map((item) => (
+                <span key={item.number} className="dl-chip-main">
+                  {item.number}
+                  <span className="dl-chip-sub">
+                    {item.count} hits (last {hotColdData.requestedN} draws)
+                  </span>
+                </span>
               ))}
-            </select>
-          </div>
-
-          {frequency && (
-            <div style={{ marginLeft: 'auto', fontSize: '0.85rem' }}>
-              Analysing{' '}
-              <strong>{frequency.totalDrawsConsidered.toLocaleString()}</strong>{' '}
-              draws
             </div>
+          )}
+        </div>
+
+        {/* Cold Main */}
+        <div className="dl-analysis-card">
+          <h2>Cold Numbers (Main)</h2>
+          {hotColdLoading && <p>Loading cold numbers…</p>}
+          {hotColdError && (
+            <p style={{ color: 'red' }}>Error: {hotColdError}</p>
+          )}
+          {!hotColdLoading && hotColdData && (
+            <div className="dl-chip-row">
+              {hotColdData.cold.main.map((item) => (
+                <span key={item.number} className="dl-chip-main dl-chip-cold">
+                  {item.number}
+                  <span className="dl-chip-sub">
+                    {item.count} hits (last {hotColdData.requestedN} draws)
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* OVERDUE / GAPS */}
+        <div className="dl-analysis-card">
+          <h2>Overdue Numbers</h2>
+          {gapsLoading && <p>Calculating overdue numbers…</p>}
+          {gapsError && <p style={{ color: 'red' }}>Error: {gapsError}</p>}
+          {!gapsLoading && gapsData && (
+            <>
+              <p className="dl-config-hint">
+                Based on full EuroMillions history (
+                {gapsData.totalDrawsConsidered} draws).
+              </p>
+
+              <div style={{ marginTop: '0.75rem' }}>
+                <h3 className="dl-overdue-subtitle">Main numbers</h3>
+                <ul className="dl-gap-list">
+                  {overdueMain.map((item) => (
+                    <li key={item.number}>
+                      <strong>{item.number}</strong> – {item.gap} draws since
+                      last seen{' '}
+                      {item.lastSeen ? `(${item.lastSeen})` : '(never seen)'}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div style={{ marginTop: '0.75rem' }}>
+                <h3 className="dl-overdue-subtitle">Stars</h3>
+                <ul className="dl-gap-list">
+                  {overdueStars.map((item) => (
+                    <li key={item.number}>
+                      <strong>{item.number}</strong> – {item.gap} draws since
+                      last seen{' '}
+                      {item.lastSeen ? `(${item.lastSeen})` : '(never seen)'}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
           )}
         </div>
       </section>
 
-      {/* Hot / Cold overview */}
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '1.25rem',
-          marginBottom: '2rem',
-        }}
-      >
-        <div className="dl-preview-card" style={{ padding: '1rem 1.25rem' }}>
-          <h2
-            style={{
-              fontSize: '1rem',
-              marginBottom: '0.5rem',
-              fontWeight: 600,
-            }}
-          >
-            Hot Numbers (Main)
-          </h2>
-          {hotMain.length === 0 && <p>No data yet.</p>}
-          {hotMain.length > 0 && (
-            <div>
-              {hotMain.map((item) => (
-                <NumberChip
-                  key={item.number}
-                  value={item.number}
-                  variant="main"
-                />
-              ))}
-            </div>
-          )}
-
-          {hotStars.length > 0 && (
-            <p style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
-              Stars:{' '}
-              {hotStars.map((item) => (
-                <NumberChip
-                  key={item.number}
-                  value={item.number}
-                  variant="star"
-                />
-              ))}
-            </p>
-          )}
-        </div>
-
-        <div className="dl-preview-card" style={{ padding: '1rem 1.25rem' }}>
-          <h2
-            style={{
-              fontSize: '1rem',
-              marginBottom: '0.5rem',
-              fontWeight: 600,
-            }}
-          >
-            Cold Numbers (Main)
-          </h2>
-          {coldMain.length === 0 && <p>No data yet.</p>}
-          {coldMain.length > 0 && (
-            <div>
-              {coldMain.map((item) => (
-                <NumberChip
-                  key={item.number}
-                  value={item.number}
-                  variant="cold"
-                />
-              ))}
-            </div>
-          )}
-
-          {coldStars.length > 0 && (
-            <p style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
-              Stars:{' '}
-              {coldStars.map((item) => (
-                <NumberChip
-                  key={item.number}
-                  value={item.number}
-                  variant="cold"
-                />
-              ))}
-            </p>
-          )}
-        </div>
-
-        <div
-          className="dl-preview-card"
-          style={{ padding: '1rem 1.25rem', opacity: 0.6 }}
-        >
-          <h2
-            style={{
-              fontSize: '1rem',
-              marginBottom: '0.5rem',
-              fontWeight: 600,
-            }}
-          >
-            Overdue Numbers
-          </h2>
-          <p style={{ fontSize: '0.9rem' }}>
-            Gap / overdue analysis coming soon. This will show numbers with the
-            longest time since last appearance.
-          </p>
-        </div>
-      </section>
-
-      {/* Status messages */}
-      {status === 'loading' && <p>Loading analysis…</p>}
-      {status === 'error' && (
-        <p style={{ color: 'red' }}>Error: {error ?? 'Unknown error'}</p>
-      )}
-
-      {/* Charts */}
-      {status === 'success' && (
-        <>
-          <section
-            className="dl-preview-card"
-            style={{ marginBottom: '1.75rem', padding: '1.25rem 1.5rem' }}
-          >
-            <h2
-              style={{
-                fontSize: '1rem',
-                marginBottom: '0.75rem',
-                fontWeight: 600,
-              }}
-            >
-              Main Number Frequency
-            </h2>
+      {/* FREQUENCY CHARTS */}
+      <section className="dl-analysis-charts">
+        <div className="dl-analysis-card">
+          <h2>Main Number Frequency</h2>
+          {freqLoading && <p>Loading frequency…</p>}
+          {freqError && <p style={{ color: 'red' }}>Error: {freqError}</p>}
+          {!freqLoading && !freqError && mainFreq.length > 0 && (
             <div style={{ width: '100%', height: 260 }}>
               <ResponsiveContainer>
                 <BarChart data={mainFreq}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="number" />
-                  <YAxis allowDecimals={false} />
+                  <YAxis />
                   <Tooltip />
                   <Bar dataKey="count" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </section>
+          )}
+        </div>
 
-          <section
-            className="dl-preview-card"
-            style={{ marginBottom: '1.75rem', padding: '1.25rem 1.5rem' }}
-          >
-            <h2
-              style={{
-                fontSize: '1rem',
-                marginBottom: '0.75rem',
-                fontWeight: 600,
-              }}
-            >
-              Star Number Frequency
-            </h2>
+        <div className="dl-analysis-card">
+          <h2>Star Number Frequency</h2>
+          {freqLoading && <p>Loading frequency…</p>}
+          {freqError && <p style={{ color: 'red' }}>Error: {freqError}</p>}
+          {!freqLoading && !freqError && starFreq.length > 0 && (
             <div style={{ width: '100%', height: 260 }}>
               <ResponsiveContainer>
                 <BarChart data={starFreq}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="number" />
-                  <YAxis allowDecimals={false} />
+                  <YAxis />
                   <Tooltip />
                   <Bar dataKey="count" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </section>
-        </>
-      )}
+          )}
+        </div>
+      </section>
     </div>
   );
 }

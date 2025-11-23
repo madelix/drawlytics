@@ -1,28 +1,46 @@
 // client/src/api/analysis.ts
 
-// Use (import.meta as any) to avoid TS typing issues with env
-const API_BASE =
-  (import.meta as any).env?.VITE_API_BASE_URL ?? 'http://localhost:3000';
+// Use (import.meta as any) so TS is happy about env
+const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || '';
 
-// Basic number → count shape
+/* ---------- Shared types ---------- */
+
 export type NumberCount = {
   number: number;
   count: number;
 };
 
-// /api/frequency/latest-n response
+/* ---------- Frequency: latest N draws ---------- */
+
 export type FrequencyLatestNResponse = {
   ok: boolean;
   main: NumberCount[];
   stars: NumberCount[];
   requestedN: number;
   totalDrawsConsidered: number;
+  error?: string;
 };
 
-// /api/hot-cold response shapes
-export type HotColdGroup = {
-  main: NumberCount[];
-  stars: NumberCount[];
+export async function getFrequencyLatestN(
+  n: number,
+): Promise<FrequencyLatestNResponse> {
+  const res = await fetch(`${API_BASE}/api/frequency/latest-n?n=${n}`);
+
+  if (!res.ok) {
+    throw new Error(
+      `Failed to fetch frequency latest-n: ${res.status} ${res.statusText}`,
+    );
+  }
+
+  const data = (await res.json()) as FrequencyLatestNResponse;
+  return data;
+}
+
+/* ---------- Hot / Cold numbers ---------- */
+
+export type HotColdItem = {
+  number: number;
+  count: number;
 };
 
 export type HotColdResponse = {
@@ -30,37 +48,56 @@ export type HotColdResponse = {
   requestedN: number;
   totalDrawsConsidered: number;
   top: number;
-  hot: HotColdGroup;
-  cold: HotColdGroup;
+  hot: {
+    main: HotColdItem[];
+    stars: HotColdItem[];
+  };
+  cold: {
+    main: HotColdItem[];
+    stars: HotColdItem[];
+  };
+  error?: string;
 };
-
-export async function getFrequencyLatestN(
-  n: number,
-): Promise<FrequencyLatestNResponse> {
-  const url = `${API_BASE}/api/frequency/latest-n?n=${encodeURIComponent(
-    String(n),
-  )}`;
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(
-      `Failed to fetch latest-n frequency (status ${res.status})`,
-    );
-  }
-  return res.json();
-}
 
 export async function getHotCold(
   n: number,
   top: number,
 ): Promise<HotColdResponse> {
-  const url = `${API_BASE}/api/hot-cold?n=${encodeURIComponent(
-    String(n),
-  )}&top=${encodeURIComponent(String(top))}`;
+  const res = await fetch(`${API_BASE}/api/hot-cold?n=${n}&top=${top}`);
 
-  const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`Failed to fetch hot/cold numbers (status ${res.status})`);
+    throw new Error(
+      `Failed to fetch hot/cold: ${res.status} ${res.statusText}`,
+    );
   }
-  return res.json();
+
+  const data = (await res.json()) as HotColdResponse;
+  return data;
+}
+
+/* ---------- Gaps / Overdue numbers ---------- */
+
+export type GapItem = {
+  number: number;
+  gap: number; // draws since last seen (0 = hit in latest draw)
+  lastSeen: string | null;
+};
+
+export type GapsResponse = {
+  ok: boolean;
+  main: GapItem[];
+  stars: GapItem[];
+  totalDrawsConsidered: number;
+  error?: string;
+};
+
+export async function getGaps(): Promise<GapsResponse> {
+  const res = await fetch(`${API_BASE}/api/gaps`);
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch gaps: ${res.status} ${res.statusText}`);
+  }
+
+  const data = (await res.json()) as GapsResponse;
+  return data;
 }
