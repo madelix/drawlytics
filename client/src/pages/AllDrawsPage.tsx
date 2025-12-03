@@ -68,124 +68,124 @@ export function AllDrawsPage() {
   };
 
   return (
-    <div
-      className="dl-page"
-      style={{ maxWidth: '960px', margin: '0 auto', padding: '2rem 1rem' }}
-    >
-      <h1 className="dl-hero-title" style={{ marginBottom: '0.5rem' }}>
-        EuroMillions draw history
-      </h1>
-      <p className="dl-hero-copy" style={{ marginBottom: '1.5rem' }}>
-        Browsing {PAGE_SIZE} draws at a time. Most recent first.
-      </p>
+    <div className="dl-page">
+      {/* Page title + subtitle (match Analysis/Gaps) */}
+      <div className="dl-analysis-header">
+        <h1 className="dl-hero-title">EuroMillions draw history</h1>
+        <p className="dl-section-subtitle">
+          Browsing 20 draws at a time. Most recent first.
+        </p>
+      </div>
 
-      {/* Latest draw summary at top */}
-      <section style={{ marginBottom: '2rem' }}>
-        <LatestDraw />
-      </section>
+      <main>
+        {/* Latest draw summary at top */}
+        <section style={{ marginBottom: '2rem' }}>
+          <LatestDraw />
+        </section>
 
-      {status === 'loading' && <p>Loading draws…</p>}
-      {status === 'error' && <p style={{ color: 'red' }}>Error: {error}</p>}
+        {status === 'loading' && <p>Loading draws…</p>}
+        {status === 'error' && <p style={{ color: 'red' }}>Error: {error}</p>}
 
-      {status === 'success' && draws.length === 0 && <p>No draws found.</p>}
+        {status === 'success' && draws.length === 0 && <p>No draws found.</p>}
 
-      {status === 'success' && draws.length > 0 && (
-        <>
-          <table
-            className="dl-preview-table"
-            style={{ width: '100%', marginBottom: '1rem' }}
-          >
-            <thead>
-              <tr>
-                <th style={{ textAlign: 'left' }}>Date</th>
-                <th style={{ textAlign: 'left' }}>Numbers</th>
-                <th style={{ textAlign: 'left' }}>Stars</th>
-              </tr>
-            </thead>
-            <tbody>
-              {draws.map((d: EuromillionsDraw) => {
-                const dateLabel = new Date(d.draw_date).toLocaleDateString();
-                const numbers = [d.n1, d.n2, d.n3, d.n4, d.n5];
-                const stars = [d.s1, d.s2];
-
-                return (
-                  <tr key={d.id}>
-                    <td>{dateLabel}</td>
-                    <td>
-                      {numbers.map((n) => (
-                        <span
-                          key={n}
-                          style={{
-                            display: 'inline-block',
-                            marginRight: '0.3rem',
-                            padding: '0.15rem 0.45rem',
-                            borderRadius: '999px',
-                            border: '1px solid #ccc',
-                            fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
-                          {n}
-                        </span>
-                      ))}
-                    </td>
-                    <td>
-                      {stars.map((s) => (
-                        <span
-                          key={s}
-                          style={{
-                            display: 'inline-block',
-                            marginRight: '0.3rem',
-                            padding: '0.15rem 0.45rem',
-                            borderRadius: '999px',
-                            border: '1px solid #ffd54f',
-                            fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
-                          {s}
-                        </span>
-                      ))}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {pagination && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '1rem',
-              }}
+        {status === 'success' && draws.length > 0 && (
+          <>
+            <table
+              className="dl-preview-table"
+              style={{ width: '100%', marginBottom: '1rem' }}
             >
-              <button
-                type="button"
-                onClick={handlePrev}
-                disabled={!canPrev}
-                className="dl-cta-btn"
-                style={{ opacity: canPrev ? 1 : 0.5 }}
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left' }}>Date</th>
+                  <th style={{ textAlign: 'left' }}>Numbers</th>
+                  <th style={{ textAlign: 'left' }}>Stars</th>
+                </tr>
+              </thead>
+              <tbody>
+                {draws.map((d: EuromillionsDraw) => {
+                  const dateLabel = new Date(d.draw_date).toLocaleDateString();
+                  const numbers = [d.n1, d.n2, d.n3, d.n4, d.n5];
+                  const stars = [d.s1, d.s2];
+
+                  return (
+                    <tr key={d.id}>
+                      <td>{dateLabel}</td>
+                      <td>
+                        {numbers.map((n) => (
+                          <span
+                            key={n}
+                            style={{
+                              display: 'inline-block',
+                              marginRight: '0.3rem',
+                              padding: '0.15rem 0.45rem',
+                              borderRadius: '999px',
+                              border: '1px solid #ccc',
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            {n}
+                          </span>
+                        ))}
+                      </td>
+                      <td>
+                        {stars.map((s) => (
+                          <span
+                            key={s}
+                            style={{
+                              display: 'inline-block',
+                              marginRight: '0.3rem',
+                              padding: '0.15rem 0.45rem',
+                              borderRadius: '999px',
+                              border: '1px solid #ffd54f',
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            {s}
+                          </span>
+                        ))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {pagination && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '1rem',
+                }}
               >
-                ← Previous
-              </button>
-              <div>
-                Showing {offset + 1}–{offset + draws.length} of{' '}
-                {pagination.total}
+                <button
+                  type="button"
+                  onClick={handlePrev}
+                  disabled={!canPrev}
+                  className="dl-cta-btn"
+                  style={{ opacity: canPrev ? 1 : 0.5 }}
+                >
+                  ← Previous
+                </button>
+                <div>
+                  Showing {offset + 1}–{offset + draws.length} of{' '}
+                  {pagination.total}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={!canNext}
+                  className="dl-cta-btn"
+                  style={{ opacity: canNext ? 1 : 0.5 }}
+                >
+                  Next →
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleNext}
-                disabled={!canNext}
-                className="dl-cta-btn"
-                style={{ opacity: canNext ? 1 : 0.5 }}
-              >
-                Next →
-              </button>
-            </div>
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
+      </main>
     </div>
   );
 }

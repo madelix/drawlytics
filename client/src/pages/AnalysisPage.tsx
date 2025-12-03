@@ -9,15 +9,9 @@ import {
   GapsResponse,
   NumberCount,
 } from '../api/analysis';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+import { ResponsiveBar } from '@nivo/bar';
 
+// ---------- Types ----------
 type RangeOption = {
   label: string;
   value: number;
@@ -30,6 +24,12 @@ const RANGE_OPTIONS: RangeOption[] = [
 ];
 
 const HOT_COLD_TOP = 5;
+
+// Small helper type for Nivo
+type BarDatum = {
+  number: number;
+  count: number;
+};
 
 export function AnalysisPage() {
   const [range, setRange] = useState<number>(100);
@@ -48,7 +48,7 @@ export function AnalysisPage() {
   const [gapsLoading, setGapsLoading] = useState(false);
   const [gapsError, setGapsError] = useState<string | null>(null);
 
-  // Fetch frequency + hot/cold when range changes
+  // ---------- Load frequency + hot/cold whenever range changes ----------
   useEffect(() => {
     let cancelled = false;
 
@@ -70,8 +70,9 @@ export function AnalysisPage() {
         }
       } catch (err: any) {
         if (!cancelled) {
-          setFreqError(err?.message ?? 'Failed to load frequency data');
-          setHotColdError(err?.message ?? 'Failed to load hot/cold data');
+          const msg = err?.message ?? 'Failed to load data';
+          setFreqError(msg);
+          setHotColdError(msg);
         }
       } finally {
         if (!cancelled) {
@@ -88,7 +89,7 @@ export function AnalysisPage() {
     };
   }, [range]);
 
-  // Fetch gaps once (full history)
+  // ---------- Load gaps once (full history) ----------
   useEffect(() => {
     let cancelled = false;
 
@@ -119,18 +120,118 @@ export function AnalysisPage() {
     };
   }, []);
 
+  // ---------- Massage data for charts ----------
   const mainFreq: NumberCount[] = freqData?.main ?? [];
   const starFreq: NumberCount[] = freqData?.stars ?? [];
 
-  const overdueMain = gapsData?.main.slice(0, 5) ?? [];
-  const overdueStars = gapsData?.stars.slice(0, 3) ?? [];
+  const sortedMainFreq: BarDatum[] = [...mainFreq]
+    .sort((a, b) => a.number - b.number)
+    .map((d) => ({ number: d.number, count: d.count }));
 
+  const sortedStarFreq: BarDatum[] = [...starFreq]
+    .sort((a, b) => a.number - b.number)
+    .map((d) => ({ number: d.number, count: d.count }));
+
+  const maxMainCount =
+    sortedMainFreq.reduce((max, item) => Math.max(max, item.count), 0) || 1;
+  const maxStarCount =
+    sortedStarFreq.reduce((max, item) => Math.max(max, item.count), 0) || 1;
+
+  const overdueMain = gapsData?.main.slice(0, 5) ?? [];
+  const overdueStars = gapsData?.stars.slice(0, 5) ?? [];
+
+  // ---------- Colour helpers ----------
+  const mainColourScale = (intensity: number) => {
+    const t = Math.max(0, Math.min(1, intensity));
+    const alpha = 0.2 + 0.6 * t; // 0.2 – 0.8
+    return `rgba(128, 65, 152, ${alpha})`;
+  };
+
+  const starColourScale = (intensity: number) => {
+    const t = Math.max(0, Math.min(1, intensity));
+    const alpha = 0.25 + 0.55 * t;
+    return `rgba(33, 64, 154, ${alpha})`;
+  };
+
+  // ---------- Reusable Nivo bar chart ----------
+  const renderBarChart = (
+    data: BarDatum[],
+    maxCount: number,
+    colourFn: (intensity: number) => string,
+    labelPrefix: string,
+  ) => (
+    <ResponsiveBar<BarDatum>
+      data={data}
+      keys={['count']}
+      indexBy="number"
+      margin={{ top: 10, right: 10, bottom: 40, left: 40 }}
+      padding={0.25}
+      valueScale={{ type: 'linear' }}
+      indexScale={{ type: 'band', round: true }}
+      colors={(bar) => colourFn((bar.data.count ?? 0) / maxCount)}
+      animate={true}
+      motionConfig="gentle"
+      enableGridX={false}
+      enableGridY={true}
+      axisBottom={{
+        tickSize: 0,
+        tickPadding: 6,
+        tickRotation: 0,
+        legend: 'Number',
+        legendOffset: 32,
+        legendPosition: 'middle',
+      }}
+      axisLeft={{
+        tickSize: 0,
+        tickPadding: 6,
+        tickRotation: 0,
+        legend: 'Hits',
+        legendOffset: -32,
+        legendPosition: 'middle',
+      }}
+      tooltip={({ data }) => (
+        <div className="dl-chart-tooltip">
+          <div className="dl-chart-tooltip-title">
+            {labelPrefix} {data.number}
+          </div>
+          <div className="dl-chart-tooltip-body">
+            {data.count} hits in the last {range} draws
+          </div>
+        </div>
+      )}
+      borderRadius={4}
+      theme={{
+        background: 'transparent',
+        text: {
+          fill: '#4b5563',
+          fontSize: 11,
+        },
+        tooltip: {
+          container: {
+            background: '#ffffff',
+            boxShadow: '0 4px 12px rgba(15,23,42,0.18)',
+            borderRadius: 10,
+            padding: '6px 10px',
+          },
+        },
+        grid: {
+          line: {
+            stroke: 'rgba(148,163,184,0.25)',
+            strokeWidth: 1,
+          },
+        },
+      }}
+      role="img"
+    />
+  );
+
+  // ---------- Render ----------
   return (
-    <div className="dl-page">
+    <div className="dl-page dl-analysis-page">
       {/* PAGE TITLE */}
       <header className="dl-analysis-header">
         <h1 className="dl-hero-title">Number Analysis</h1>
-        <p className="dl-hero-copy">
+        <p className="dl-section-subtitle">
           Discover trends, hot &amp; cold numbers, and overdue numbers from
           recent EuroMillions draws.
         </p>
@@ -166,9 +267,9 @@ export function AnalysisPage() {
         </div>
       </section>
 
-      {/* HOT / COLD SUMMARY + OVERDUE */}
+      {/* HOT / COLD / OVERDUE SUMMARY */}
       <section className="dl-analysis-grid">
-        {/* Hot/Cold Main */}
+        {/* Hot Main */}
         <div className="dl-analysis-card">
           <h2>Hot Numbers (Main)</h2>
           {hotColdLoading && <p>Loading hot numbers…</p>}
@@ -210,8 +311,8 @@ export function AnalysisPage() {
           )}
         </div>
 
-        {/* OVERDUE / GAPS */}
-        <div className="dl-analysis-card">
+        {/* Overdue / Gaps */}
+        <div className="dl-analysis-card dl-analysis-card-overdue">
           <h2>Overdue Numbers</h2>
           {gapsLoading && <p>Calculating overdue numbers…</p>}
           {gapsError && <p style={{ color: 'red' }}>Error: {gapsError}</p>}
@@ -222,30 +323,44 @@ export function AnalysisPage() {
                 {gapsData.totalDrawsConsidered} draws).
               </p>
 
-              <div style={{ marginTop: '0.75rem' }}>
-                <h3 className="dl-overdue-subtitle">Main numbers</h3>
-                <ul className="dl-gap-list">
-                  {overdueMain.map((item) => (
-                    <li key={item.number}>
-                      <strong>{item.number}</strong> – {item.gap} draws since
-                      last seen{' '}
-                      {item.lastSeen ? `(${item.lastSeen})` : '(never seen)'}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <div className="dl-overdue-grid">
+                {/* Main numbers column */}
+                <div className="dl-overdue-column">
+                  <h3 className="dl-overdue-subtitle">Main numbers</h3>
+                  <ul className="dl-gap-list">
+                    {overdueMain.map((item) => (
+                      <li key={item.number}>
+                        <span className="dl-gap-number">{item.number}</span>
+                        <span className="dl-gap-text">
+                          {item.gap} draws since last seen{' '}
+                          {item.lastSeen
+                            ? `(${item.lastSeen})`
+                            : '(never seen)'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-              <div style={{ marginTop: '0.75rem' }}>
-                <h3 className="dl-overdue-subtitle">Stars</h3>
-                <ul className="dl-gap-list">
-                  {overdueStars.map((item) => (
-                    <li key={item.number}>
-                      <strong>{item.number}</strong> – {item.gap} draws since
-                      last seen{' '}
-                      {item.lastSeen ? `(${item.lastSeen})` : '(never seen)'}
-                    </li>
-                  ))}
-                </ul>
+                {/* Stars column */}
+                <div className="dl-overdue-column">
+                  <h3 className="dl-overdue-subtitle">Stars</h3>
+                  <ul className="dl-gap-list">
+                    {overdueStars.map((item) => (
+                      <li key={item.number}>
+                        <span className="dl-gap-number dl-gap-number-star">
+                          {item.number}
+                        </span>
+                        <span className="dl-gap-text">
+                          {item.gap} draws since last seen{' '}
+                          {item.lastSeen
+                            ? `(${item.lastSeen})`
+                            : '(never seen)'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </>
           )}
@@ -254,38 +369,44 @@ export function AnalysisPage() {
 
       {/* FREQUENCY CHARTS */}
       <section className="dl-analysis-charts">
+        {/* MAIN NUMBERS */}
         <div className="dl-analysis-card">
           <h2>Main Number Frequency</h2>
+          <p className="dl-config-hint">
+            Frequency of each main number in the last {range} draws.
+          </p>
+
           {freqLoading && <p>Loading frequency…</p>}
           {freqError && <p style={{ color: 'red' }}>Error: {freqError}</p>}
-          {!freqLoading && !freqError && mainFreq.length > 0 && (
-            <div style={{ width: '100%', height: 260 }}>
-              <ResponsiveContainer>
-                <BarChart data={mainFreq}>
-                  <XAxis dataKey="number" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="count" />
-                </BarChart>
-              </ResponsiveContainer>
+          {!freqLoading && !freqError && sortedMainFreq.length > 0 && (
+            <div className="dl-chart-shell">
+              {renderBarChart(
+                sortedMainFreq,
+                maxMainCount,
+                mainColourScale,
+                'Number',
+              )}
             </div>
           )}
         </div>
 
+        {/* STARS */}
         <div className="dl-analysis-card">
           <h2>Star Number Frequency</h2>
+          <p className="dl-config-hint">
+            Frequency of each star number in the last {range} draws.
+          </p>
+
           {freqLoading && <p>Loading frequency…</p>}
           {freqError && <p style={{ color: 'red' }}>Error: {freqError}</p>}
-          {!freqLoading && !freqError && starFreq.length > 0 && (
-            <div style={{ width: '100%', height: 260 }}>
-              <ResponsiveContainer>
-                <BarChart data={starFreq}>
-                  <XAxis dataKey="number" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="count" />
-                </BarChart>
-              </ResponsiveContainer>
+          {!freqLoading && !freqError && sortedStarFreq.length > 0 && (
+            <div className="dl-chart-shell">
+              {renderBarChart(
+                sortedStarFreq,
+                maxStarCount,
+                starColourScale,
+                'Star',
+              )}
             </div>
           )}
         </div>

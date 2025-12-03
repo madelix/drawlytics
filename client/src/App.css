@@ -29,6 +29,169 @@ body {
   color: var(--dl-text-main);
 }
 
+/* ===========================
+   APP SHELL + HEADER NAV
+   =========================== */
+
+.dl-app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dl-main {
+  flex: 1;
+}
+
+/* Top nav bar (for all non-landing pages) */
+.dl-main-header {
+  width: 100%;
+  background: var(--dl-bg);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.dl-header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* Brand / logo link */
+.dl-logo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.dl-header-logo {
+  height: 32px;
+  width: auto;
+  display: block;
+}
+
+.dl-header-wordmark {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+/* Desktop nav links */
+.dl-nav-desktop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dl-nav-link {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  text-decoration: none;
+  color: #4b5563;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.dl-nav-link:hover {
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.dl-nav-link--active {
+  background: linear-gradient(90deg, var(--dl-blue), var(--dl-purple));
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
+}
+
+/* Hamburger button (hidden on desktop) */
+.dl-nav-toggle {
+  border: none;
+  background: transparent;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: none; /* shown on small screens */
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.dl-nav-toggle-bars {
+  width: 18px;
+  height: 2px;
+  background: #4b5563;
+  border-radius: 999px;
+  position: relative;
+}
+
+.dl-nav-toggle-bars::before,
+.dl-nav-toggle-bars::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 18px;
+  height: 2px;
+  background: #4b5563;
+  border-radius: 999px;
+}
+
+.dl-nav-toggle-bars::before {
+  top: -5px;
+}
+
+.dl-nav-toggle-bars::after {
+  top: 5px;
+}
+
+/* Mobile menu (collapsible) */
+.dl-nav-mobile {
+  display: none;
+}
+
+/* Shared subtitle under section titles */
+.dl-section-subtitle {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--dl-text-subtle);
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto 1.25rem;
+  line-height: 1.45;
+}
+
+/* ---------- Responsive header ---------- */
+
+@media (max-width: 640px) {
+  .dl-nav-desktop {
+    display: none;
+  }
+
+  .dl-nav-toggle {
+    display: inline-flex;
+  }
+
+  .dl-nav-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 960px;
+    margin: 0 auto 8px;
+    padding: 0 16px 8px;
+  }
+
+  .dl-nav-link--mobile {
+    width: 100%;
+    text-align: left;
+  }
+}
+
 /* PAGE WRAP */
 
 .dl-page {
@@ -38,6 +201,11 @@ body {
   padding: 32px 16px 40px;
   display: flex;
   flex-direction: column;
+  align-items: stretch; /* allow full-width sections by default */
+}
+
+/* Landing page only – center content */
+.dl-page--landing {
   align-items: center;
 }
 
@@ -111,7 +279,7 @@ body {
   margin: 0 auto 28px;
   text-align: left;
   color: var(--dl-text-main);
-  display: inline-block; /* shrink to fit content */
+  display: inline-block;
 }
 
 .dl-feature-list li {
@@ -130,7 +298,7 @@ body {
   background: #ffffff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   align-self: center;
-  min-width: 360px; /* keeps structure balanced */
+  min-width: 360px;
 }
 
 .dl-preview-header {
@@ -143,10 +311,18 @@ body {
 }
 
 .dl-status-dot {
-  width: 7px;
-  height: 7px;
+  width: 0.55rem;
+  height: 0.55rem;
   border-radius: 999px;
   background: #22c55e;
+}
+
+.dl-status-ok {
+  background: #22c55e;
+}
+
+.dl-status-error {
+  background: #ef4444;
 }
 
 .dl-preview-title {
@@ -164,7 +340,7 @@ body {
 
 .dl-preview-table th,
 .dl-preview-table td {
-  padding: 4px 10px; /* wider column spacing */
+  padding: 4px 10px;
   text-align: left;
 }
 
@@ -204,6 +380,8 @@ body {
   }
 }
 
+/* API status line */
+
 .dl-api-status {
   margin: 1.5rem auto 0;
   max-width: 720px;
@@ -219,18 +397,360 @@ body {
   color: #9ca3af;
 }
 
-/* reuse / extend the existing status dot */
-.dl-status-dot {
-  width: 0.55rem;
-  height: 0.55rem;
+/* ===========================
+   ANALYSIS PAGE LAYOUT
+   =========================== */
+
+/* Header block on /analysis */
+.dl-analysis-header {
+  width: 100%;
+  max-width: 960px;
+  text-align: center;
+  margin: 0 auto 1.5rem;
+}
+
+/* Config bar container */
+.dl-analysis-config {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto 1.5rem;
+}
+
+/* Card that holds lottery + range controls */
+.dl-config-card {
+  background: #ffffff;
+  border-radius: var(--dl-radius);
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+/* Two-column layout inside the config card */
+.dl-config-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.dl-config-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dl-text-subtle);
+  margin-bottom: 0.3rem;
+}
+
+.dl-config-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--dl-text-main);
+}
+
+.dl-config-select {
+  display: inline-block;
+  min-width: 170px;
+  padding: 0.45rem 2rem 0.45rem 0.8rem;
   border-radius: 999px;
-  background: #22c55e;
+  border: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: var(--dl-text-main);
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #9ca3af 50%),
+    linear-gradient(135deg, #9ca3af 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 55%,
+    calc(100% - 9px) 55%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
 }
 
-.dl-status-ok {
-  background: #22c55e;
+.dl-config-select:focus {
+  border-color: var(--dl-purple);
+  box-shadow: 0 0 0 1px rgba(128, 65, 152, 0.15);
+  background-color: #ffffff;
 }
 
-.dl-status-error {
-  background: #ef4444;
+.dl-config-hint {
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--dl-text-subtle);
+}
+
+/* Analysis cards grid: Hot, Cold, Overdue */
+.dl-analysis-grid {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto 1.5rem;
+  display: grid;
+  grid-template-columns: 0.9fr 0.9fr 1.2fr; /* hot/cold narrower, overdue wider */
+  gap: 1rem;
+}
+
+.dl-analysis-card {
+  background: #ffffff;
+  border-radius: var(--dl-radius);
+  padding: 1rem 1.25rem 1.1rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.dl-analysis-card h2 {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+}
+
+/* Chips for hot / cold numbers */
+
+.dl-chip-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+}
+
+.dl-chip-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  font-size: 0.85rem;
+  color: #26223b;
+}
+
+.dl-chip-main.dl-chip-cold {
+  border-color: #d1ecff;
+  background: #f4fbff;
+}
+
+.dl-chip-sub {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+/* ===========================
+   Overdue / Gaps styling (shared)
+   =========================== */
+
+.dl-overdue-subtitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  color: #26223b;
+}
+
+.dl-overdue-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 0.75rem;
+  align-items: flex-start;
+}
+
+.dl-overdue-col {
+  min-width: 0;
+}
+
+.dl-gap-list {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+}
+
+/* Pill-style overdue items */
+.dl-gap-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: #f6f4ff;
+  font-size: 0.85rem;
+  color: #3a3553;
+  margin-bottom: 0.3rem;
+}
+
+/* Number pill */
+.dl-gap-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #d3c7ff;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Slightly bluer pill for stars */
+.dl-gap-number-star {
+  background: #e6f4ff;
+  border-color: #c0e1ff;
+  color: #1f3a6d;
+}
+
+.dl-gap-text {
+  opacity: 0.8;
+  font-size: 0.8rem;
+}
+
+/* ===========================
+   CHART WRAPPER
+   =========================== */
+
+.dl-chart-shell {
+  width: 100%;
+  height: 420px; /* tall charts */
+  margin-top: 1rem;
+  padding: 0.75rem 0.75rem 0.5rem;
+}
+
+/* Layout for the chart section on the analysis page */
+.dl-analysis-charts {
+  width: 100%;
+  max-width: 960px;
+  margin: 1.5rem auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.dl-analysis-charts .dl-analysis-card {
+  width: 100%;
+}
+
+/* RESPONSIVE for analysis layout */
+
+@media (min-width: 640px) {
+  .dl-overdue-layout {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .dl-analysis-grid {
+    grid-template-columns: 0.9fr 0.9fr 1.2fr;
+  }
+
+  .dl-config-row {
+    align-items: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .dl-config-select {
+    width: 100%;
+  }
+
+  .dl-analysis-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===========================
+   GAPS PAGE (/gaps)
+   =========================== */
+
+.dl-page-gaps {
+  align-items: stretch;
+}
+
+/* Header (you can switch to .dl-analysis-header + .dl-section-subtitle in JSX) */
+.dl-gaps-header {
+  width: 100%;
+  max-width: 960px;
+  text-align: center;
+  margin: 0 auto 1.5rem;
+}
+
+.dl-gaps-intro {
+  margin-top: 0.3rem;
+  font-size: 0.9rem;
+  color: var(--dl-text-subtle);
+}
+
+/* Top summary cards */
+.dl-gaps-top {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dl-gaps-summary-card {
+  background: #ffffff;
+  border-radius: var(--dl-radius);
+  padding: 1rem 1.25rem 1.1rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.dl-gaps-summary-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.dl-gaps-summary-meta {
+  font-size: 0.78rem;
+  color: var(--dl-text-subtle);
+  margin-bottom: 0.4rem;
+}
+
+/* Chart sections */
+.dl-gaps-section {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.dl-gaps-chart-card {
+  background: #ffffff;
+  border-radius: var(--dl-radius);
+  padding: 1rem 1.25rem 1.1rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+/* Chart wrapper height for gaps page */
+.dl-chart-shell--gaps {
+  width: 100%;
+  height: 420px;
+  margin-top: 1rem;
+  padding: 0.75rem 0.75rem 0.5rem;
+}
+
+/* Tooltip styling reuse */
+.dl-chart-tooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.dl-chart-tooltip-sub {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* Responsive tweaks for gaps page */
+@media (max-width: 768px) {
+  .dl-gaps-top {
+    grid-template-columns: 1fr;
+  }
 }
