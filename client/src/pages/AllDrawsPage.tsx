@@ -6,6 +6,7 @@ import {
   type EuromillionsDraw,
 } from '../api/draws';
 import { LatestDraw } from '../components/LatestDraw';
+import { ScrollToTopButton } from '../components/ScrollToTopButton';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
@@ -68,14 +69,14 @@ export function AllDrawsPage() {
   };
 
   return (
-    <div className="dl-page">
-      {/* Page title + subtitle (match Analysis/Gaps) */}
-      <div className="dl-analysis-header">
+    <div className="dl-page dl-analysis-page">
+      {/* PAGE TITLE */}
+      <header className="dl-analysis-header">
         <h1 className="dl-hero-title">EuroMillions draw history</h1>
         <p className="dl-section-subtitle">
           Browsing 20 draws at a time. Most recent first.
         </p>
-      </div>
+      </header>
 
       <main>
         {/* Latest draw summary at top */}
@@ -114,14 +115,7 @@ export function AllDrawsPage() {
                         {numbers.map((n) => (
                           <span
                             key={n}
-                            style={{
-                              display: 'inline-block',
-                              marginRight: '0.3rem',
-                              padding: '0.15rem 0.45rem',
-                              borderRadius: '999px',
-                              border: '1px solid #ccc',
-                              fontVariantNumeric: 'tabular-nums',
-                            }}
+                            className="dl-draw-pill dl-draw-pill--main"
                           >
                             {n}
                           </span>
@@ -131,14 +125,7 @@ export function AllDrawsPage() {
                         {stars.map((s) => (
                           <span
                             key={s}
-                            style={{
-                              display: 'inline-block',
-                              marginRight: '0.3rem',
-                              padding: '0.15rem 0.45rem',
-                              borderRadius: '999px',
-                              border: '1px solid #ffd54f',
-                              fontVariantNumeric: 'tabular-nums',
-                            }}
+                            className="dl-draw-pill dl-draw-pill--star"
                           >
                             {s}
                           </span>
@@ -151,14 +138,7 @@ export function AllDrawsPage() {
             </table>
 
             {pagination && (
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '1rem',
-                }}
-              >
+              <div className="dl-pagination-bar">
                 <button
                   type="button"
                   onClick={handlePrev}
@@ -186,6 +166,8 @@ export function AllDrawsPage() {
           </>
         )}
       </main>
+
+      <ScrollToTopButton />
     </div>
   );
 }

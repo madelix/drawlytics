@@ -7,7 +7,7 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import FrequencyDebug from './components/FrequencyDebug';
 import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
 
-// --- Lazy-loaded pages (helps with bundle size) ---
+// --- Lazy-loaded pages ---
 const AnalysisPage = lazy(() =>
   import('./pages/AnalysisPage').then((m) => ({ default: m.AnalysisPage })),
 );
@@ -20,10 +20,6 @@ const AllDrawsPage = lazy(() =>
 
 // Logo lives in /public
 const logo = '/Drawlytics.png';
-
-/* ──────────────────────────────────────────────
-   Types for landing page live preview
-   ────────────────────────────────────────────── */
 
 type NumberCount = {
   number: number;
@@ -58,19 +54,19 @@ function AppHeader() {
   if (location.pathname === '/') return null;
 
   return (
-    <header className="dl-header">
+    <header className="dl-main-header">
       <div className="dl-header-inner">
-        <NavLink to="/" className="dl-header-brand">
+        {/* Brand / logo */}
+        <NavLink to="/" className="dl-logo-link">
           <img src={logo} alt="Drawlytics" className="dl-header-logo" />
-          <span className="dl-header-wordmark">Drawlytics</span>
         </NavLink>
 
         {/* Desktop nav */}
-        <nav className="dl-header-nav">
+        <nav className="dl-nav-desktop">
           <NavLink
             to="/analysis"
             className={({ isActive }) =>
-              `dl-header-link ${isActive ? 'dl-header-link--active' : ''}`
+              `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
             }
           >
             Analysis
@@ -78,7 +74,7 @@ function AppHeader() {
           <NavLink
             to="/gaps"
             className={({ isActive }) =>
-              `dl-header-link ${isActive ? 'dl-header-link--active' : ''}`
+              `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
             }
           >
             Gaps
@@ -86,7 +82,7 @@ function AppHeader() {
           <NavLink
             to="/draws"
             className={({ isActive }) =>
-              `dl-header-link ${isActive ? 'dl-header-link--active' : ''}`
+              `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
             }
           >
             All draws
@@ -96,22 +92,21 @@ function AppHeader() {
         {/* Mobile hamburger */}
         <button
           type="button"
-          className="dl-header-toggle"
+          className="dl-nav-toggle"
           aria-label="Toggle navigation"
           onClick={() => setOpen((v) => !v)}
         >
-          <span className="dl-header-burger" />
+          <span className="dl-nav-toggle-bars" />
         </button>
       </div>
 
-      {/* Mobile dropdown menu */}
       {open && (
-        <nav className="dl-header-mobile-menu">
+        <nav className="dl-nav-mobile">
           <NavLink
             to="/analysis"
             className={({ isActive }) =>
-              `dl-header-mobile-link ${
-                isActive ? 'dl-header-mobile-link--active' : ''
+              `dl-nav-link dl-nav-link--mobile ${
+                isActive ? 'dl-nav-link--active' : ''
               }`
             }
           >
@@ -120,8 +115,8 @@ function AppHeader() {
           <NavLink
             to="/gaps"
             className={({ isActive }) =>
-              `dl-header-mobile-link ${
-                isActive ? 'dl-header-mobile-link--active' : ''
+              `dl-nav-link dl-nav-link--mobile ${
+                isActive ? 'dl-nav-link--active' : ''
               }`
             }
           >
@@ -130,14 +125,21 @@ function AppHeader() {
           <NavLink
             to="/draws"
             className={({ isActive }) =>
-              `dl-header-mobile-link ${
-                isActive ? 'dl-header-mobile-link--active' : ''
+              `dl-nav-link dl-nav-link--mobile ${
+                isActive ? 'dl-nav-link--active' : ''
               }`
             }
           >
             All draws
           </NavLink>
-          <span className="dl-header-mobile-link dl-header-mobile-link--muted">
+
+          <span
+            style={{
+              marginTop: '4px',
+              fontSize: '0.75rem',
+              color: 'var(--dl-text-subtle)',
+            }}
+          >
             Drawlytics does not sell tickets. Analytics only.
           </span>
         </nav>
@@ -154,7 +156,6 @@ export default function App() {
   return (
     <>
       <AppHeader />
-
       <Suspense fallback={<div style={{ padding: 24 }}>Loading…</div>}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -168,7 +169,7 @@ export default function App() {
 }
 
 /* ──────────────────────────────────────────────
-   LANDING PAGE (unchanged visually)
+   LANDING PAGE
    ────────────────────────────────────────────── */
 
 function LandingPage() {
@@ -187,21 +188,23 @@ function LandingPage() {
   const fallbackStars: NumberCount[] = [
     { number: 3, count: 377 },
     { number: 2, count: 375 },
-    { number: 8, count: 363 },
+    { number: 11, count: 360 },
+    { number: 9, count: 355 },
+    { number: 7, count: 350 },
   ];
 
-  const mains: NumberCount[] = data?.main?.slice(0, 5) ?? fallbackMains;
-  const stars: NumberCount[] = data?.stars?.slice(0, 3) ?? fallbackStars;
+  const mainsPreview = data?.main?.slice(0, 5) ?? fallbackMains;
+  const starsPreview = data?.stars?.slice(0, 5) ?? fallbackStars;
 
   return (
     <div className="dl-page dl-page--landing">
-      {/* LOGO */}
-      <header className="dl-logo-wrap">
+      {/* Logo + tagline (like screenshot 1) */}
+      <header className="dl-landing-header">
         <img src={logo} alt="Drawlytics" className="dl-logo" />
-        <div className="dl-tagline">Data-driven clarity for every draw</div>
+        <p className="dl-landing-tagline">Data-driven clarity for every draw</p>
       </header>
 
-      {/* HERO */}
+      {/* HERO COPY */}
       <h1 className="dl-hero-title">
         Where lottery data meets meaningful insight
       </h1>
@@ -233,17 +236,25 @@ function LandingPage() {
         <li>&ldquo;My predictions&rdquo; (coming in beta).</li>
       </ul>
 
-      {/* LIVE PREVIEW CARD */}
+      {/* PREVIEW CARD – table style */}
       <section className="dl-preview-card">
         <div className="dl-preview-header">
-          <span>Preview from the live API</span>
-          <span className="dl-status-dot" />
-          <span>Online</span>
+          <span className="dl-preview-title">Preview from the live API</span>
+          {!error && (
+            <span className="dl-preview-status">
+              <span className="dl-status-dot" /> Online
+            </span>
+          )}
+          {error && (
+            <span className="dl-preview-status dl-preview-status--error">
+              <span className="dl-status-dot dl-status-dot--error" /> Offline
+            </span>
+          )}
         </div>
 
-        <div className="dl-preview-title">
+        <p className="dl-preview-note">
           EuroMillions: top numbers (live sample)
-        </div>
+        </p>
 
         <table className="dl-preview-table">
           <thead>
@@ -253,39 +264,33 @@ function LandingPage() {
             </tr>
           </thead>
           <tbody>
-            {mains.map((m, i) => (
-              <tr key={m.number}>
-                <td>
-                  #{m.number} → {m.count}
-                </td>
-                <td>
-                  {stars[i] ? `★ ${stars[i].number} → ${stars[i].count}` : ''}
-                </td>
-              </tr>
-            ))}
+            {Array.from({ length: 5 }).map((_, idx) => {
+              const main = mainsPreview[idx];
+              const star = starsPreview[idx];
+
+              return (
+                <tr key={idx}>
+                  <td>
+                    #{main.number} → {main.count}
+                  </td>
+                  <td>
+                    ★ {star.number} → {star.count}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
-        {loading && <p className="dl-preview-note">Loading live data…</p>}
-
-        {error && (
-          <p className="dl-preview-note" style={{ color: 'red' }}>
-            Live data unavailable, showing sample numbers.
-          </p>
-        )}
-
-        {!loading && !error && (
-          <p className="dl-preview-note">
-            Beta users will get full history per lottery, more models, and saved
-            predictions — this is just a small live preview.
-          </p>
-        )}
+        <p className="dl-preview-note">
+          Beta users will get full history per lottery, more models, and saved
+          predictions — this is just a small live preview.
+        </p>
       </section>
 
-      {/* SMALL API STATUS LINE */}
+      {/* SMALL API STATUS LINE / FOOTER */}
       <FrequencyDebug />
 
-      {/* FOOTNOTE */}
       <footer className="dl-footnote">
         Drawlytics does not sell tickets or guarantee winnings. Analytics only —
         for informed, responsible play.

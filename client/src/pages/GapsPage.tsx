@@ -1,6 +1,7 @@
 // client/src/pages/GapsPage.tsx
 import { useEffect, useState } from 'react';
 import { ResponsiveBar } from '@nivo/bar';
+import { ScrollToTopButton } from '../components/ScrollToTopButton';
 
 import { getGaps, GapsResponse } from '../api/analysis';
 
@@ -30,7 +31,8 @@ export function GapsPage() {
         }
       } catch (err: any) {
         if (!cancelled) {
-          setError(err?.message ?? 'Failed to load gaps data');
+          const msg = err?.message ?? 'Failed to load gaps';
+          setError(msg);
         }
       } finally {
         if (!cancelled) {
@@ -40,6 +42,7 @@ export function GapsPage() {
     }
 
     load();
+
     return () => {
       cancelled = true;
     };
@@ -63,26 +66,9 @@ export function GapsPage() {
   const overdueMainTop = mainGapsRaw.slice(0, 5);
   const overdueStarsTop = starGapsRaw.slice(0, 5);
 
-  const maxMainGap = mainGaps.reduce((max, d) => Math.max(max, d.gap), 0) || 1;
-  const maxStarGap = starGaps.reduce((max, d) => Math.max(max, d.gap), 0) || 1;
-
-  // colour scales – strong brand purple / blue
-  const mainColourScale = (intensity: number) => {
-    const t = Math.max(0, Math.min(1, intensity));
-    const alpha = 0.35 + 0.55 * t; // 0.35–0.9
-    return `rgba(128, 65, 152, ${alpha})`; // brand purple
-  };
-
-  const starColourScale = (intensity: number) => {
-    const t = Math.max(0, Math.min(1, intensity));
-    const alpha = 0.4 + 0.5 * t; // 0.4–0.9
-    return `rgba(33, 64, 154, ${alpha})`; // brand blue
-  };
-
   return (
-    <div className="dl-page dl-page-gaps">
-      {/* HEADER */}
-      <header className="dl-gaps-header">
+    <div className="dl-page dl-analysis-page">
+      <header className="dl-analysis-header">
         <h1 className="dl-hero-title">Overdue Numbers</h1>
         <p className="dl-section-subtitle">
           Explore EuroMillions numbers that haven&apos;t been drawn for the
@@ -90,7 +76,6 @@ export function GapsPage() {
         </p>
       </header>
 
-      {/* TOP SUMMARY CARDS */}
       <section className="dl-gaps-top">
         <div className="dl-gaps-summary-card">
           <h3>Most overdue main numbers</h3>
@@ -147,8 +132,7 @@ export function GapsPage() {
         </div>
       </section>
 
-      {/* MAIN GAPS CHART */}
-      <section className="dl-gaps-section">
+      <section className="dl-analysis-charts">
         <div className="dl-gaps-chart-card">
           <h2>Main number gaps</h2>
           <p className="dl-config-hint">
@@ -164,33 +148,51 @@ export function GapsPage() {
                 keys={['gap']}
                 indexBy="label"
                 margin={{ top: 20, right: 20, bottom: 40, left: 40 }}
-                padding={0.3}
+                padding={0.25}
                 valueScale={{ type: 'linear' }}
                 indexScale={{ type: 'band', round: true }}
+                colors="#804198"
+                animate={true}
+                motionConfig="gentle"
+                enableGridX={false}
+                enableGridY={true}
                 axisBottom={{
                   tickSize: 0,
-                  tickPadding: 8,
+                  tickPadding: 6,
+                  tickRotation: 0,
                   legend: 'Number',
+                  legendOffset: 32,
                   legendPosition: 'middle',
-                  legendOffset: 28,
                 }}
                 axisLeft={{
                   tickSize: 0,
                   tickPadding: 6,
+                  tickRotation: 0,
                   legend: 'Draws since last seen',
+                  legendOffset: -50,
                   legendPosition: 'middle',
-                  legendOffset: -38,
                 }}
-                enableGridX={false}
-                enableGridY={true}
-                labelSkipHeight={16}
-                label={(d) => `${d.value}`}
-                labelTextColor="#4b5563"
-                colors={(bar) =>
-                  mainColourScale((bar.data.gap as number) / maxMainGap)
-                }
-                animate={true}
-                motionConfig="gentle"
+                theme={{
+                  text: {
+                    fontSize: 11,
+                    fill: '#4b5563',
+                  },
+                  grid: {
+                    line: {
+                      stroke: '#e5e7eb',
+                      strokeWidth: 1,
+                      strokeDasharray: '2 4',
+                    },
+                  },
+                  tooltip: {
+                    container: {
+                      background: '#ffffff',
+                      borderRadius: 12,
+                      padding: '8px 10px',
+                      boxShadow: '0 8px 20px rgba(15, 23, 42, 0.18)',
+                    },
+                  },
+                }}
                 tooltip={({ data }: { data: GapDatum }) => (
                   <div className="dl-chart-tooltip">
                     <strong>Number {data.label}</strong>
@@ -207,7 +209,6 @@ export function GapsPage() {
           )}
         </div>
 
-        {/* STAR GAPS CHART */}
         <div className="dl-gaps-chart-card">
           <h2>Star number gaps</h2>
           <p className="dl-config-hint">
@@ -223,33 +224,51 @@ export function GapsPage() {
                 keys={['gap']}
                 indexBy="label"
                 margin={{ top: 20, right: 20, bottom: 40, left: 40 }}
-                padding={0.35}
+                padding={0.25}
                 valueScale={{ type: 'linear' }}
                 indexScale={{ type: 'band', round: true }}
+                colors="#21409a"
+                animate={true}
+                motionConfig="gentle"
+                enableGridX={false}
+                enableGridY={true}
                 axisBottom={{
                   tickSize: 0,
-                  tickPadding: 8,
-                  legend: 'Number',
+                  tickPadding: 6,
+                  tickRotation: 0,
+                  legend: 'Star',
+                  legendOffset: 32,
                   legendPosition: 'middle',
-                  legendOffset: 28,
                 }}
                 axisLeft={{
                   tickSize: 0,
                   tickPadding: 6,
+                  tickRotation: 0,
                   legend: 'Draws since last seen',
+                  legendOffset: -50,
                   legendPosition: 'middle',
-                  legendOffset: -38,
                 }}
-                enableGridX={false}
-                enableGridY={true}
-                labelSkipHeight={16}
-                label={(d) => `${d.value}`}
-                labelTextColor="#4b5563"
-                colors={(bar) =>
-                  starColourScale((bar.data.gap as number) / maxStarGap)
-                }
-                animate={true}
-                motionConfig="gentle"
+                theme={{
+                  text: {
+                    fontSize: 11,
+                    fill: '#4b5563',
+                  },
+                  grid: {
+                    line: {
+                      stroke: '#e5e7eb',
+                      strokeWidth: 1,
+                      strokeDasharray: '2 4',
+                    },
+                  },
+                  tooltip: {
+                    container: {
+                      background: '#ffffff',
+                      borderRadius: 12,
+                      padding: '8px 10px',
+                      boxShadow: '0 8px 20px rgba(15, 23, 42, 0.18)',
+                    },
+                  },
+                }}
                 tooltip={({ data }: { data: GapDatum }) => (
                   <div className="dl-chart-tooltip">
                     <strong>Star {data.label}</strong>
@@ -266,6 +285,8 @@ export function GapsPage() {
           )}
         </div>
       </section>
+
+      <ScrollToTopButton />
     </div>
   );
 }

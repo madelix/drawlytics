@@ -304,7 +304,8 @@ body {
 .dl-preview-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 0.5rem;
   font-size: 13px;
   color: var(--dl-text-subtle);
   margin-bottom: 8px;
@@ -447,7 +448,9 @@ body {
   color: var(--dl-text-main);
 }
 
-.dl-config-select {
+/* Custom select for range – used by both classes */
+.dl-config-select,
+.dl-range-select {
   display: inline-block;
   min-width: 170px;
   padding: 0.45rem 2rem 0.45rem 0.8rem;
@@ -474,7 +477,8 @@ body {
   background-repeat: no-repeat;
 }
 
-.dl-config-select:focus {
+.dl-config-select:focus,
+.dl-range-select:focus {
   border-color: var(--dl-purple);
   box-shadow: 0 0 0 1px rgba(128, 65, 152, 0.15);
   background-color: #ffffff;
@@ -652,7 +656,8 @@ body {
 }
 
 @media (max-width: 480px) {
-  .dl-config-select {
+  .dl-config-select,
+  .dl-range-select {
     width: 100%;
   }
 
@@ -753,4 +758,189 @@ body {
   .dl-gaps-top {
     grid-template-columns: 1fr;
   }
+}
+
+/* ===========================
+   Draws page pills
+   =========================== */
+
+.dl-draw-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  padding: 0 0.55rem;
+  margin-right: 0.3rem;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  background: #f9fafb;
+  color: #26223b;
+}
+
+.dl-draw-pill--main {
+  border-color: #d3c7ff;
+  background: #f6f4ff;
+}
+
+/* keep stars blue to match unified section */
+.dl-draw-pill--star {
+  border-color: #bfddff;
+  background: #e6f4ff;
+  color: #1e3a8a;
+}
+
+/* ===========================
+   Pagination bar
+   =========================== */
+
+.dl-pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 0.75rem 0;
+  position: sticky;
+  bottom: 0;
+  background: var(--dl-bg);
+  border-top: 1px solid rgba(148, 163, 184, 0.4);
+  z-index: 5;
+}
+
+/* ===========================
+   Scroll-to-top button
+   =========================== */
+
+.dl-scroll-top {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(90deg, var(--dl-blue), var(--dl-purple));
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.25);
+}
+
+.dl-scroll-top:hover {
+  transform: translateY(-1px);
+}
+
+/* ===========================
+   Tablet spacing tweaks
+   =========================== */
+
+@media (max-width: 1024px) {
+  .dl-page {
+    padding: 24px 16px 36px;
+  }
+
+  .dl-analysis-header {
+    margin-bottom: 1.25rem;
+  }
+
+  .dl-analysis-grid,
+  .dl-gaps-top {
+    gap: 1rem;
+  }
+}
+
+/* =======================================
+   Unified number balls & chips
+   ======================================= */
+
+/* Single-number circles (used in many places) */
+.dl-gap-number,
+.dl-gap-number-star,
+.dl-draw-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+/* Main numbers: soft lilac */
+.dl-gap-number,
+.dl-draw-pill--main {
+  background: #f6f4ff;
+  border-color: #d3c7ff;
+  color: #26223b;
+}
+
+/* Stars: soft blue */
+.dl-gap-number-star,
+.dl-draw-pill--star {
+  background: #e6f4ff;
+  border: 1px solid #bfddff;
+  color: #1e3a8a; /* deep blue text */
+}
+
+/* Hot / cold chips (number + text) */
+.dl-chip-main {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: #f6f4ff;
+  border: 1px solid #e0d6ff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #26223b;
+}
+
+.dl-chip-main .dl-chip-sub {
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+/* Cold variant: pale blue */
+.dl-chip-cold {
+  background: #e6f4ff;
+  border-color: #bfddff;
+}
+
+/* Landing preview header status */
+.dl-preview-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: #16a34a;
+}
+
+.dl-preview-status--error {
+  color: #b91c1c;
+}
+
+.dl-status-dot--error {
+  background-color: #ef4444;
+}
+
+/* Simple tagline under logo */
+.dl-landing-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.dl-landing-tagline {
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--dl-text-subtle);
 }

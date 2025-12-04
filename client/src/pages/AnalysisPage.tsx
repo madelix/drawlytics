@@ -10,6 +10,7 @@ import {
   NumberCount,
 } from '../api/analysis';
 import { ResponsiveBar } from '@nivo/bar';
+import { ScrollToTopButton } from '../components/ScrollToTopButton';
 
 // ---------- Types ----------
 type RangeOption = {
@@ -104,7 +105,8 @@ export function AnalysisPage() {
         }
       } catch (err: any) {
         if (!cancelled) {
-          setGapsError(err?.message ?? 'Failed to load gaps data');
+          const msg = err?.message ?? 'Failed to load gaps';
+          setGapsError(msg);
         }
       } finally {
         if (!cancelled) {
@@ -120,7 +122,7 @@ export function AnalysisPage() {
     };
   }, []);
 
-  // ---------- Massage data for charts ----------
+  // ---------- Basic derived data ----------
   const mainFreq: NumberCount[] = freqData?.main ?? [];
   const starFreq: NumberCount[] = freqData?.stars ?? [];
 
@@ -149,7 +151,7 @@ export function AnalysisPage() {
 
   const starColourScale = (intensity: number) => {
     const t = Math.max(0, Math.min(1, intensity));
-    const alpha = 0.25 + 0.55 * t;
+    const alpha = 0.2 + 0.6 * t; // 0.2 – 0.8
     return `rgba(33, 64, 154, ${alpha})`;
   };
 
@@ -189,46 +191,46 @@ export function AnalysisPage() {
         legendOffset: -32,
         legendPosition: 'middle',
       }}
-      tooltip={({ data }) => (
-        <div className="dl-chart-tooltip">
-          <div className="dl-chart-tooltip-title">
-            {labelPrefix} {data.number}
-          </div>
-          <div className="dl-chart-tooltip-body">
-            {data.count} hits in the last {range} draws
-          </div>
-        </div>
-      )}
-      borderRadius={4}
       theme={{
-        background: 'transparent',
         text: {
-          fill: '#4b5563',
           fontSize: 11,
+          fill: '#4b5563',
+        },
+        grid: {
+          line: {
+            stroke: '#e5e7eb',
+            strokeWidth: 1,
+            strokeDasharray: '2 4',
+          },
         },
         tooltip: {
           container: {
             background: '#ffffff',
-            boxShadow: '0 4px 12px rgba(15,23,42,0.18)',
-            borderRadius: 10,
-            padding: '6px 10px',
-          },
-        },
-        grid: {
-          line: {
-            stroke: 'rgba(148,163,184,0.25)',
-            strokeWidth: 1,
+            borderRadius: 12,
+            padding: '8px 10px',
+            boxShadow: '0 8px 20px rgba(15, 23, 42, 0.18)',
           },
         },
       }}
-      role="img"
+      tooltip={({ data }) => (
+        <div className="dl-chart-tooltip">
+          <strong>
+            {labelPrefix} {data.number}
+          </strong>
+          <span>{data.count} hits</span>
+          <span className="dl-chart-tooltip-sub">
+            Based on the last {freqData?.totalDrawsConsidered ?? range} draws.
+          </span>
+        </div>
+      )}
+      role="application"
+      ariaLabel={`${labelPrefix} number frequency bar chart`}
     />
   );
 
-  // ---------- Render ----------
   return (
     <div className="dl-page dl-analysis-page">
-      {/* PAGE TITLE */}
+      {/* HEADER */}
       <header className="dl-analysis-header">
         <h1 className="dl-hero-title">Number Analysis</h1>
         <p className="dl-section-subtitle">
@@ -241,17 +243,20 @@ export function AnalysisPage() {
       <section className="dl-analysis-config">
         <div className="dl-config-card">
           <div className="dl-config-row">
-            <div>
-              <div className="dl-config-label">Lottery Type</div>
+            <div className="dl-config-item">
+              <div className="dl-config-label">Lottery type</div>
               <div className="dl-config-value">EuroMillions</div>
             </div>
 
-            <div>
-              <div className="dl-config-label">Number of draws to analyse</div>
+            <div className="dl-config-item dl-config-item--right">
+              <label className="dl-config-label" htmlFor="dl-range-select">
+                Number of draws to analyse
+              </label>
               <select
+                id="dl-range-select"
+                className="dl-range-select"
                 value={range}
                 onChange={(e) => setRange(Number(e.target.value))}
-                className="dl-config-select"
               >
                 {RANGE_OPTIONS.map((r) => (
                   <option key={r.value} value={r.value}>
@@ -311,65 +316,69 @@ export function AnalysisPage() {
           )}
         </div>
 
-        {/* Overdue / Gaps */}
-        <div className="dl-analysis-card dl-analysis-card-overdue">
+        {/* Overdue summary */}
+        <div className="dl-analysis-card">
           <h2>Overdue Numbers</h2>
-          {gapsLoading && <p>Calculating overdue numbers…</p>}
+          {gapsLoading && <p>Loading overdue numbers…</p>}
           {gapsError && <p style={{ color: 'red' }}>Error: {gapsError}</p>}
-          {!gapsLoading && gapsData && (
-            <>
-              <p className="dl-config-hint">
-                Based on full EuroMillions history (
-                {gapsData.totalDrawsConsidered} draws).
-              </p>
 
-              <div className="dl-overdue-grid">
-                {/* Main numbers column */}
-                <div className="dl-overdue-column">
-                  <h3 className="dl-overdue-subtitle">Main numbers</h3>
-                  <ul className="dl-gap-list">
-                    {overdueMain.map((item) => (
-                      <li key={item.number}>
-                        <span className="dl-gap-number">{item.number}</span>
-                        <span className="dl-gap-text">
-                          {item.gap} draws since last seen{' '}
-                          {item.lastSeen
-                            ? `(${item.lastSeen})`
-                            : '(never seen)'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+          <div className="dl-overdue-grid">
+            <div className="dl-overdue-col">
+              <h3 className="dl-overdue-subtitle">Main numbers</h3>
+              {gapsData && (
+                <p className="dl-gaps-summary-meta dl-overdue-meta">
+                  Based on full EuroMillions history (
+                  {gapsData.totalDrawsConsidered} draws).
+                </p>
+              )}
 
-                {/* Stars column */}
-                <div className="dl-overdue-column">
-                  <h3 className="dl-overdue-subtitle">Stars</h3>
-                  <ul className="dl-gap-list">
-                    {overdueStars.map((item) => (
-                      <li key={item.number}>
-                        <span className="dl-gap-number dl-gap-number-star">
-                          {item.number}
-                        </span>
-                        <span className="dl-gap-text">
-                          {item.gap} draws since last seen{' '}
-                          {item.lastSeen
-                            ? `(${item.lastSeen})`
-                            : '(never seen)'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </>
-          )}
+              {!gapsLoading && !gapsError && (
+                <ul className="dl-gap-list">
+                  {overdueMain.map((item) => (
+                    <li key={item.number}>
+                      <span className="dl-gap-number">{item.number}</span>
+                      <span className="dl-gap-text">
+                        {item.gap} draws since last seen{' '}
+                        {item.lastSeen ? `(${item.lastSeen})` : '(never seen)'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="dl-overdue-col">
+              <h3 className="dl-overdue-subtitle">Stars</h3>
+              {gapsData && (
+                <p className="dl-gaps-summary-meta dl-overdue-meta">
+                  Based on full EuroMillions history (
+                  {gapsData.totalDrawsConsidered} draws).
+                </p>
+              )}
+
+              {!gapsLoading && !gapsError && (
+                <ul className="dl-gap-list">
+                  {overdueStars.map((item) => (
+                    <li key={item.number}>
+                      <span className="dl-gap-number dl-gap-number-star">
+                        {item.number}
+                      </span>
+                      <span className="dl-gap-text">
+                        {item.gap} draws since last seen{' '}
+                        {item.lastSeen ? `(${item.lastSeen})` : '(never seen)'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
       {/* FREQUENCY CHARTS */}
       <section className="dl-analysis-charts">
-        {/* MAIN NUMBERS */}
+        {/* MAIN */}
         <div className="dl-analysis-card">
           <h2>Main Number Frequency</h2>
           <p className="dl-config-hint">
@@ -411,6 +420,8 @@ export function AnalysisPage() {
           )}
         </div>
       </section>
+
+      <ScrollToTopButton />
     </div>
   );
 }
