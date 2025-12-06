@@ -8,6 +8,20 @@
       "when": 1763237610412,
       "tag": "0000_stiff_kree",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1764974403509,
+      "tag": "0001_lovely_galactus",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1764974515028,
+      "tag": "0002_classy_steve_rogers",
+      "breakpoints": true
     }
   ]
 }

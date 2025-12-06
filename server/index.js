@@ -5,18 +5,24 @@ import { desc } from 'drizzle-orm';
 
 import { db, pool } from './db.js';
 import * as schema from './drizzle/schema.js';
+import predictionsRouter from './routes/predictions.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const { euromillions_draws } = schema;
+// Pull both tables from the Drizzle schema
+const { euromillions_draws, predictions } = schema;
 
 app.use(cors());
 app.use(express.json());
 
-/**
- * Health check
- */
+// Mount predictions router (for saving etc.) under /api
+app.use('/api', predictionsRouter);
+
+/* ──────────────────────────────────────────────
+   Health check
+   GET /api/health
+   ────────────────────────────────────────────── */
 app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -37,10 +43,36 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-/**
- * Frequency – full history
- * GET /api/frequency
- */
+/* ──────────────────────────────────────────────
+   My Predictions – list saved predictions
+   GET /api/predictions
+   (MyPredictionsPage calls this)
+   ────────────────────────────────────────────── */
+app.get('/api/predictions', async (_req, res) => {
+  try {
+    const rows = await db
+      .select()
+      .from(predictions)
+      .orderBy(desc(predictions.created_at))
+      .limit(200); // simple safety cap
+
+    res.json({
+      ok: true,
+      predictions: rows,
+    });
+  } catch (err) {
+    console.error('List predictions error:', err);
+    res.status(500).json({
+      ok: false,
+      error: 'predictions_list_failed',
+    });
+  }
+});
+
+/* ──────────────────────────────────────────────
+   Frequency – full history
+   GET /api/frequency
+   ────────────────────────────────────────────── */
 app.get('/api/frequency', async (_req, res) => {
   try {
     const draws = await db.select().from(euromillions_draws);
@@ -74,10 +106,10 @@ app.get('/api/frequency', async (_req, res) => {
   }
 });
 
-/**
- * Frequency on last N draws
- * GET /api/frequency/latest-n?n=100
- */
+/* ──────────────────────────────────────────────
+   Frequency on last N draws
+   GET /api/frequency/latest-n?n=100
+   ────────────────────────────────────────────── */
 app.get('/api/frequency/latest-n', async (req, res) => {
   try {
     const rawN = req.query.n;
@@ -121,10 +153,10 @@ app.get('/api/frequency/latest-n', async (req, res) => {
   }
 });
 
-/**
- * Hot/Cold numbers on the last N draws
- * GET /api/hot-cold?n=100&top=5
- */
+/* ──────────────────────────────────────────────
+   Hot/Cold numbers on the last N draws
+   GET /api/hot-cold?n=100&top=5
+   ────────────────────────────────────────────── */
 app.get('/api/hot-cold', async (req, res) => {
   try {
     const rawN = req.query.n;
@@ -199,49 +231,33 @@ app.get('/api/hot-cold', async (req, res) => {
   }
 });
 
-/**
- * Gap / Overdue analysis (full history)
- * For each number, how many draws since it last appeared?
- *
- * GET /api/gaps
- *
- * Response:
- * {
- *   ok: true,
- *   main: [ { number, gap, lastSeen }, ... ],
- *   stars: [ { number, gap, lastSeen }, ... ],
- *   totalDrawsConsidered: number
- * }
- */
+/* ──────────────────────────────────────────────
+   Gap / Overdue analysis (full history)
+   GET /api/gaps
+   ────────────────────────────────────────────── */
 app.get('/api/gaps', async (_req, res) => {
   try {
-    // Most recent first
     const draws = await db
       .select()
       .from(euromillions_draws)
       .orderBy(desc(euromillions_draws.draw_date));
 
     const totalDraws = draws.length;
-
-    // Maps: number -> { gap, lastSeen }
     const mainLastSeen = new Map();
     const starLastSeen = new Map();
 
-    // Walk draws from most recent (index 0) backwards
     draws.forEach((d, index) => {
       const drawDate = d.draw_date;
 
-      // Main numbers
       [d.n1, d.n2, d.n3, d.n4, d.n5].forEach((num) => {
         if (num != null && !mainLastSeen.has(num)) {
           mainLastSeen.set(num, {
-            gap: index, // 0 = hit in latest draw, 1 = one draw ago, etc.
+            gap: index,
             lastSeen: drawDate,
           });
         }
       });
 
-      // Stars
       [d.s1, d.s2].forEach((num) => {
         if (num != null && !starLastSeen.has(num)) {
           starLastSeen.set(num, {
@@ -252,13 +268,12 @@ app.get('/api/gaps', async (_req, res) => {
       });
     });
 
-    // EuroMillions ranges: mains 1–50, stars 1–12
     const mainGaps = [];
     for (let n = 1; n <= 50; n++) {
       const info = mainLastSeen.get(n);
       mainGaps.push({
         number: n,
-        gap: info ? info.gap : totalDraws, // if never seen, treat as max gap
+        gap: info ? info.gap : totalDraws,
         lastSeen: info ? info.lastSeen : null,
       });
     }
@@ -273,7 +288,6 @@ app.get('/api/gaps', async (_req, res) => {
       });
     }
 
-    // Sort by gap descending (most overdue first)
     mainGaps.sort((a, b) => b.gap - a.gap || a.number - b.number);
     starGaps.sort((a, b) => b.gap - a.gap || a.number - b.number);
 
@@ -289,10 +303,10 @@ app.get('/api/gaps', async (_req, res) => {
   }
 });
 
-/**
- * Latest draw
- * GET /api/draws/latest
- */
+/* ──────────────────────────────────────────────
+   Latest draw
+   GET /api/draws/latest
+   ────────────────────────────────────────────── */
 app.get('/api/draws/latest', async (_req, res) => {
   try {
     const rows = await db
@@ -307,7 +321,7 @@ app.get('/api/draws/latest', async (_req, res) => {
       return res.json({ ok: true, draw: null });
     }
 
-    const { id, draw_date, n1, n2, n3, n4, n5, s1, s2, created_at } = latest;
+    const { id, draw_date, n1, n2, n3, n4, n5, s1, s2 } = latest;
 
     res.json({
       ok: true,
@@ -325,10 +339,10 @@ app.get('/api/draws/latest', async (_req, res) => {
   }
 });
 
-/**
- * Draws collection with pagination
- * GET /api/draws/all?limit=20&offset=0
- */
+/* ──────────────────────────────────────────────
+   Draws collection with pagination
+   GET /api/draws/all?limit=20&offset=0
+   ────────────────────────────────────────────── */
 app.get('/api/draws/all', async (req, res) => {
   try {
     const rawLimit = req.query.limit;
@@ -339,10 +353,8 @@ app.get('/api/draws/all', async (req, res) => {
 
     if (Number.isNaN(limit) || limit <= 0) limit = 20;
     if (limit > 200) limit = 200;
-
     if (Number.isNaN(offset) || offset < 0) offset = 0;
 
-    // Page of draws (most recent first)
     const draws = await db
       .select()
       .from(euromillions_draws)
@@ -350,10 +362,8 @@ app.get('/api/draws/all', async (req, res) => {
       .limit(limit)
       .offset(offset);
 
-    // Simple total count
     const allRows = await db.select().from(euromillions_draws);
     const total = allRows.length;
-
     const hasMore = offset + draws.length < total;
 
     res.json({
@@ -372,12 +382,13 @@ app.get('/api/draws/all', async (req, res) => {
   }
 });
 
-// Simple root route
+/* ──────────────────────────────────────────────
+   Root
+   ────────────────────────────────────────────── */
 app.get('/', (_req, res) => {
   res.send('Drawlytics API is running');
 });
 
-// Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`API running on http://0.0.0.0:${PORT}`);
 });

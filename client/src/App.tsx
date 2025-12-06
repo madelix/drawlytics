@@ -7,6 +7,8 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import FrequencyDebug from './components/FrequencyDebug';
 import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
 
+import MyPredictionsPage from './pages/MyPredictionsPage';
+
 // --- Lazy-loaded pages ---
 const AnalysisPage = lazy(() =>
   import('./pages/AnalysisPage').then((m) => ({ default: m.AnalysisPage })),
@@ -87,6 +89,14 @@ function AppHeader() {
           >
             All draws
           </NavLink>
+          <NavLink
+            to="/predictions"
+            className={({ isActive }) =>
+              `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
+            }
+          >
+            My predictions
+          </NavLink>
         </nav>
 
         {/* Mobile hamburger */}
@@ -132,6 +142,16 @@ function AppHeader() {
           >
             All draws
           </NavLink>
+          <NavLink
+            to="/predictions"
+            className={({ isActive }) =>
+              `dl-nav-link dl-nav-link--mobile ${
+                isActive ? 'dl-nav-link--active' : ''
+              }`
+            }
+          >
+            My predictions
+          </NavLink>
 
           <span
             style={{
@@ -162,6 +182,7 @@ export default function App() {
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/gaps" element={<GapsPage />} />
           <Route path="/draws" element={<AllDrawsPage />} />
+          <Route path="/predictions" element={<MyPredictionsPage />} />
         </Routes>
       </Suspense>
     </>

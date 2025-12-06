@@ -1,0 +1,181 @@
+{
+  "id": "e08fd967-72c8-4cd4-8530-24359c62d8a6",
+  "prevId": "ef4656cc-ba68-4035-8ead-bc3928a8261c",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.euromillions_draws": {
+      "name": "euromillions_draws",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "draw_date": {
+          "name": "draw_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n1": {
+          "name": "n1",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n2": {
+          "name": "n2",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n3": {
+          "name": "n3",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n4": {
+          "name": "n4",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n5": {
+          "name": "n5",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "s1": {
+          "name": "s1",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "s2": {
+          "name": "s2",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.predictions": {
+      "name": "predictions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "lottery": {
+          "name": "lottery",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'euromillions'"
+        },
+        "draw_date": {
+          "name": "draw_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model_name": {
+          "name": "model_name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "main_numbers": {
+          "name": "main_numbers",
+          "type": "smallint[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "star_numbers": {
+          "name": "star_numbers",
+          "type": "smallint[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(24)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "matched_main": {
+          "name": "matched_main",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "matched_stars": {
+          "name": "matched_stars",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result_label": {
+          "name": "result_label",
+          "type": "varchar(24)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
