@@ -23,9 +23,7 @@ export default function MyPredictionsPage() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -53,12 +51,7 @@ export default function MyPredictionsPage() {
     load();
   }, []);
 
-  async function handleDeletePrediction(id: number) {
-    if (!API_BASE_URL) {
-      alert('API base URL is not configured');
-      return;
-    }
-
+  async function handleDelete(id: number) {
     const confirmed = window.confirm(
       'Delete this prediction? This cannot be undone.',
     );
@@ -66,7 +59,10 @@ export default function MyPredictionsPage() {
 
     try {
       setDeletingId(id);
-      setDeleteError(null);
+
+      if (!API_BASE_URL) {
+        throw new Error('Missing VITE_API_BASE_URL');
+      }
 
       const res = await fetch(`${API_BASE_URL}/api/predictions/${id}`, {
         method: 'DELETE',
@@ -75,15 +71,15 @@ export default function MyPredictionsPage() {
       if (!res.ok) {
         const text = await res.text();
         throw new Error(
-          `API error (${res.status}): ${text || 'Failed to delete'}`,
+          text || `Failed to delete prediction (status ${res.status})`,
         );
       }
 
       // Remove from local state
       setPredictions((prev) => prev.filter((p) => p.id !== id));
-    } catch (err: any) {
+    } catch (err) {
       console.error('Delete prediction failed:', err);
-      setDeleteError(err?.message ?? 'Failed to delete prediction');
+      window.alert('Sorry, something went wrong deleting this prediction.');
     } finally {
       setDeletingId(null);
     }
@@ -101,11 +97,6 @@ export default function MyPredictionsPage() {
 
       {loading && <p>Loading predictions…</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
-      {deleteError && (
-        <p style={{ color: 'red' }}>
-          Delete error: <span>{deleteError}</span>
-        </p>
-      )}
 
       {!loading && !error && predictions.length === 0 && (
         <p>No predictions saved yet.</p>
@@ -131,6 +122,7 @@ export default function MyPredictionsPage() {
                 boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
               }}
             >
+              {/* Top row: lottery / model / date + status + delete */}
               <div
                 style={{
                   display: 'flex',
@@ -150,7 +142,7 @@ export default function MyPredictionsPage() {
                       marginBottom: 2,
                     }}
                   >
-                    {p.lottery}
+                    {p.lottery.toUpperCase()}
                   </div>
                   <div style={{ fontWeight: 600 }}>
                     {p.model_name} — draw {p.draw_date}
@@ -160,8 +152,9 @@ export default function MyPredictionsPage() {
                 <div
                   style={{
                     display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    gap: 4,
                   }}
                 >
                   <div
@@ -181,6 +174,7 @@ export default function MyPredictionsPage() {
                           : p.status === 'lost'
                             ? '#991b1b'
                             : '#1d4ed8',
+                      textTransform: 'lowercase',
                     }}
                   >
                     {p.status}
@@ -188,15 +182,17 @@ export default function MyPredictionsPage() {
 
                   <button
                     type="button"
-                    onClick={() => handleDeletePrediction(p.id)}
+                    onClick={() => handleDelete(p.id)}
                     disabled={deletingId === p.id}
                     style={{
                       border: 'none',
                       background: 'transparent',
                       color: '#9ca3af',
-                      fontSize: '0.8rem',
+                      fontSize: '0.75rem',
                       cursor: deletingId === p.id ? 'default' : 'pointer',
-                      padding: '0.2rem 0.4rem',
+                      textDecoration:
+                        deletingId === p.id ? 'none' : 'underline',
+                      padding: 0,
                     }}
                   >
                     {deletingId === p.id ? 'Deleting…' : 'Delete'}
@@ -204,6 +200,7 @@ export default function MyPredictionsPage() {
                 </div>
               </div>
 
+              {/* Numbers & confidence row */}
               <div
                 style={{
                   display: 'flex',
