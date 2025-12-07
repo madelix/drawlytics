@@ -1,12 +1,34 @@
 // server/routes/predictions.js
-import { Router } from 'express';
-import { desc } from 'drizzle-orm';
-
+import express from 'express';
 import { db } from '../db.js';
 import * as schema from '../drizzle/schema.js';
+import { desc } from 'drizzle-orm';
 
-const router = Router();
+const router = express.Router();
 const { predictions } = schema;
+
+/**
+ * Helper: get the next EuroMillions draw date (Tue or Fri).
+ * - If today is Tue/Fri, we use today.
+ * - Otherwise, we move forward until we hit the next Tue or Fri.
+ * Returns YYYY-MM-DD string.
+ */
+function getNextEuroMillionsDrawDate() {
+  const today = new Date();
+  const candidate = new Date(today);
+  candidate.setHours(0, 0, 0, 0);
+
+  for (let i = 0; i < 7; i++) {
+    const day = candidate.getDay(); // 0=Sun ... 2=Tue ... 5=Fri
+    if (day === 2 || day === 5) {
+      return candidate.toISOString().slice(0, 10);
+    }
+    candidate.setDate(candidate.getDate() + 1);
+  }
+
+  // Fallback (should never hit)
+  return today.toISOString().slice(0, 10);
+}
 
 /**
  * GET /api/predictions
@@ -19,65 +41,47 @@ router.get('/predictions', async (_req, res) => {
       .from(predictions)
       .orderBy(desc(predictions.created_at));
 
-    res.json({ ok: true, predictions: rows });
+    res.json({
+      ok: true,
+      predictions: rows,
+    });
   } catch (err) {
-    console.error('GET /api/predictions error:', err);
-    res.status(500).json({ ok: false, error: 'predictions_list_failed' });
+    console.error('Error fetching predictions:', err);
+    res.status(500).json({ ok: false, error: 'predictions_fetch_failed' });
   }
 });
 
 /**
- * POST /api/predictions
- * Create a new prediction
+ * POST /api/predictions/example
+ * Dev helper: save one example EuroMillions prediction
  */
-router.post('/predictions', async (req, res) => {
+router.post('/predictions/example', async (_req, res) => {
   try {
-    const {
-      lottery,
-      draw_date,
-      model_name,
-      main_numbers,
-      star_numbers,
-      confidence,
-    } = req.body || {};
+    const drawDate = getNextEuroMillionsDrawDate();
 
-    // Basic validation
-    if (!lottery || !draw_date || !model_name) {
-      return res.status(400).json({
-        ok: false,
-        error: 'missing_required_fields',
-      });
-    }
-
-    if (
-      !Array.isArray(main_numbers) ||
-      main_numbers.length !== 5 ||
-      !Array.isArray(star_numbers) ||
-      star_numbers.length !== 2
-    ) {
-      return res.status(400).json({
-        ok: false,
-        error: 'invalid_numbers',
-      });
-    }
-
-    const [inserted] = await db
+    const [row] = await db
       .insert(predictions)
       .values({
-        lottery,
-        draw_date, // YYYY-MM-DD
-        model_name,
-        main_numbers, // int[]
-        star_numbers, // int[]
-        confidence, // numeric(5,2) – will come as string/number
-        status: 'pending', // default status for new predictions
+        lottery: 'EuroMillions',
+        draw_date: drawDate, // ✅ use next Tue/Fri, not "today"
+        model_name: 'Example hot/cold blend',
+        main_numbers: [7, 19, 23, 42, 44],
+        star_numbers: [3, 9],
+        confidence: '12.34', // numeric(5,2) stored as string
+        status: 'pending',
+        result_label: null,
+        matched_main: null,
+        matched_stars: null,
       })
       .returning();
 
-    res.status(201).json({ ok: true, prediction: inserted });
+    res.json({
+      ok: true,
+      prediction: row,
+    });
   } catch (err) {
-    console.error('POST /api/predictions error:', err);
-    res.status(500).json({ ok: false, error: 'predictions_create_failed' });
+    console.error('Error inserting example prediction:', err);
+    res.status(500).json({ ok: false, error: 'prediction_insert_failed' });
   }
 });
 
