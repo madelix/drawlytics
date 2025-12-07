@@ -24,10 +24,14 @@ export default function MyPredictionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   useEffect(() => {
     async function load() {
       try {
         setLoading(true);
+        setError(null);
 
         if (!API_BASE_URL) {
           throw new Error('Missing VITE_API_BASE_URL');
@@ -49,6 +53,42 @@ export default function MyPredictionsPage() {
     load();
   }, []);
 
+  async function handleDeletePrediction(id: number) {
+    if (!API_BASE_URL) {
+      alert('API base URL is not configured');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Delete this prediction? This cannot be undone.',
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingId(id);
+      setDeleteError(null);
+
+      const res = await fetch(`${API_BASE_URL}/api/predictions/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(
+          `API error (${res.status}): ${text || 'Failed to delete'}`,
+        );
+      }
+
+      // Remove from local state
+      setPredictions((prev) => prev.filter((p) => p.id !== id));
+    } catch (err: any) {
+      console.error('Delete prediction failed:', err);
+      setDeleteError(err?.message ?? 'Failed to delete prediction');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <main className="dl-page">
       <header className="dl-analysis-header">
@@ -61,6 +101,11 @@ export default function MyPredictionsPage() {
 
       {loading && <p>Loading predictions…</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
+      {deleteError && (
+        <p style={{ color: 'red' }}>
+          Delete error: <span>{deleteError}</span>
+        </p>
+      )}
 
       {!loading && !error && predictions.length === 0 && (
         <p>No predictions saved yet.</p>
@@ -92,7 +137,7 @@ export default function MyPredictionsPage() {
                   justifyContent: 'space-between',
                   gap: '0.75rem',
                   marginBottom: '0.4rem',
-                  alignItems: 'baseline',
+                  alignItems: 'center',
                 }}
               >
                 <div>
@@ -111,26 +156,51 @@ export default function MyPredictionsPage() {
                     {p.model_name} — draw {p.draw_date}
                   </div>
                 </div>
+
                 <div
                   style={{
-                    fontSize: '0.8rem',
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: 999,
-                    background:
-                      p.status === 'won'
-                        ? '#ecfdf3'
-                        : p.status === 'lost'
-                          ? '#fef2f2'
-                          : '#eff6ff',
-                    color:
-                      p.status === 'won'
-                        ? '#166534'
-                        : p.status === 'lost'
-                          ? '#991b1b'
-                          : '#1d4ed8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
                   }}
                 >
-                  {p.status}
+                  <div
+                    style={{
+                      fontSize: '0.8rem',
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: 999,
+                      background:
+                        p.status === 'won'
+                          ? '#ecfdf3'
+                          : p.status === 'lost'
+                            ? '#fef2f2'
+                            : '#eff6ff',
+                      color:
+                        p.status === 'won'
+                          ? '#166534'
+                          : p.status === 'lost'
+                            ? '#991b1b'
+                            : '#1d4ed8',
+                    }}
+                  >
+                    {p.status}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeletePrediction(p.id)}
+                    disabled={deletingId === p.id}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#9ca3af',
+                      fontSize: '0.8rem',
+                      cursor: deletingId === p.id ? 'default' : 'pointer',
+                      padding: '0.2rem 0.4rem',
+                    }}
+                  >
+                    {deletingId === p.id ? 'Deleting…' : 'Delete'}
+                  </button>
                 </div>
               </div>
 
