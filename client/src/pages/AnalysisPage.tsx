@@ -35,7 +35,46 @@ type BarDatum = {
 type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
 // 👇 must match client/.env
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
+
+/**
+ * Return the next EuroMillions draw date (Tue/Fri), strictly in the future.
+ * If today is Tue, you get Fri; if today is Fri, you get next Tue.
+ */
+function getNextEuroMillionsDrawDate(from: Date = new Date()): string {
+  // Work in UTC so local timezones don't accidentally bump the date
+  const d = new Date(
+    Date.UTC(from.getFullYear(), from.getMonth(), from.getDate()),
+  );
+  const day = d.getUTCDay(); // 0=Sun, 1=Mon, 2=Tue, ... 5=Fri
+
+  const TUE = 2;
+  const FRI = 5;
+
+  let daysToAdd: number;
+
+  if (day < TUE) {
+    // Before Tuesday → this week's Tuesday
+    daysToAdd = TUE - day;
+  } else if (day > TUE && day < FRI) {
+    // Between Tuesday and Friday (Wed/Thu) → this week's Friday
+    daysToAdd = FRI - day;
+  } else if (day > FRI) {
+    // Weekend (Sat/Sun) → next week's Tuesday
+    daysToAdd = 7 - day + TUE;
+  } else {
+    // We are exactly on Tue or Fri → jump to the next draw
+    if (day === TUE) {
+      daysToAdd = FRI - TUE; // 3 days: Tue → Fri
+    } else {
+      // day === FRI
+      daysToAdd = 7 - FRI + TUE; // 4 days: Fri → next Tue
+    }
+  }
+
+  d.setUTCDate(d.getUTCDate() + daysToAdd);
+  return d.toISOString().slice(0, 10); // "YYYY-MM-DD"
+}
 
 export function AnalysisPage() {
   const [range, setRange] = useState<number>(100);
@@ -54,7 +93,7 @@ export function AnalysisPage() {
   const [gapsLoading, setGapsLoading] = useState(false);
   const [gapsError, setGapsError] = useState<string | null>(null);
 
-  // NEW: save example prediction state
+  // save example prediction state
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -247,16 +286,16 @@ export function AnalysisPage() {
         throw new Error('VITE_API_BASE_URL is not configured');
       }
 
-      // Simple hard-coded example for now
-      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const drawDate = getNextEuroMillionsDrawDate();
 
       const body = {
-        lottery: 'Euromillions',
-        draw_date: today,
+        lottery: 'EuroMillions',
+        draw_date: drawDate,
         model_name: 'Example hot/cold blend',
         main_numbers: [7, 19, 23, 42, 44],
         star_numbers: [3, 9],
         confidence: '12.34',
+        // status will default to 'pending' in the DB
       };
 
       const res = await fetch(`${API_BASE_URL}/api/predictions`, {
@@ -324,7 +363,7 @@ export function AnalysisPage() {
             </div>
           </div>
 
-          {/* NEW: Save example prediction action */}
+          {/* Save example prediction action */}
           <div
             style={{
               marginTop: '1rem',
