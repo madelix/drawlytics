@@ -32,6 +32,11 @@ type BarDatum = {
   count: number;
 };
 
+type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
+
+// 👇 must match client/.env
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export function AnalysisPage() {
   const [range, setRange] = useState<number>(100);
 
@@ -48,6 +53,10 @@ export function AnalysisPage() {
   const [gapsData, setGapsData] = useState<GapsResponse | null>(null);
   const [gapsLoading, setGapsLoading] = useState(false);
   const [gapsError, setGapsError] = useState<string | null>(null);
+
+  // NEW: save example prediction state
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // ---------- Load frequency + hot/cold whenever range changes ----------
   useEffect(() => {
@@ -228,6 +237,51 @@ export function AnalysisPage() {
     />
   );
 
+  // ---------- Save example prediction ----------
+  async function handleSaveExamplePrediction() {
+    try {
+      setSaveStatus('saving');
+      setSaveError(null);
+
+      if (!API_BASE_URL) {
+        throw new Error('VITE_API_BASE_URL is not configured');
+      }
+
+      // Simple hard-coded example for now
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+      const body = {
+        lottery: 'Euromillions',
+        draw_date: today,
+        model_name: 'Example hot/cold blend',
+        main_numbers: [7, 19, 23, 42, 44],
+        star_numbers: [3, 9],
+        confidence: '12.34',
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/predictions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(
+          `API error (${res.status}): ${text || 'Failed to save prediction'}`,
+        );
+      }
+
+      setSaveStatus('success');
+    } catch (err: any) {
+      console.error('Save example prediction failed:', err);
+      setSaveError(err?.message ?? 'Failed to save prediction');
+      setSaveStatus('error');
+    }
+  }
+
   return (
     <div className="dl-page dl-analysis-page">
       {/* HEADER */}
@@ -267,6 +321,79 @@ export function AnalysisPage() {
               <div className="dl-config-hint">
                 Analysing {freqData?.totalDrawsConsidered ?? range} draws
               </div>
+            </div>
+          </div>
+
+          {/* NEW: Save example prediction action */}
+          <div
+            style={{
+              marginTop: '1rem',
+              paddingTop: '0.75rem',
+              borderTop: '1px solid rgba(148, 163, 184, 0.25)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '0.75rem',
+              flexWrap: 'wrap',
+            }}
+          >
+            <p
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--dl-text-subtle, #6b7280)',
+                margin: 0,
+              }}
+            >
+              For now this saves a single example prediction to the database, so
+              you can see it appear on the <strong>My Predictions</strong> page.
+            </p>
+
+            <div style={{ textAlign: 'right' }}>
+              <button
+                type="button"
+                onClick={handleSaveExamplePrediction}
+                disabled={saveStatus === 'saving'}
+                style={{
+                  borderRadius: 999,
+                  border: 'none',
+                  padding: '0.45rem 1.1rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 500,
+                  cursor: saveStatus === 'saving' ? 'default' : 'pointer',
+                  background:
+                    'linear-gradient(135deg, #804198 0%, #21409a 100%)',
+                  color: '#ffffff',
+                  opacity: saveStatus === 'saving' ? 0.7 : 1,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {saveStatus === 'saving'
+                  ? 'Saving…'
+                  : 'Save example prediction'}
+              </button>
+              {saveStatus === 'success' && (
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: '0.75rem',
+                    color: '#16a34a',
+                  }}
+                >
+                  Saved! Check the My Predictions page.
+                </div>
+              )}
+              {saveStatus === 'error' && saveError && (
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: '0.75rem',
+                    color: '#b91c1c',
+                    maxWidth: 260,
+                  }}
+                >
+                  {saveError}
+                </div>
+              )}
             </div>
           </div>
         </div>

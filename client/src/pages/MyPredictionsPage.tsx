@@ -17,7 +17,7 @@ type Prediction = {
 };
 
 // 👇 this must match client/.env
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
 
 export default function MyPredictionsPage() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
