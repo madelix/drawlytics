@@ -1,18 +1,18 @@
-// server/predictions.js
+// server/routes/predictions.js
 import express from 'express';
-import { db } from './db.js';
-import * as schema from './drizzle/schema.js';
-import { desc, eq } from 'drizzle-orm';
+import { db } from '../db.js';
+import * as schema from '../drizzle/schema.js';
+import { eq } from 'drizzle-orm';
 
 const router = express.Router();
 
-// GET /api/predictions  -> list all predictions (newest first)
-router.get('/', async (req, res) => {
+// GET /api/predictions  – list all predictions (newest first)
+router.get('/predictions', async (req, res) => {
   try {
     const rows = await db
       .select()
       .from(schema.predictions)
-      .orderBy(desc(schema.predictions.created_at));
+      .orderBy(schema.predictions.created_at.desc());
 
     res.json({ predictions: rows });
   } catch (err) {
@@ -21,8 +21,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/predictions  -> create a new prediction
-router.post('/', async (req, res) => {
+// POST /api/predictions – create a prediction
+router.post('/predictions', async (req, res) => {
   try {
     const {
       lottery,
@@ -33,11 +33,17 @@ router.post('/', async (req, res) => {
       confidence,
     } = req.body;
 
-    if (!lottery || !draw_date || !model_name) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (
+      !lottery ||
+      !draw_date ||
+      !model_name ||
+      !Array.isArray(main_numbers) ||
+      !Array.isArray(star_numbers)
+    ) {
+      return res.status(400).json({ error: 'Missing or invalid fields' });
     }
 
-    const inserted = await db
+    const [inserted] = await db
       .insert(schema.predictions)
       .values({
         lottery,
@@ -45,36 +51,37 @@ router.post('/', async (req, res) => {
         model_name,
         main_numbers,
         star_numbers,
-        confidence,
-        // status, matched_* and result_label can use DB defaults / nulls
+        confidence: confidence ?? '0.00',
+        status: 'pending',
       })
       .returning();
 
-    res.status(201).json({ prediction: inserted[0] });
+    res.status(201).json({ prediction: inserted });
   } catch (err) {
-    console.error('Error inserting prediction:', err);
+    console.error('Error saving prediction:', err);
     res.status(500).json({ error: 'Failed to save prediction' });
   }
 });
 
-// DELETE /api/predictions/:id  -> delete a prediction by id
-router.delete('/:id', async (req, res) => {
+// DELETE /api/predictions/:id – delete one prediction
+router.delete('/predictions/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
-    if (Number.isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid id' });
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Invalid prediction id' });
     }
 
     const deleted = await db
       .delete(schema.predictions)
       .where(eq(schema.predictions.id, id))
-      .returning({ id: schema.predictions.id });
+      .returning();
 
-    if (!deleted.length) {
+    if (deleted.length === 0) {
       return res.status(404).json({ error: 'Prediction not found' });
     }
 
-    res.json({ success: true });
+    // 204 = No Content, standard for successful DELETE
+    res.status(204).send();
   } catch (err) {
     console.error('Error deleting prediction:', err);
     res.status(500).json({ error: 'Failed to delete prediction' });
