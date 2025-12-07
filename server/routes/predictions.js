@@ -2,17 +2,20 @@
 import express from 'express';
 import { db } from '../db.js';
 import * as schema from '../drizzle/schema.js';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 
 const router = express.Router();
 
-// GET /api/predictions  – list all predictions (newest first)
+/**
+ * GET /api/predictions
+ * Return all predictions, newest first.
+ */
 router.get('/predictions', async (req, res) => {
   try {
     const rows = await db
       .select()
       .from(schema.predictions)
-      .orderBy(schema.predictions.created_at.desc());
+      .orderBy(desc(schema.predictions.created_at));
 
     res.json({ predictions: rows });
   } catch (err) {
@@ -21,7 +24,10 @@ router.get('/predictions', async (req, res) => {
   }
 });
 
-// POST /api/predictions – create a prediction
+/**
+ * POST /api/predictions
+ * Create a new prediction.
+ */
 router.post('/predictions', async (req, res) => {
   try {
     const {
@@ -63,10 +69,14 @@ router.post('/predictions', async (req, res) => {
   }
 });
 
-// DELETE /api/predictions/:id – delete one prediction
+/**
+ * DELETE /api/predictions/:id
+ * Delete a prediction by id.
+ */
 router.delete('/predictions/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
+
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ error: 'Invalid prediction id' });
     }
@@ -80,7 +90,7 @@ router.delete('/predictions/:id', async (req, res) => {
       return res.status(404).json({ error: 'Prediction not found' });
     }
 
-    // 204 = No Content, standard for successful DELETE
+    // Success, nothing else to send
     res.status(204).send();
   } catch (err) {
     console.error('Error deleting prediction:', err);

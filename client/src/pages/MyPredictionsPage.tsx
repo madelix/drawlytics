@@ -25,6 +25,7 @@ export default function MyPredictionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  // -------- Load predictions --------
   useEffect(() => {
     async function load() {
       try {
@@ -36,11 +37,16 @@ export default function MyPredictionsPage() {
         }
 
         const res = await fetch(`${API_BASE_URL}/api/predictions`);
-        if (!res.ok) throw new Error('Failed to load predictions');
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(
+            `Failed to load predictions (status ${res.status}): ${text}`,
+          );
+        }
 
         const data = await res.json();
         setPredictions(data.predictions ?? []);
-      } catch (err) {
+      } catch (err: any) {
         console.error(err);
         setError('Could not load predictions');
       } finally {
@@ -51,27 +57,29 @@ export default function MyPredictionsPage() {
     load();
   }, []);
 
+  // -------- Delete a prediction --------
   async function handleDelete(id: number) {
-    const confirmed = window.confirm(
-      'Delete this prediction? This cannot be undone.',
+    if (!API_BASE_URL) {
+      alert('API base URL is not configured');
+      return;
+    }
+
+    const ok = window.confirm(
+      'Delete this prediction? This action cannot be undone.',
     );
-    if (!confirmed) return;
+    if (!ok) return;
 
     try {
       setDeletingId(id);
-
-      if (!API_BASE_URL) {
-        throw new Error('Missing VITE_API_BASE_URL');
-      }
 
       const res = await fetch(`${API_BASE_URL}/api/predictions/${id}`, {
         method: 'DELETE',
       });
 
-      if (!res.ok) {
+      if (!res.ok && res.status !== 204) {
         const text = await res.text();
         throw new Error(
-          text || `Failed to delete prediction (status ${res.status})`,
+          `Failed to delete (status ${res.status}): ${text || 'Unknown error'}`,
         );
       }
 
@@ -79,7 +87,7 @@ export default function MyPredictionsPage() {
       setPredictions((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
       console.error('Delete prediction failed:', err);
-      window.alert('Sorry, something went wrong deleting this prediction.');
+      alert('Could not delete prediction. Check console/logs for details.');
     } finally {
       setDeletingId(null);
     }
@@ -122,14 +130,13 @@ export default function MyPredictionsPage() {
                 boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
               }}
             >
-              {/* Top row: lottery / model / date + status + delete */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   gap: '0.75rem',
                   marginBottom: '0.4rem',
-                  alignItems: 'center',
+                  alignItems: 'baseline',
                 }}
               >
                 <div>
@@ -142,7 +149,7 @@ export default function MyPredictionsPage() {
                       marginBottom: 2,
                     }}
                   >
-                    {p.lottery.toUpperCase()}
+                    {p.lottery}
                   </div>
                   <div style={{ fontWeight: 600 }}>
                     {p.model_name} — draw {p.draw_date}
@@ -152,11 +159,11 @@ export default function MyPredictionsPage() {
                 <div
                   style={{
                     display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-end',
-                    gap: 4,
+                    alignItems: 'center',
+                    gap: '0.5rem',
                   }}
                 >
+                  {/* status pill */}
                   <div
                     style={{
                       fontSize: '0.8rem',
@@ -174,12 +181,12 @@ export default function MyPredictionsPage() {
                           : p.status === 'lost'
                             ? '#991b1b'
                             : '#1d4ed8',
-                      textTransform: 'lowercase',
                     }}
                   >
                     {p.status}
                   </div>
 
+                  {/* delete button */}
                   <button
                     type="button"
                     onClick={() => handleDelete(p.id)}
@@ -188,11 +195,9 @@ export default function MyPredictionsPage() {
                       border: 'none',
                       background: 'transparent',
                       color: '#9ca3af',
-                      fontSize: '0.75rem',
+                      fontSize: '0.8rem',
                       cursor: deletingId === p.id ? 'default' : 'pointer',
-                      textDecoration:
-                        deletingId === p.id ? 'none' : 'underline',
-                      padding: 0,
+                      padding: '0.1rem 0.4rem',
                     }}
                   >
                     {deletingId === p.id ? 'Deleting…' : 'Delete'}
@@ -200,7 +205,6 @@ export default function MyPredictionsPage() {
                 </div>
               </div>
 
-              {/* Numbers & confidence row */}
               <div
                 style={{
                   display: 'flex',
