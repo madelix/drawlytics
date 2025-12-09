@@ -1,64 +1,51 @@
 // client/src/pages/MakeMagicPage.tsx
 import { useState } from 'react';
 
-type StrategyId =
-  | 'balanced_hot_cold'
-  | 'pure_random'
-  | 'hot_focused'
-  | 'cold_focused'
-  | 'overdue';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-type StrategyOption = {
-  id: StrategyId;
-  label: string;
-  description: string;
-};
-
-const STRATEGY_OPTIONS: StrategyOption[] = [
+// Canonical strategy keys + labels + descriptions.
+// These keys must match what the server understands.
+const STRATEGIES = [
   {
-    id: 'balanced_hot_cold',
+    value: 'balanced_hot_cold',
     label: 'Balanced hot/cold',
     description: 'Mix of frequently and infrequently drawn numbers.',
   },
   {
-    id: 'pure_random',
+    value: 'pure_random',
     label: 'Pure random',
     description: 'Uniform random within valid ranges.',
   },
   {
-    id: 'hot_focused',
+    value: 'hot_focused',
     label: 'Hot-focused',
     description: 'Leans towards recently frequent numbers.',
   },
   {
-    id: 'cold_focused',
+    value: 'cold_focused',
     label: 'Cold-focused',
     description: 'Leans towards less frequent / “ignored” numbers.',
   },
   {
-    id: 'overdue',
+    value: 'overdue',
     label: 'Overdue',
     description: 'Prioritises numbers with long gaps.',
   },
 ];
 
-// 👇 must match client/.env
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined;
-
-type GeneratorStatus = 'idle' | 'loading' | 'success' | 'error';
+type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
 export function MakeMagicPage() {
-  const [strategyId, setStrategyId] = useState<StrategyId>('balanced_hot_cold');
+  const [strategy, setStrategy] = useState<string>('balanced_hot_cold');
   const [lines, setLines] = useState<number>(5);
-  const [status, setStatus] = useState<GeneratorStatus>('idle');
+  const [status, setStatus] = useState<SaveStatus>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  const currentStrategy =
-    STRATEGY_OPTIONS.find((s) => s.id === strategyId) ?? STRATEGY_OPTIONS[0];
+  const selectedStrategy = STRATEGIES.find((s) => s.value === strategy)!;
 
   async function handleGenerate() {
     try {
-      setStatus('loading');
+      setStatus('saving');
       setError(null);
 
       if (!API_BASE_URL) {
@@ -67,10 +54,12 @@ export function MakeMagicPage() {
 
       const res = await fetch(`${API_BASE_URL}/api/predictions/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           lottery: 'Euromillions',
-          strategy: strategyId,
+          strategy, // 👈 send canonical key
           lines,
         }),
       });
@@ -83,7 +72,8 @@ export function MakeMagicPage() {
       }
 
       setStatus('success');
-      // (Optional: you could toast or link to /predictions here)
+      // tiny auto-reset after a moment
+      setTimeout(() => setStatus('idle'), 2000);
     } catch (err: any) {
       console.error('Generate & save failed:', err);
       setStatus('error');
@@ -93,7 +83,6 @@ export function MakeMagicPage() {
 
   return (
     <div className="dl-page dl-analysis-page">
-      {/* HEADER */}
       <header className="dl-analysis-header">
         <h1 className="dl-hero-title">Make magic</h1>
         <p className="dl-section-subtitle">
@@ -102,10 +91,9 @@ export function MakeMagicPage() {
         </p>
       </header>
 
-      {/* CONFIG CARD */}
       <section className="dl-analysis-config">
         <div className="dl-config-card">
-          {/* Lottery row */}
+          {/* LOTTERY ROW */}
           <div className="dl-config-row">
             <div className="dl-config-item">
               <div className="dl-config-label">Lottery</div>
@@ -116,54 +104,58 @@ export function MakeMagicPage() {
             </div>
           </div>
 
-          {/* Strategy + lines row */}
-          <div className="dl-config-row" style={{ marginTop: '1.25rem' }}>
+          {/* STRATEGY + LINES ROW */}
+          <div className="dl-config-row" style={{ marginTop: '1.5rem' }}>
             {/* Strategy */}
             <div className="dl-config-item">
               <label className="dl-config-label" htmlFor="dl-strategy-select">
                 Strategy
               </label>
-              <select
-                id="dl-strategy-select"
-                className="dl-range-select"
-                value={strategyId}
-                onChange={(e) => setStrategyId(e.target.value as StrategyId)}
-              >
-                {STRATEGY_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              <div className="dl-select-shell">
+                <select
+                  id="dl-strategy-select"
+                  className="dl-range-select"
+                  value={strategy}
+                  onChange={(e) => setStrategy(e.target.value)}
+                >
+                  {STRATEGIES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="dl-config-hint">
-                {currentStrategy.description}
+                {selectedStrategy.description}
               </div>
             </div>
 
-            {/* Number of lines */}
+            {/* Lines */}
             <div className="dl-config-item dl-config-item--right">
-              <label className="dl-config-label" htmlFor="dl-lines-select">
+              <label className="dl-config-label" htmlFor="dl-lines-input">
                 Number of lines
               </label>
-              <select
-                id="dl-lines-select"
+              <input
+                id="dl-lines-input"
                 className="dl-range-select"
+                type="number"
+                min={1}
+                max={5}
                 value={lines}
-                onChange={(e) => setLines(Number(e.target.value))}
-              >
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (!Number.isNaN(v)) {
+                    setLines(Math.min(Math.max(v, 1), 5));
+                  }
+                }}
+              />
               <div className="dl-config-hint">
                 Generate between 1 and 5 lines per request.
               </div>
             </div>
           </div>
 
-          {/* Footer / status row */}
+          {/* FOOTER ROW: INFO + BUTTON */}
           <div
             style={{
               marginTop: '1.5rem',
@@ -191,36 +183,27 @@ export function MakeMagicPage() {
               <button
                 type="button"
                 onClick={handleGenerate}
-                disabled={status === 'loading'}
+                disabled={status === 'saving'}
                 style={{
                   borderRadius: 999,
                   border: 'none',
                   padding: '0.6rem 1.4rem',
-                  fontSize: '0.9rem',
+                  fontSize: '0.95rem',
                   fontWeight: 500,
-                  cursor: status === 'loading' ? 'default' : 'pointer',
+                  cursor: status === 'saving' ? 'default' : 'pointer',
                   background:
                     'linear-gradient(135deg, #804198 0%, #21409a 100%)',
                   color: '#ffffff',
-                  opacity: status === 'loading' ? 0.75 : 1,
+                  opacity: status === 'saving' ? 0.7 : 1,
                   whiteSpace: 'nowrap',
                 }}
               >
-                {status === 'loading' ? 'Generating…' : 'Generate & save'}
+                {status === 'saving'
+                  ? 'Generating…'
+                  : status === 'success'
+                    ? 'Saved!'
+                    : 'Generate & save'}
               </button>
-
-              {status === 'success' && (
-                <div
-                  style={{
-                    marginTop: 4,
-                    fontSize: '0.75rem',
-                    color: '#16a34a',
-                  }}
-                >
-                  Saved! Check the My predictions page.
-                </div>
-              )}
-
               {status === 'error' && error && (
                 <div
                   style={{

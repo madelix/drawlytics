@@ -19,27 +19,41 @@ const router = express.Router();
 
 /**
  * Normalise any incoming strategy value to one of our canonical keys.
- * This lets us accept both old and new values, e.g. "hot" or "hot_focused".
+ *
+ * Accepts things like:
+ *   "balanced_hot_cold"
+ *   "Balanced hot/cold"
+ *   "hot-focused"
+ *   "Hot"
+ *   "pure random"
+ *   "overdue"
  */
 function normaliseStrategy(raw) {
-  switch (raw) {
+  if (!raw) return 'balanced_hot_cold';
+
+  // e.g. "Hot-focused" -> "hot_focused"
+  //      "Balanced hot/cold" -> "balanced_hot_cold"
+  const cleaned = String(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-\/]+/g, '_');
+
+  switch (cleaned) {
+    case 'balanced_hot_cold':
     case 'balanced':
     case 'default':
-    case 'balanced_hot_cold':
-    case undefined:
-    case null:
       return 'balanced_hot_cold';
 
-    case 'random':
     case 'pure_random':
+    case 'random':
       return 'pure_random';
 
-    case 'hot':
     case 'hot_focused':
+    case 'hot':
       return 'hot_focused';
 
-    case 'cold':
     case 'cold_focused':
+    case 'cold':
       return 'cold_focused';
 
     case 'overdue':
@@ -52,27 +66,86 @@ function normaliseStrategy(raw) {
 }
 
 /**
- * Helper: get the next EuroMillions draw date (Tue/Fri)
- * as a YYYY-MM-DD string.
+ * Decide which EuroMillions draw this prediction should belong to.
+ *
+ * Rules (Europe/London time):
+ * - Draw days: Tuesday (2), Friday (5)
+ * - Until 20:44 → prediction belongs to *today's* draw
+ * - From 20:45 onwards → prediction belongs to the *next* draw
+ *
+ * Returns YYYY-MM-DD.
  */
 function getNextEuroMillionsDrawDate(from = new Date()) {
-  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  const day = d.getDay(); // 0 = Sun, 1 = Mon, ..., 2 = Tue, 5 = Fri
+  // Interpret "from" in Europe/London time
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  });
 
-  let daysToAdd;
-  if (day <= 2) {
-    // Sun/Mon/Tue → go to this week's Tuesday
-    daysToAdd = 2 - day;
-  } else if (day <= 5) {
-    // Wed/Thu/Fri → go to this week's Friday
+  const parts = fmt.formatToParts(from);
+  const getPart = (type) => Number(parts.find((p) => p.type === type)?.value);
+
+  const year = getPart('year');
+  const month = getPart('month'); // 1–12
+  const dayOfMonth = getPart('day');
+  const hour = getPart('hour');
+  const minute = getPart('minute');
+
+  // Make a Date that represents that London date at that time, in UTC
+  const londonNow = new Date(
+    Date.UTC(year, month - 1, dayOfMonth, hour, minute),
+  );
+
+  // Day-of-week in London
+  const day = londonNow.getUTCDay(); // 0=Sun ... 2=Tue ... 5=Fri
+  const minutes = hour * 60 + minute;
+  const cutoffMinutes = 20 * 60 + 45; // 20:45
+
+  let daysToAdd = 0;
+
+  if (day === 2 || day === 5) {
+    // Tuesday or Friday
+    if (minutes >= cutoffMinutes) {
+      // After cutoff → next draw
+      daysToAdd = day === 2 ? 3 : 4; // Tue→Fri (+3), Fri→Tue (+4)
+    } else {
+      // Before cutoff → today's draw
+      daysToAdd = 0;
+    }
+  } else if (day === 3 || day === 4) {
+    // Wed/Thu → this week's Friday
     daysToAdd = 5 - day;
-  } else {
-    // Saturday → next Tuesday (+3 days)
+  } else if (day === 6) {
+    // Saturday → next Tuesday
     daysToAdd = 3;
+  } else if (day === 0 || day === 1) {
+    // Sunday or Monday → Tuesday
+    daysToAdd = 2 - day;
+  } else {
+    // Fallback: next Tuesday
+    daysToAdd = (2 - day + 7) % 7;
   }
 
-  d.setDate(d.getDate() + daysToAdd);
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+  const drawDate = new Date(
+    Date.UTC(year, month - 1, dayOfMonth + daysToAdd, 0, 0, 0, 0),
+  );
+
+  const iso = drawDate.toISOString().slice(0, 10); // YYYY-MM-DD
+
+  // Debug log so you can see decisions in Railway logs
+  console.log('[draw-date]', {
+    nowIso: from.toISOString(),
+    london: { year, month, dayOfMonth, hour, minute, day, minutes },
+    daysToAdd,
+    drawDate: iso,
+  });
+
+  return iso;
 }
 
 // --- simple helpers to generate numbers ---
