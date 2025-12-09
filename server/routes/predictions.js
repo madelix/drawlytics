@@ -4,9 +4,52 @@ import { db } from '../db.js';
 import * as schema from '../drizzle/schema.js';
 import { desc, eq } from 'drizzle-orm';
 
+// Canonical internal strategy keys -> human labels
+const STRATEGY_LABELS = {
+  balanced_hot_cold: 'Balanced hot/cold generator',
+  pure_random: 'Pure random generator',
+  hot_focused: 'Hot-focused generator',
+  cold_focused: 'Cold-focused generator',
+  overdue: 'Overdue-focused generator',
+};
+
 const { predictions } = schema;
 
 const router = express.Router();
+
+/**
+ * Normalise any incoming strategy value to one of our canonical keys.
+ * This lets us accept both old and new values, e.g. "hot" or "hot_focused".
+ */
+function normaliseStrategy(raw) {
+  switch (raw) {
+    case 'balanced':
+    case 'default':
+    case 'balanced_hot_cold':
+    case undefined:
+    case null:
+      return 'balanced_hot_cold';
+
+    case 'random':
+    case 'pure_random':
+      return 'pure_random';
+
+    case 'hot':
+    case 'hot_focused':
+      return 'hot_focused';
+
+    case 'cold':
+    case 'cold_focused':
+      return 'cold_focused';
+
+    case 'overdue':
+    case 'overdue_focused':
+      return 'overdue';
+
+    default:
+      return 'balanced_hot_cold';
+  }
+}
 
 /**
  * Helper: get the next EuroMillions draw date (Tue/Fri)
@@ -24,7 +67,7 @@ function getNextEuroMillionsDrawDate(from = new Date()) {
     // Wed/Thu/Fri → go to this week's Friday
     daysToAdd = 5 - day;
   } else {
-    // Saturday → next Tuesday ( +3 days )
+    // Saturday → next Tuesday (+3 days)
     daysToAdd = 3;
   }
 
@@ -53,22 +96,6 @@ function generateStarNumbers() {
   return generateUniqueNumbers(12, 2);
 }
 
-function strategyToLabel(strategy) {
-  switch (strategy) {
-    case 'hot':
-      return 'Hot-focused generator';
-    case 'cold':
-      return 'Cold-focused generator';
-    case 'overdue':
-      return 'Overdue-focused generator';
-    case 'random':
-      return 'Random generator';
-    case 'balanced_hot_cold':
-    default:
-      return 'Balanced hot/cold generator';
-  }
-}
-
 // ----------------- ROUTES -----------------
 
 // GET /api/predictions  – list all predictions
@@ -86,7 +113,7 @@ router.get('/predictions', async (req, res) => {
   }
 });
 
-// POST /api/predictions  – generic create (used if you ever call it manually)
+// POST /api/predictions  – generic create (manual use)
 router.post('/predictions', async (req, res) => {
   try {
     const {
@@ -129,7 +156,7 @@ router.post('/predictions', async (req, res) => {
   }
 });
 
-// NEW: POST /api/predictions/generate – generate + save one or more lines
+// POST /api/predictions/generate – generate + save one or more lines
 router.post('/predictions/generate', async (req, res) => {
   try {
     const {
@@ -138,12 +165,14 @@ router.post('/predictions/generate', async (req, res) => {
       lines = 1,
     } = req.body || {};
 
+    // Normalise strategy to a canonical key and label
+    const normalised = normaliseStrategy(strategy);
+    const model_name = STRATEGY_LABELS[normalised] || 'Generator';
+
     // Clamp lines between 1 and 10
     const lineCount = Math.min(Math.max(Number(lines) || 1, 1), 10);
 
     const drawDate = getNextEuroMillionsDrawDate();
-    const model_name = strategyToLabel(strategy);
-
     const created = [];
 
     for (let i = 0; i < lineCount; i++) {

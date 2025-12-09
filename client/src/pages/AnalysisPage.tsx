@@ -37,6 +37,47 @@ type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 // 👇 must match client/.env
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
 
+// --------- helper: next EuroMillions draw date (Tue/Fri) ----------
+function getNextEuroMillionsDrawDate(from: Date = new Date()): string {
+  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const day = d.getDay(); // 0 = Sun, 1 = Mon, ..., 2 = Tue, 5 = Fri
+
+  let daysToAdd: number;
+  if (day <= 2) {
+    // Sun/Mon/Tue → this week's Tuesday
+    daysToAdd = 2 - day;
+  } else if (day <= 5) {
+    // Wed/Thu/Fri → this week's Friday
+    daysToAdd = 5 - day;
+  } else {
+    // Saturday → next Tuesday
+    daysToAdd = 3;
+  }
+
+  d.setDate(d.getDate() + daysToAdd);
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+// --------- helper: generate random numbers ----------
+function generateUniqueNumbers(max: number, count: number): number[] {
+  const nums = new Set<number>();
+  while (nums.size < count) {
+    const n = Math.floor(Math.random() * max) + 1; // 1..max
+    nums.add(n);
+  }
+  return Array.from(nums).sort((a, b) => a - b);
+}
+
+function generateMainNumbers(): number[] {
+  // EuroMillions: 5 main numbers 1..50
+  return generateUniqueNumbers(50, 5);
+}
+
+function generateStarNumbers(): number[] {
+  // EuroMillions: 2 stars 1..12
+  return generateUniqueNumbers(12, 2);
+}
+
 export function AnalysisPage() {
   const [range, setRange] = useState<number>(100);
 
@@ -54,7 +95,7 @@ export function AnalysisPage() {
   const [gapsLoading, setGapsLoading] = useState(false);
   const [gapsError, setGapsError] = useState<string | null>(null);
 
-  // NEW: quick generate state
+  // quick generate state
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -237,7 +278,7 @@ export function AnalysisPage() {
     />
   );
 
-  // ---------- Quick generate prediction ----------
+  // ---------- Quick generate prediction (client-side) ----------
   async function handleQuickGenerate() {
     try {
       setSaveStatus('saving');
@@ -247,30 +288,34 @@ export function AnalysisPage() {
         throw new Error('VITE_API_BASE_URL is not configured');
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/predictions/generate`, {
+      const drawDate = getNextEuroMillionsDrawDate();
+      const main_numbers = generateMainNumbers();
+      const star_numbers = generateStarNumbers();
+
+      const body = {
+        lottery: 'Euromillions',
+        draw_date: drawDate,
+        model_name: 'Balanced hot/cold generator',
+        main_numbers,
+        star_numbers,
+        confidence: '0.00',
+        status: 'pending',
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/predictions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          lottery: 'Euromillions',
-          strategy: 'balanced_hot_cold',
-          lines: 1,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
         const text = await res.text();
         throw new Error(
-          `API error (${res.status}): ${
-            text || 'Failed to generate prediction'
-          }`,
+          `API error (${res.status}): ${text || 'Failed to save prediction'}`,
         );
       }
-
-      // We *could* read the returned prediction here if we wanted,
-      // but for now we just show a success message.
-      // const json = await res.json();
 
       setSaveStatus('success');
     } catch (err: any) {
@@ -322,7 +367,7 @@ export function AnalysisPage() {
             </div>
           </div>
 
-          {/* NEW: Quick generate action */}
+          {/* Quick generate action */}
           <div
             style={{
               marginTop: '1rem',

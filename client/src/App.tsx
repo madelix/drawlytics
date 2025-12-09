@@ -8,6 +8,7 @@ import FrequencyDebug from './components/FrequencyDebug';
 import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
 
 import MyPredictionsPage from './pages/MyPredictionsPage';
+import { MakeMagicPage } from './pages/MakeMagicPage';
 
 // --- Lazy-loaded pages ---
 const AnalysisPage = lazy(() =>
@@ -90,6 +91,14 @@ function AppHeader() {
             All draws
           </NavLink>
           <NavLink
+            to="/make-magic"
+            className={({ isActive }) =>
+              `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
+            }
+          >
+            Make magic
+          </NavLink>
+          <NavLink
             to="/predictions"
             className={({ isActive }) =>
               `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
@@ -143,6 +152,16 @@ function AppHeader() {
             All draws
           </NavLink>
           <NavLink
+            to="/make-magic"
+            className={({ isActive }) =>
+              `dl-nav-link dl-nav-link--mobile ${
+                isActive ? 'dl-nav-link--active' : ''
+              }`
+            }
+          >
+            Make magic
+          </NavLink>
+          <NavLink
             to="/predictions"
             className={({ isActive }) =>
               `dl-nav-link dl-nav-link--mobile ${
@@ -183,6 +202,7 @@ export default function App() {
           <Route path="/gaps" element={<GapsPage />} />
           <Route path="/draws" element={<AllDrawsPage />} />
           <Route path="/predictions" element={<MyPredictionsPage />} />
+          <Route path="/make-magic" element={<MakeMagicPage />} />
         </Routes>
       </Suspense>
     </>
