@@ -10,13 +10,13 @@ import predictionsRouter from './routes/predictions.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Pull both tables from the Drizzle schema
-const { euromillions_draws, predictions } = schema;
+// Pull tables from the Drizzle schema
+const { euromillions_draws } = schema;
 
 app.use(cors());
 app.use(express.json());
 
-// Mount predictions router (for saving etc.) under /api
+// Mount predictions router under /api
 app.use('/api', predictionsRouter);
 
 /* ──────────────────────────────────────────────
@@ -39,32 +39,6 @@ app.get('/api/health', async (_req, res) => {
       ok: false,
       service: 'drawlytics-api',
       db: 'connection_failed',
-    });
-  }
-});
-
-/* ──────────────────────────────────────────────
-   My Predictions – list saved predictions
-   GET /api/predictions
-   (MyPredictionsPage calls this)
-   ────────────────────────────────────────────── */
-app.get('/api/predictions', async (_req, res) => {
-  try {
-    const rows = await db
-      .select()
-      .from(predictions)
-      .orderBy(desc(predictions.created_at))
-      .limit(200); // simple safety cap
-
-    res.json({
-      ok: true,
-      predictions: rows,
-    });
-  } catch (err) {
-    console.error('List predictions error:', err);
-    res.status(500).json({
-      ok: false,
-      error: 'predictions_list_failed',
     });
   }
 });
@@ -216,14 +190,8 @@ app.get('/api/hot-cold', async (req, res) => {
       requestedN: n,
       totalDrawsConsidered: draws.length,
       top,
-      hot: {
-        main: hotMain,
-        stars: hotStars,
-      },
-      cold: {
-        main: coldMain,
-        stars: coldStars,
-      },
+      hot: { main: hotMain, stars: hotStars },
+      cold: { main: coldMain, stars: coldStars },
     });
   } catch (err) {
     console.error('Hot/Cold error:', err);
@@ -251,19 +219,13 @@ app.get('/api/gaps', async (_req, res) => {
 
       [d.n1, d.n2, d.n3, d.n4, d.n5].forEach((num) => {
         if (num != null && !mainLastSeen.has(num)) {
-          mainLastSeen.set(num, {
-            gap: index,
-            lastSeen: drawDate,
-          });
+          mainLastSeen.set(num, { gap: index, lastSeen: drawDate });
         }
       });
 
       [d.s1, d.s2].forEach((num) => {
         if (num != null && !starLastSeen.has(num)) {
-          starLastSeen.set(num, {
-            gap: index,
-            lastSeen: drawDate,
-          });
+          starLastSeen.set(num, { gap: index, lastSeen: drawDate });
         }
       });
     });
@@ -317,9 +279,7 @@ app.get('/api/draws/latest', async (_req, res) => {
 
     const latest = rows[0] ?? null;
 
-    if (!latest) {
-      return res.json({ ok: true, draw: null });
-    }
+    if (!latest) return res.json({ ok: true, draw: null });
 
     const { id, draw_date, n1, n2, n3, n4, n5, s1, s2 } = latest;
 
@@ -369,12 +329,7 @@ app.get('/api/draws/all', async (req, res) => {
     res.json({
       ok: true,
       draws,
-      pagination: {
-        limit,
-        offset,
-        total,
-        hasMore,
-      },
+      pagination: { limit, offset, total, hasMore },
     });
   } catch (err) {
     console.error('Draws/all error:', err);
