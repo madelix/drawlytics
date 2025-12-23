@@ -9,6 +9,7 @@ import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
 
 import MyPredictionsPage from './pages/MyPredictionsPage';
 import { MakeMagicPage } from './pages/MakeMagicPage';
+import ModelPerformancePage from './pages/ModelPerformancePage';
 
 // --- Lazy-loaded pages ---
 const AnalysisPage = lazy(() =>
@@ -74,6 +75,7 @@ function AppHeader() {
           >
             Analysis
           </NavLink>
+
           <NavLink
             to="/gaps"
             className={({ isActive }) =>
@@ -82,6 +84,7 @@ function AppHeader() {
           >
             Gaps
           </NavLink>
+
           <NavLink
             to="/draws"
             className={({ isActive }) =>
@@ -90,6 +93,7 @@ function AppHeader() {
           >
             All draws
           </NavLink>
+
           <NavLink
             to="/make-magic"
             className={({ isActive }) =>
@@ -98,6 +102,17 @@ function AppHeader() {
           >
             Make magic
           </NavLink>
+
+          {/* ✅ NEW */}
+          <NavLink
+            to="/performance"
+            className={({ isActive }) =>
+              `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
+            }
+          >
+            Performance
+          </NavLink>
+
           <NavLink
             to="/predictions"
             className={({ isActive }) =>
@@ -131,6 +146,7 @@ function AppHeader() {
           >
             Analysis
           </NavLink>
+
           <NavLink
             to="/gaps"
             className={({ isActive }) =>
@@ -141,6 +157,7 @@ function AppHeader() {
           >
             Gaps
           </NavLink>
+
           <NavLink
             to="/draws"
             className={({ isActive }) =>
@@ -151,6 +168,7 @@ function AppHeader() {
           >
             All draws
           </NavLink>
+
           <NavLink
             to="/make-magic"
             className={({ isActive }) =>
@@ -161,6 +179,19 @@ function AppHeader() {
           >
             Make magic
           </NavLink>
+
+          {/* ✅ NEW */}
+          <NavLink
+            to="/performance"
+            className={({ isActive }) =>
+              `dl-nav-link dl-nav-link--mobile ${
+                isActive ? 'dl-nav-link--active' : ''
+              }`
+            }
+          >
+            Performance
+          </NavLink>
+
           <NavLink
             to="/predictions"
             className={({ isActive }) =>
@@ -201,8 +232,12 @@ export default function App() {
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/gaps" element={<GapsPage />} />
           <Route path="/draws" element={<AllDrawsPage />} />
-          <Route path="/predictions" element={<MyPredictionsPage />} />
           <Route path="/make-magic" element={<MakeMagicPage />} />
+
+          {/* ✅ NEW */}
+          <Route path="/performance" element={<ModelPerformancePage />} />
+
+          <Route path="/predictions" element={<MyPredictionsPage />} />
         </Routes>
       </Suspense>
     </>
@@ -239,13 +274,12 @@ function LandingPage() {
 
   return (
     <div className="dl-page dl-page--landing">
-      {/* Logo + tagline (like screenshot 1) */}
+      {/* Logo + tagline */}
       <header className="dl-landing-header">
         <img src={logo} alt="Drawlytics" className="dl-logo" />
         <p className="dl-landing-tagline">Data-driven clarity for every draw</p>
       </header>
 
-      {/* HERO COPY */}
       <h1 className="dl-hero-title">
         Where lottery data meets meaningful insight
       </h1>
@@ -257,7 +291,6 @@ function LandingPage() {
         understanding over luck.
       </p>
 
-      {/* CTA BUTTON */}
       <div className="dl-cta-wrap">
         <a
           href="https://tally.so/r/OD1k5g"
@@ -269,7 +302,6 @@ function LandingPage() {
         </a>
       </div>
 
-      {/* FEATURES */}
       <ul className="dl-feature-list">
         <li>Multi-lottery support: EuroMillions, UK Lotto, Set For Life.</li>
         <li>Number frequency &amp; gap analysis.</li>
@@ -277,7 +309,6 @@ function LandingPage() {
         <li>&ldquo;My predictions&rdquo; (coming in beta).</li>
       </ul>
 
-      {/* PREVIEW CARD – table style */}
       <section className="dl-preview-card">
         <div className="dl-preview-header">
           <span className="dl-preview-title">Preview from the live API</span>
@@ -329,7 +360,6 @@ function LandingPage() {
         </p>
       </section>
 
-      {/* SMALL API STATUS LINE / FOOTER */}
       <FrequencyDebug />
 
       <footer className="dl-footnote">
