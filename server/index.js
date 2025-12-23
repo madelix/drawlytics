@@ -5,7 +5,9 @@ import { desc } from 'drizzle-orm';
 
 import { db, pool } from './db.js';
 import * as schema from './drizzle/schema.js';
+
 import predictionsRouter from './routes/predictions.js';
+import performanceRouter from './routes/performance.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,11 +15,16 @@ const PORT = process.env.PORT || 3000;
 // Pull tables from the Drizzle schema
 const { euromillions_draws } = schema;
 
-app.use(cors());
+app.use(
+  cors({
+    origin: true, // reflect request origin
+  }),
+);
 app.use(express.json());
 
-// Mount predictions router under /api
+// Mount routers under /api
 app.use('/api', predictionsRouter);
+app.use('/api', performanceRouter);
 
 /* ──────────────────────────────────────────────
    Health check
@@ -26,7 +33,6 @@ app.use('/api', predictionsRouter);
 app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
-
     res.json({
       ok: true,
       service: 'drawlytics-api',
@@ -278,7 +284,6 @@ app.get('/api/draws/latest', async (_req, res) => {
       .limit(1);
 
     const latest = rows[0] ?? null;
-
     if (!latest) return res.json({ ok: true, draw: null });
 
     const { id, draw_date, n1, n2, n3, n4, n5, s1, s2 } = latest;
