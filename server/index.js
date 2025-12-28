@@ -1,4 +1,5 @@
 // server/index.js
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { desc } from 'drizzle-orm';
@@ -6,6 +7,7 @@ import { desc } from 'drizzle-orm';
 import { db, pool } from './db.js';
 import * as schema from './drizzle/schema.js';
 
+// ✅ Use ONE predictions router file (recommended: savePredictions.js)
 import predictionsRouter from './routes/predictions.js';
 import performanceRouter from './routes/performance.js';
 
@@ -22,8 +24,15 @@ app.use(
 );
 app.use(express.json());
 
-// Mount routers under /api
-app.use('/api', predictionsRouter);
+// ✅ Mount routers
+// Predictions endpoints become:
+//   POST /api/predictions
+//   POST /api/predictions/played-model   (when you add it)
+//   GET  /api/predictions/played-model   (when you add it)
+app.use('/api/predictions', predictionsRouter);
+
+// Performance endpoints remain:
+//   GET /api/performance/models
 app.use('/api', performanceRouter);
 
 /* ──────────────────────────────────────────────

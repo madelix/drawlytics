@@ -1,4 +1,5 @@
 // client/src/api/performance.ts
+import { apiGetJson } from './apiClient';
 
 export type ModelPerformanceRow = {
   model_name: string;
@@ -22,11 +23,6 @@ export type ModelsPerformanceResponse = {
   models: ModelPerformanceRow[];
 };
 
-function getApiBaseUrl() {
-  const base = import.meta.env.VITE_API_BASE_URL || '';
-  return base.replace(/\/+$/, '');
-}
-
 export async function getModelPerformance(params?: {
   lottery?: string;
   limit?: number;
@@ -34,20 +30,12 @@ export async function getModelPerformance(params?: {
   const lottery = params?.lottery ?? 'euromillions';
   const limit = params?.limit ?? 500;
 
-  const base = getApiBaseUrl();
-  const url =
-    `${base}/api/performance/models` +
-    `?lottery=${encodeURIComponent(lottery)}` +
-    `&limit=${encodeURIComponent(String(limit))}`;
+  const qs = new URLSearchParams({
+    lottery,
+    limit: String(limit),
+  });
 
-  console.log('[getModelPerformance] GET', url);
-
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Performance fetch failed: ${res.status} ${text}`);
-  }
-
-  return res.json();
+  return apiGetJson<ModelsPerformanceResponse>(
+    `/api/performance/models?${qs.toString()}`,
+  );
 }

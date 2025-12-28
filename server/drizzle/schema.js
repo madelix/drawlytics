@@ -6,9 +6,13 @@ import {
   timestamp,
   varchar,
   numeric,
+  text,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
-// Existing EuroMillions table
+/* =========================
+   Existing EuroMillions table
+========================= */
 export const euromillions_draws = pgTable('euromillions_draws', {
   id: serial('id').primaryKey(),
   draw_date: date('draw_date').notNull(),
@@ -25,11 +29,13 @@ export const euromillions_draws = pgTable('euromillions_draws', {
   created_at: timestamp('created_at').defaultNow().notNull(),
 });
 
-// Predictions table
+/* =========================
+   Predictions table
+========================= */
 export const predictions = pgTable('predictions', {
   id: serial('id').primaryKey(),
 
-  lottery: varchar('lottery', { length: 40 }).notNull(), // ← NEW
+  lottery: varchar('lottery', { length: 40 }).notNull(),
 
   draw_date: date('draw_date').notNull(),
   model_name: varchar('model_name', { length: 120 }).notNull(),
@@ -47,3 +53,31 @@ export const predictions = pgTable('predictions', {
 
   created_at: timestamp('created_at').defaultNow().notNull(),
 });
+
+/* =========================
+   NEW: Played model per draw
+========================= */
+export const played_models = pgTable(
+  'played_models',
+  {
+    id: serial('id').primaryKey(),
+
+    lottery: varchar('lottery', { length: 40 }).notNull(),
+    draw_date: date('draw_date').notNull(),
+
+    model_name: varchar('model_name', { length: 120 }).notNull(),
+
+    played_at: timestamp('played_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+
+    notes: text('notes'),
+  },
+  (t) => ({
+    // Enforce ONE played model per lottery + draw
+    one_per_draw: uniqueIndex('played_models_lottery_draw_unique').on(
+      t.lottery,
+      t.draw_date,
+    ),
+  }),
+);

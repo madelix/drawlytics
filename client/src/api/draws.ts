@@ -1,7 +1,5 @@
 // client/src/api/draws.ts
-
-// Fix: use `(import.meta as any).env` so TS stops complaining about ImportMeta.env
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || '';
+import { apiGetJson } from './apiClient';
 
 export type LatestDrawResponse = {
   ok: boolean;
@@ -11,24 +9,13 @@ export type LatestDrawResponse = {
     numbers: number[];
     stars: number[];
     raw: Record<string, unknown>;
-  };
+  } | null;
   error?: string;
 };
 
 export async function getLatestDraw(): Promise<LatestDrawResponse> {
-  const res = await fetch(`${API_BASE}/api/draws/latest`);
-
-  if (!res.ok) {
-    throw new Error(
-      `Failed to fetch latest draw: ${res.status} ${res.statusText}`,
-    );
-  }
-
-  const data = (await res.json()) as LatestDrawResponse;
-  return data;
+  return apiGetJson<LatestDrawResponse>('/api/draws/latest');
 }
-
-// ---------- NEW: list types + getDraws ----------
 
 export type EuromillionsDraw = {
   id: number;
@@ -56,24 +43,14 @@ export type DrawsListResponse = {
 };
 
 export async function getDraws(
-  params: {
-    limit?: number;
-    offset?: number;
-  } = {},
+  params: { limit?: number; offset?: number } = {},
 ): Promise<DrawsListResponse> {
   const { limit = 20, offset = 0 } = params;
 
-  // Build full API URL using the API base, NOT window.location.origin
-  const url = new URL(`${API_BASE}/api/draws/all`);
-  url.searchParams.set('limit', String(limit));
-  url.searchParams.set('offset', String(offset));
+  const qs = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
 
-  const res = await fetch(url.toString());
-
-  if (!res.ok) {
-    throw new Error(`Failed to fetch draws: ${res.status} ${res.statusText}`);
-  }
-
-  const data = (await res.json()) as DrawsListResponse;
-  return data;
+  return apiGetJson<DrawsListResponse>(`/api/draws/all?${qs.toString()}`);
 }

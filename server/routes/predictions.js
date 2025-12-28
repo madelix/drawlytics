@@ -2,7 +2,7 @@
 import express from 'express';
 import { db } from '../db.js';
 import * as schema from '../drizzle/schema.js';
-import { desc, eq, and } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 
 // Canonical internal strategy keys -> human labels
 const STRATEGY_LABELS = {
@@ -115,16 +115,7 @@ function getNextEuroMillionsDrawDate(from = new Date()) {
     Date.UTC(year, month - 1, dayOfMonth + daysToAdd, 0, 0, 0, 0),
   );
 
-  const iso = drawDate.toISOString().slice(0, 10);
-
-  console.log('[draw-date]', {
-    nowIso: from.toISOString(),
-    london: { year, month, dayOfMonth, hour, minute, day, minutes },
-    daysToAdd,
-    drawDate: iso,
-  });
-
-  return iso;
+  return drawDate.toISOString().slice(0, 10);
 }
 
 // --- simple helpers to generate numbers ---
@@ -154,25 +145,27 @@ function countIntersection(a = [], b = []) {
   return hits;
 }
 
-// ----------------- ROUTES -----------------
+/* =========================
+   ROUTES (mounted at /api/predictions)
+========================= */
 
 // GET /api/predictions  – list all predictions
-router.get('/predictions', async (_req, res) => {
+router.get('/', async (_req, res) => {
   try {
     const rows = await db
       .select()
       .from(predictions)
       .orderBy(desc(predictions.created_at));
 
-    res.json({ predictions: rows });
+    res.json({ ok: true, predictions: rows });
   } catch (err) {
     console.error('Error fetching predictions:', err);
-    res.status(500).json({ error: 'Failed to load predictions' });
+    res.status(500).json({ ok: false, error: 'predictions_list_failed' });
   }
 });
 
-// POST /api/predictions  – generic create (manual use)
-router.post('/predictions', async (req, res) => {
+// POST /api/predictions  – create (manual or from UI)
+router.post('/', async (req, res) => {
   try {
     const {
       lottery,
@@ -191,7 +184,7 @@ router.post('/predictions', async (req, res) => {
       !Array.isArray(main_numbers) ||
       !Array.isArray(star_numbers)
     ) {
-      return res.status(400).json({ error: 'Missing or invalid fields' });
+      return res.status(400).json({ ok: false, error: 'invalid_payload' });
     }
 
     const [row] = await db
@@ -207,18 +200,18 @@ router.post('/predictions', async (req, res) => {
       })
       .returning();
 
-    res.status(201).json({ prediction: row });
+    res.status(201).json({ ok: true, prediction: row });
   } catch (err) {
     console.error('Error creating prediction:', err);
-    res.status(500).json({ error: 'Failed to create prediction' });
+    res.status(500).json({ ok: false, error: 'predictions_create_failed' });
   }
 });
 
 // POST /api/predictions/generate – generate + save one or more lines
-router.post('/predictions/generate', async (req, res) => {
+router.post('/generate', async (req, res) => {
   try {
     const {
-      lottery = 'Euromillions',
+      lottery = 'euromillions',
       strategy = 'balanced_hot_cold',
       lines = 1,
     } = req.body || {};
@@ -251,17 +244,16 @@ router.post('/predictions/generate', async (req, res) => {
       created.push(row);
     }
 
-    res.status(201).json({ predictions: created });
+    res.status(201).json({ ok: true, predictions: created });
   } catch (err) {
     console.error('Error generating prediction(s):', err);
-    res.status(500).json({ error: 'Failed to generate predictions' });
+    res.status(500).json({ ok: false, error: 'predictions_generate_failed' });
   }
 });
 
 // POST /api/predictions/check – check pending predictions against results
-router.post('/predictions/check', async (_req, res) => {
+router.post('/check', async (_req, res) => {
   try {
-    // 1) Find pending predictions
     const pending = await db
       .select()
       .from(predictions)
@@ -276,7 +268,6 @@ router.post('/predictions/check', async (_req, res) => {
     let updated = 0;
     let skipped = 0;
 
-    // 2) For each pending prediction, find matching draw and compute hits
     for (const p of pending) {
       const [draw] = await db
         .select()
@@ -285,7 +276,6 @@ router.post('/predictions/check', async (_req, res) => {
         .limit(1);
 
       if (!draw) {
-        // draw not in DB yet (results not seeded) → skip, keep it pending
         skipped++;
         continue;
       }
@@ -295,10 +285,8 @@ router.post('/predictions/check', async (_req, res) => {
       );
       const drawStars = [draw.s1, draw.s2].filter((x) => x != null);
 
-      // IMPORTANT: mains only vs mains, stars only vs stars
       const matchedMain = countIntersection(p.main_numbers, drawMains);
       const matchedStars = countIntersection(p.star_numbers, drawStars);
-
       const resultLabel = `${matchedMain}+${matchedStars}`;
 
       await db
@@ -322,11 +310,11 @@ router.post('/predictions/check', async (_req, res) => {
 });
 
 // DELETE /api/predictions/:id – delete a prediction
-router.delete('/predictions/:id', async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) {
-      return res.status(400).json({ error: 'Invalid id' });
+      return res.status(400).json({ ok: false, error: 'invalid_id' });
     }
 
     const [deleted] = await db
@@ -335,13 +323,13 @@ router.delete('/predictions/:id', async (req, res) => {
       .returning();
 
     if (!deleted) {
-      return res.status(404).json({ error: 'Prediction not found' });
+      return res.status(404).json({ ok: false, error: 'not_found' });
     }
 
-    res.json({ success: true });
+    res.json({ ok: true });
   } catch (err) {
     console.error('Error deleting prediction:', err);
-    res.status(500).json({ error: 'Failed to delete prediction' });
+    res.status(500).json({ ok: false, error: 'predictions_delete_failed' });
   }
 });
 
