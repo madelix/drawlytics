@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node index.js",
+    "dev": "node --watch index.js",
     "start": "node index.js",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "seed:euromillions": "node seed-euromillions.js"
+    "db:generate": "drizzle-kit generate --config=drizzle.config.js",
+    "db:migrate": "drizzle-kit migrate --config=drizzle.config.js",
+    "seed:euromillions": "node seed-euromillions.js",
+    "start:prod": "npm run db:migrate && node index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
