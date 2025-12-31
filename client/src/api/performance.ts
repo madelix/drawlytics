@@ -23,17 +23,22 @@ export type ModelsPerformanceResponse = {
   models: ModelPerformanceRow[];
 };
 
+function clampInt(n: unknown, fallback: number, min: number, max: number) {
+  const x = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(x)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(x)));
+}
+
 export async function getModelPerformance(params?: {
   lottery?: string;
   limit?: number;
 }): Promise<ModelsPerformanceResponse> {
   const lottery = params?.lottery ?? 'euromillions';
-  const limit = params?.limit ?? 500;
+  const limit = clampInt(params?.limit ?? 500, 500, 1, 5000);
 
-  const qs = new URLSearchParams({
-    lottery,
-    limit: String(limit),
-  });
+  const qs = new URLSearchParams();
+  qs.set('lottery', lottery);
+  qs.set('limit', String(limit));
 
   return apiGetJson<ModelsPerformanceResponse>(
     `/api/performance/models?${qs.toString()}`,
