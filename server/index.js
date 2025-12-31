@@ -7,10 +7,8 @@ import { desc } from 'drizzle-orm';
 import { db, pool } from './db.js';
 import * as schema from './drizzle/schema.js';
 
-// ✅ Use ONE predictions router file (recommended: savePredictions.js)
 import predictionsRouter from './routes/predictions.js';
 import performanceRouter from './routes/performance.js';
-import playedModelsRouter from './routes/playedModels.js';
 import playedPredictionsRouter from './routes/playedPredictions.js';
 
 const app = express();
@@ -27,16 +25,8 @@ app.use(
 app.use(express.json());
 
 // ✅ Mount routers
-// Predictions endpoints become:
-//   POST /api/predictions
-//   POST /api/predictions/played-model   (when you add it)
-//   GET  /api/predictions/played-model   (when you add it)
-app.use('/api/predictions', predictionsRouter);
-
-// Performance endpoints remain:
-//   GET /api/performance/models
+app.use('/api', predictionsRouter);
 app.use('/api', performanceRouter);
-app.use('/api', playedModelsRouter);
 app.use('/api', playedPredictionsRouter);
 
 /* ──────────────────────────────────────────────

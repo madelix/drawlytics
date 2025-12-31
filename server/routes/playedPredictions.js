@@ -6,16 +6,13 @@ import { and, eq, inArray, desc } from 'drizzle-orm';
 
 const router = express.Router();
 
-// Expect these to exist in drizzle/schema.js
 const { predictions, played_predictions } = schema;
 
 function isPgUniqueViolation(err) {
-  // Postgres unique violation code
   return err && typeof err === 'object' && err.code === '23505';
 }
 
 function isPgForeignKeyViolation(err) {
-  // Postgres FK violation code
   return err && typeof err === 'object' && err.code === '23503';
 }
 
@@ -24,12 +21,14 @@ function isPgForeignKeyViolation(err) {
  * Body: { prediction_id: number, notes?: string }
  *
  * Marks ONE prediction line as "played".
- * This is the right abstraction if a model generates multiple lines and you play some/all of them.
  */
 router.post('/played-predictions', async (req, res) => {
   try {
     const prediction_id = Number(req.body?.prediction_id);
-    const notes = req.body?.notes ?? null;
+    const notes =
+      req.body?.notes != null && String(req.body.notes).trim() !== ''
+        ? String(req.body.notes)
+        : null;
 
     if (!Number.isInteger(prediction_id) || prediction_id <= 0) {
       return res
@@ -48,6 +47,10 @@ router.post('/played-predictions', async (req, res) => {
         star_numbers: predictions.star_numbers,
         confidence: predictions.confidence,
         status: predictions.status,
+        matched_main: predictions.matched_main,
+        matched_stars: predictions.matched_stars,
+        result_label: predictions.result_label,
+        created_at: predictions.created_at,
       })
       .from(predictions)
       .where(eq(predictions.id, prediction_id))
@@ -57,7 +60,7 @@ router.post('/played-predictions', async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Prediction not found' });
     }
 
-    // 2) Check if already marked as played (fast path; avoids unique violation noise)
+    // 2) Fast path: already played?
     const [already] = await db
       .select({ id: played_predictions.id })
       .from(played_predictions)
@@ -72,13 +75,14 @@ router.post('/played-predictions', async (req, res) => {
     }
 
     // 3) Insert played record
-    // NOTE: played_predictions does NOT store model_name; we join to predictions when reading.
-    const insertedRows = await db
+    // IMPORTANT: played_predictions now has model_name NOT NULL, so we MUST insert it.
+    const [inserted] = await db
       .insert(played_predictions)
       .values({
         lottery: p.lottery,
         draw_date: p.draw_date,
         prediction_id: p.id,
+        model_name: p.model_name,
         notes,
       })
       .returning({
@@ -88,23 +92,25 @@ router.post('/played-predictions', async (req, res) => {
         prediction_id: played_predictions.prediction_id,
         lottery: played_predictions.lottery,
         draw_date: played_predictions.draw_date,
+        model_name: played_predictions.model_name,
       });
-
-    const inserted = insertedRows?.[0];
 
     return res.json({
       ok: true,
       played: {
-        ...(inserted || {}),
-        model_name: p.model_name,
+        ...inserted,
+        // return the prediction details too (handy for UI)
         main_numbers: p.main_numbers,
         star_numbers: p.star_numbers,
         confidence: p.confidence,
         status: p.status,
+        matched_main: p.matched_main,
+        matched_stars: p.matched_stars,
+        result_label: p.result_label,
+        created_at: p.created_at,
       },
     });
   } catch (err) {
-    // Handle DB constraint errors in a user-friendly way
     if (isPgUniqueViolation(err)) {
       return res.status(409).json({
         ok: false,
@@ -125,7 +131,7 @@ router.post('/played-predictions', async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: 'server_error',
-      detail: err instanceof Error ? err.message : String(err),
+      detail: err?.detail || (err instanceof Error ? err.message : String(err)),
     });
   }
 });
@@ -151,7 +157,9 @@ router.get('/played-predictions', async (req, res) => {
         draw_date: played_predictions.draw_date,
         played_at: played_predictions.played_at,
         notes: played_predictions.notes,
+        played_model_name: played_predictions.model_name, // stored at play time ✅
 
+        // current prediction details (could change in theory, but usually stable)
         model_name: predictions.model_name,
         main_numbers: predictions.main_numbers,
         star_numbers: predictions.star_numbers,

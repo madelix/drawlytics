@@ -1,3 +1,4 @@
+// server/drizzle/schema.js
 import {
   pgTable,
   serial,
@@ -56,33 +57,6 @@ export const predictions = pgTable('predictions', {
 });
 
 /* =========================
-   Legacy: one model per draw (optional)
-========================= */
-export const played_models = pgTable(
-  'played_models',
-  {
-    id: serial('id').primaryKey(),
-
-    lottery: varchar('lottery', { length: 40 }).notNull(),
-    draw_date: date('draw_date').notNull(),
-
-    model_name: varchar('model_name', { length: 120 }).notNull(),
-
-    played_at: timestamp('played_at', { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-
-    notes: text('notes'),
-  },
-  (t) => ({
-    one_per_draw: uniqueIndex('played_models_lottery_draw_unique').on(
-      t.lottery,
-      t.draw_date,
-    ),
-  }),
-);
-
-/* =========================
    Played prediction lines (what you actually played)
 ========================= */
 export const played_predictions = pgTable(
@@ -90,12 +64,14 @@ export const played_predictions = pgTable(
   {
     id: serial('id').primaryKey(),
 
+    // Keep these for fast filtering without needing a join
     lottery: varchar('lottery', { length: 40 }).notNull(),
     draw_date: date('draw_date').notNull(),
 
+    // snapshot of model name at time played (useful if model naming changes later)
     model_name: varchar('model_name', { length: 120 }).notNull(),
 
-    // ✅ must be integer FK, NOT serial
+    // ✅ integer FK (NOT serial)
     prediction_id: integer('prediction_id')
       .notNull()
       .references(() => predictions.id, { onDelete: 'cascade' }),
