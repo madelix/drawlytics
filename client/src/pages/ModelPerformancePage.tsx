@@ -3,6 +3,11 @@ import {
   getModelPerformance,
   type ModelPerformanceRow,
 } from '../api/performance';
+import {
+  getPlayedModelLatest,
+  savePlayedModel,
+  type PlayedModelRow,
+} from '../api/playedModels';
 
 function formatPct(n: number) {
   if (Number.isNaN(n)) return '—';
@@ -16,13 +21,27 @@ function formatDate(iso: string | null) {
   return d.toLocaleString();
 }
 
+function formatDateOnly(iso: string | null) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString();
+}
+
 export default function ModelPerformancePage() {
   const [lottery, setLottery] = useState('euromillions');
   const [limit, setLimit] = useState(500);
 
   const [loading, setLoading] = useState(false);
+  const [savingModel, setSavingModel] = useState<string | null>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ModelPerformanceRow[]>([]);
+
+  // Played model state
+  const [played, setPlayed] = useState<PlayedModelRow | null>(null);
+  const [playedDrawDate, setPlayedDrawDate] = useState<string | null>(null);
+  const [playedError, setPlayedError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -38,8 +57,39 @@ export default function ModelPerformancePage() {
     }
   }
 
+  async function loadPlayedLatest(currentLottery: string) {
+    setPlayedError(null);
+    try {
+      const r = await getPlayedModelLatest(currentLottery);
+      setPlayed(r.played);
+      setPlayedDrawDate(r.draw_date);
+    } catch (e: any) {
+      console.error(e);
+      setPlayedError(e?.message ?? 'Failed to load played model');
+      setPlayed(null);
+      setPlayedDrawDate(null);
+    }
+  }
+
+  async function handlePlayModel(model_name: string) {
+    try {
+      setSavingModel(model_name);
+      setError(null);
+
+      await savePlayedModel({ lottery, model_name });
+
+      // Refresh the played model card
+      await loadPlayedLatest(lottery);
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to save played model');
+    } finally {
+      setSavingModel(null);
+    }
+  }
+
   useEffect(() => {
     load();
+    loadPlayedLatest(lottery);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -49,6 +99,8 @@ export default function ModelPerformancePage() {
     return { total, checked };
   }, [rows]);
 
+  const playedModelName = played?.model_name ?? null;
+
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '28px 16px' }}>
       <header style={{ textAlign: 'center', marginBottom: 18 }}>
@@ -57,6 +109,41 @@ export default function ModelPerformancePage() {
           Based on checked predictions (matched_main / matched_stars).
         </p>
       </header>
+
+      {/* Played model card */}
+      <div
+        style={{
+          background: '#fff',
+          border: '1px solid #eef2f7',
+          borderRadius: 16,
+          padding: '14px 14px',
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 6 }}>
+          Played model for next draw{' '}
+          {playedDrawDate ? `(${formatDateOnly(playedDrawDate)})` : ''}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>
+            {playedModelName || 'None selected yet'}
+          </div>
+
+          {playedModelName && (
+            <div style={{ color: '#6b7280', fontSize: 13 }}>
+              (saved at {played?.played_at ? formatDate(played.played_at) : '—'}
+              )
+            </div>
+          )}
+        </div>
+
+        {playedError && (
+          <div style={{ marginTop: 8, color: '#b91c1c', fontSize: 13 }}>
+            {playedError}
+          </div>
+        )}
+      </div>
 
       <div
         style={{
@@ -101,7 +188,10 @@ export default function ModelPerformancePage() {
         </label>
 
         <button
-          onClick={load}
+          onClick={async () => {
+            await load();
+            await loadPlayedLatest(lottery);
+          }}
           disabled={loading}
           style={{
             padding: '8px 14px',
@@ -149,6 +239,7 @@ export default function ModelPerformancePage() {
                   '5 main',
                   'Saved conf',
                   'Last run',
+                  'Play',
                 ].map((h) => (
                   <th
                     key={h}
@@ -166,106 +257,155 @@ export default function ModelPerformancePage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.model_name}>
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                      fontWeight: 600,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {r.model_name}
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {r.checked}/{r.total}
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {formatPct(r.hit_rate_any)}
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {r.avg_main_hits.toFixed(2)}
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {r.avg_star_hits.toFixed(2)}
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {r.main_2plus}
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {r.main_3plus}
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {r.main_4plus}
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {r.main_5}
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {formatPct(r.avg_saved_confidence)}
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {formatDate(r.last_created_at)}
-                  </td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const isSelected = playedModelName === r.model_name;
+
+                return (
+                  <tr key={r.model_name}>
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {r.model_name}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
+                      {r.checked}/{r.total}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
+                      {formatPct(r.hit_rate_any)}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
+                      {r.avg_main_hits.toFixed(2)}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
+                      {r.avg_star_hits.toFixed(2)}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
+                      {r.main_2plus}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
+                      {r.main_3plus}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
+                      {r.main_4plus}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
+                      {r.main_5}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
+                      {formatPct(r.avg_saved_confidence)}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {formatDate(r.last_created_at)}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handlePlayModel(r.model_name)}
+                        disabled={savingModel != null}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: 999,
+                          border: '1px solid #e5e7eb',
+                          background: isSelected ? '#f1f5f9' : '#fff',
+                          cursor:
+                            savingModel != null ? 'not-allowed' : 'pointer',
+                          fontWeight: 600,
+                          opacity: savingModel != null ? 0.6 : 1,
+                        }}
+                        title={
+                          isSelected
+                            ? 'Currently selected for the next draw'
+                            : 'Mark this model as the one you played'
+                        }
+                      >
+                        {savingModel === r.model_name
+                          ? 'Saving…'
+                          : isSelected
+                            ? 'Selected'
+                            : 'Play this model'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
 
               {!loading && rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={11}
+                    colSpan={12}
                     style={{
                       padding: 18,
                       textAlign: 'center',
