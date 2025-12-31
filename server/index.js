@@ -10,6 +10,8 @@ import * as schema from './drizzle/schema.js';
 // ✅ Use ONE predictions router file (recommended: savePredictions.js)
 import predictionsRouter from './routes/predictions.js';
 import performanceRouter from './routes/performance.js';
+import playedModelsRouter from './routes/playedModels.js';
+import playedPredictionsRouter from './routes/playedPredictions.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,6 +36,8 @@ app.use('/api/predictions', predictionsRouter);
 // Performance endpoints remain:
 //   GET /api/performance/models
 app.use('/api', performanceRouter);
+app.use('/api', playedModelsRouter);
+app.use('/api', playedPredictionsRouter);
 
 /* ──────────────────────────────────────────────
    Health check

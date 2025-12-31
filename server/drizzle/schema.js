@@ -1,6 +1,7 @@
 import {
   pgTable,
   serial,
+  integer,
   smallint,
   date,
   timestamp,
@@ -11,7 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 /* =========================
-   Existing EuroMillions table
+   EuroMillions draws
 ========================= */
 export const euromillions_draws = pgTable('euromillions_draws', {
   id: serial('id').primaryKey(),
@@ -30,7 +31,7 @@ export const euromillions_draws = pgTable('euromillions_draws', {
 });
 
 /* =========================
-   Predictions table
+   Predictions (generated lines)
 ========================= */
 export const predictions = pgTable('predictions', {
   id: serial('id').primaryKey(),
@@ -55,7 +56,7 @@ export const predictions = pgTable('predictions', {
 });
 
 /* =========================
-   NEW: Played model per draw
+   Legacy: one model per draw (optional)
 ========================= */
 export const played_models = pgTable(
   'played_models',
@@ -74,10 +75,40 @@ export const played_models = pgTable(
     notes: text('notes'),
   },
   (t) => ({
-    // Enforce ONE played model per lottery + draw
     one_per_draw: uniqueIndex('played_models_lottery_draw_unique').on(
       t.lottery,
       t.draw_date,
     ),
+  }),
+);
+
+/* =========================
+   Played prediction lines (what you actually played)
+========================= */
+export const played_predictions = pgTable(
+  'played_predictions',
+  {
+    id: serial('id').primaryKey(),
+
+    lottery: varchar('lottery', { length: 40 }).notNull(),
+    draw_date: date('draw_date').notNull(),
+
+    model_name: varchar('model_name', { length: 120 }).notNull(),
+
+    // ✅ must be integer FK, NOT serial
+    prediction_id: integer('prediction_id')
+      .notNull()
+      .references(() => predictions.id, { onDelete: 'cascade' }),
+
+    played_at: timestamp('played_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+
+    notes: text('notes'),
+  },
+  (t) => ({
+    one_per_prediction: uniqueIndex(
+      'played_predictions_lottery_draw_prediction_unique',
+    ).on(t.lottery, t.draw_date, t.prediction_id),
   }),
 );
