@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": "/"
+      "source": "/api/:path*",
+      "destination": "https://drawlytics-production.up.railway.app/api/:path*"
     }
   ]
 }
