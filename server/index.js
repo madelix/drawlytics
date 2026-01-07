@@ -27,7 +27,7 @@ app.use(express.json());
 // ✅ Mount routers
 app.use('/api', predictionsRouter);
 app.use('/api', performanceRouter);
-app.use('/api', playedPredictionsRouter);
+app.use('/api/predictions', predictionsRouter);
 
 /* ──────────────────────────────────────────────
    Health check
