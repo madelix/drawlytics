@@ -1,15 +1,16 @@
 // client/src/api/frequency.js
+import { apiUrl } from './apiClient';
 
 export async function getFrequency() {
-  const api = import.meta.env.VITE_API_BASE_URL;
+  // In dev: stays relative → Vite proxy → localhost:3000
+  // In prod: relative → Vercel rewrite → Railway
+  const res = await fetch(apiUrl('/api/frequency'));
 
-  if (!api) {
-    throw new Error('VITE_API_BASE_URL is not set');
-  }
-
-  const res = await fetch(`${api}/api/frequency`);
   if (!res.ok) {
-    throw new Error(`Failed to fetch frequency data: ${res.status}`);
+    const text = await res.text();
+    throw new Error(
+      `Failed to fetch frequency data: ${res.status} ${text || ''}`,
+    );
   }
 
   return res.json();

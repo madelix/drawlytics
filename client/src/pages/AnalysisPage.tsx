@@ -11,6 +11,7 @@ import {
 } from '../api/analysis';
 import { ResponsiveBar } from '@nivo/bar';
 import { ScrollToTopButton } from '../components/ScrollToTopButton';
+import { apiUrl } from '../api/apiClient';
 
 // ---------- Types ----------
 type RangeOption = {
@@ -33,9 +34,6 @@ type BarDatum = {
 };
 
 type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
-
-// 👇 must match client/.env
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
 
 // --------- helper: next EuroMillions draw date (Tue/Fri) ----------
 function getNextEuroMillionsDrawDate(from: Date = new Date()): string {
@@ -284,10 +282,6 @@ export function AnalysisPage() {
       setSaveStatus('saving');
       setSaveError(null);
 
-      if (!API_BASE_URL) {
-        throw new Error('VITE_API_BASE_URL is not configured');
-      }
-
       const drawDate = getNextEuroMillionsDrawDate();
       const main_numbers = generateMainNumbers();
       const star_numbers = generateStarNumbers();
@@ -302,11 +296,12 @@ export function AnalysisPage() {
         status: 'pending',
       };
 
-      const res = await fetch(`${API_BASE_URL}/api/predictions`, {
+      // IMPORTANT:
+      // - In dev: this stays relative (/api/...) so Vite proxy works and avoids CORS.
+      // - In prod: your apiUrl helper can prepend a real base URL if you choose.
+      const res = await fetch(apiUrl('/api/predictions'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
 

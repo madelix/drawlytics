@@ -1,127 +1,103 @@
 // client/src/components/LatestDraw.tsx
 import { useEffect, useState } from 'react';
-import { getLatestDraw, type LatestDrawResponse } from '../api/draws';
+import { apiUrl } from '../api/apiClient';
 
-type Status = 'idle' | 'loading' | 'success' | 'error';
+type DrawRow = {
+  id: number;
+  draw_date: string;
+  n1: number;
+  n2: number;
+  n3: number;
+  n4: number;
+  n5: number;
+  s1: number;
+  s2: number;
+};
 
-export function LatestDraw() {
-  const [status, setStatus] = useState<Status>('idle');
-  const [data, setData] = useState<LatestDrawResponse | null>(null);
+type LatestDrawResponse = {
+  ok: boolean;
+  draw: DrawRow | null;
+  error?: string;
+};
+
+export default function LatestDraw() {
+  const [draw, setDraw] = useState<DrawRow | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchLatest() {
+    async function load() {
+      setLoading(true);
+      setError(null);
+
       try {
-        setStatus('loading');
-        setError(null);
+        const res = await fetch(apiUrl('/api/draws/latest'));
+        const text = await res.text();
 
-        const result = await getLatestDraw();
-        if (cancelled) return;
+        if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
 
-        if (!result.ok || !result.draw) {
-          setStatus('error');
-          setError(result.error || 'No draw data available.');
-          return;
-        }
+        const data = text ? (JSON.parse(text) as LatestDrawResponse) : null;
+        const latest = data?.draw ?? null;
 
-        setData(result);
-        setStatus('success');
-      } catch (err: unknown) {
-        if (cancelled) return;
-        console.error(err);
-        setStatus('error');
-        setError(
-          err instanceof Error ? err.message : 'Failed to load latest draw.',
-        );
+        if (!cancelled) setDraw(latest);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message ?? 'Failed to load latest draw');
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
 
-    fetchLatest();
-
+    load();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // Basic UI states
-  if (status === 'loading' || status === 'idle') {
-    return (
-      <section className="latest-draw">
-        <h2>Latest EuroMillions Draw</h2>
-        <p>Loading latest draw…</p>
-      </section>
-    );
-  }
+  if (loading) return <div>Loading latest draw…</div>;
+  if (error)
+    return <div style={{ color: 'red' }}>Latest draw error: {error}</div>;
+  if (!draw) return <div>No draw found.</div>;
 
-  if (status === 'error') {
-    return (
-      <section className="latest-draw">
-        <h2>Latest EuroMillions Draw</h2>
-        <p style={{ color: 'red' }}>Error: {error}</p>
-      </section>
-    );
-  }
-
-  const draw = data?.draw;
-  if (!draw) {
-    return (
-      <section className="latest-draw">
-        <h2>Latest EuroMillions Draw</h2>
-        <p>No draw data available.</p>
-      </section>
-    );
-  }
-
-  const formattedDate = new Date(draw.draw_date).toLocaleDateString();
+  const mains = [draw.n1, draw.n2, draw.n3, draw.n4, draw.n5].filter(
+    (n) => typeof n === 'number',
+  );
+  const stars = [draw.s1, draw.s2].filter((n) => typeof n === 'number');
 
   return (
-    <section className="latest-draw">
-      <h2>Latest EuroMillions Draw</h2>
-      <p>
-        Draw date: <strong>{formattedDate}</strong>
-      </p>
+    <div className="dl-latest-draw">
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>
+        Latest draw: {new Date(draw.draw_date).toISOString().slice(0, 10)}
+      </div>
 
-      <div style={{ marginTop: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         <div>
-          <span style={{ fontWeight: 'bold' }}>Numbers:</span>{' '}
-          {draw.numbers.map((n) => (
-            <span
-              key={n}
-              style={{
-                display: 'inline-block',
-                marginRight: '0.3rem',
-                padding: '0.2rem 0.5rem',
-                borderRadius: '999px',
-                border: '1px solid #ccc',
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {n}
-            </span>
-          ))}
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+            Main
+          </div>
+          <div>
+            {mains.map((n) => (
+              <span key={`m-${n}`} className="dl-draw-pill dl-draw-pill--main">
+                {n}
+              </span>
+            ))}
+          </div>
         </div>
 
-        <div style={{ marginTop: '0.4rem' }}>
-          <span style={{ fontWeight: 'bold' }}>Stars:</span>{' '}
-          {draw.stars.map((s) => (
-            <span
-              key={s}
-              style={{
-                display: 'inline-block',
-                marginRight: '0.3rem',
-                padding: '0.2rem 0.5rem',
-                borderRadius: '999px',
-                border: '1px solid #ffd54f',
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {s}
-            </span>
-          ))}
+        <div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+            Stars
+          </div>
+          <div>
+            {stars.map((n) => (
+              <span key={`s-${n}`} className="dl-draw-pill dl-draw-pill--star">
+                {n}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }

@@ -24,10 +24,10 @@ app.use(
 );
 app.use(express.json());
 
-// ✅ Mount routers
+// ✅ Mount routers (all under /api)
 app.use('/api', predictionsRouter);
 app.use('/api', performanceRouter);
-app.use('/api/predictions', predictionsRouter);
+app.use('/api', playedPredictionsRouter);
 
 /* ──────────────────────────────────────────────
    Health check

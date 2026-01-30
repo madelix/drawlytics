@@ -1,7 +1,5 @@
 // client/src/api/analysis.ts
-
-// Use (import.meta as any) so TS is happy about env
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || '';
+import { apiUrl } from './apiClient';
 
 /* ---------- Shared types ---------- */
 
@@ -24,16 +22,16 @@ export type FrequencyLatestNResponse = {
 export async function getFrequencyLatestN(
   n: number,
 ): Promise<FrequencyLatestNResponse> {
-  const res = await fetch(`${API_BASE}/api/frequency/latest-n?n=${n}`);
+  const res = await fetch(apiUrl(`/api/frequency/latest-n?n=${n}`));
 
   if (!res.ok) {
+    const text = await res.text();
     throw new Error(
-      `Failed to fetch frequency latest-n: ${res.status} ${res.statusText}`,
+      `Failed to fetch frequency latest-n: ${res.status} ${text || res.statusText}`,
     );
   }
 
-  const data = (await res.json()) as FrequencyLatestNResponse;
-  return data;
+  return (await res.json()) as FrequencyLatestNResponse;
 }
 
 /* ---------- Hot / Cold numbers ---------- */
@@ -63,16 +61,16 @@ export async function getHotCold(
   n: number,
   top: number,
 ): Promise<HotColdResponse> {
-  const res = await fetch(`${API_BASE}/api/hot-cold?n=${n}&top=${top}`);
+  const res = await fetch(apiUrl(`/api/hot-cold?n=${n}&top=${top}`));
 
   if (!res.ok) {
+    const text = await res.text();
     throw new Error(
-      `Failed to fetch hot/cold: ${res.status} ${res.statusText}`,
+      `Failed to fetch hot/cold: ${res.status} ${text || res.statusText}`,
     );
   }
 
-  const data = (await res.json()) as HotColdResponse;
-  return data;
+  return (await res.json()) as HotColdResponse;
 }
 
 /* ---------- Gaps / Overdue numbers ---------- */
@@ -92,12 +90,14 @@ export type GapsResponse = {
 };
 
 export async function getGaps(): Promise<GapsResponse> {
-  const res = await fetch(`${API_BASE}/api/gaps`);
+  const res = await fetch(apiUrl('/api/gaps'));
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch gaps: ${res.status} ${res.statusText}`);
+    const text = await res.text();
+    throw new Error(
+      `Failed to fetch gaps: ${res.status} ${text || res.statusText}`,
+    );
   }
 
-  const data = (await res.json()) as GapsResponse;
-  return data;
+  return (await res.json()) as GapsResponse;
 }

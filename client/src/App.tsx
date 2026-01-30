@@ -4,7 +4,6 @@ import './App.css';
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { Suspense, lazy, useEffect, useState } from 'react';
 
-import FrequencyDebug from './components/FrequencyDebug';
 import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
 
 import MyPredictionsPage from './pages/MyPredictionsPage';
@@ -103,7 +102,6 @@ function AppHeader() {
             Make magic
           </NavLink>
 
-          {/* ✅ NEW */}
           <NavLink
             to="/performance"
             className={({ isActive }) =>
@@ -180,7 +178,6 @@ function AppHeader() {
             Make magic
           </NavLink>
 
-          {/* ✅ NEW */}
           <NavLink
             to="/performance"
             className={({ isActive }) =>
@@ -233,10 +230,7 @@ export default function App() {
           <Route path="/gaps" element={<GapsPage />} />
           <Route path="/draws" element={<AllDrawsPage />} />
           <Route path="/make-magic" element={<MakeMagicPage />} />
-
-          {/* ✅ NEW */}
           <Route path="/performance" element={<ModelPerformancePage />} />
-
           <Route path="/predictions" element={<MyPredictionsPage />} />
         </Routes>
       </Suspense>
@@ -359,8 +353,6 @@ function LandingPage() {
           predictions — this is just a small live preview.
         </p>
       </section>
-
-      <FrequencyDebug />
 
       <footer className="dl-footnote">
         Drawlytics does not sell tickets or guarantee winnings. Analytics only —

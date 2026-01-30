@@ -1,7 +1,6 @@
 // client/src/pages/MakeMagicPage.tsx
 import { useState } from 'react';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+import { apiUrl } from '../api/apiClient';
 
 // Canonical strategy keys + labels + descriptions.
 // These keys must match what the server understands.
@@ -48,11 +47,10 @@ export function MakeMagicPage() {
       setStatus('saving');
       setError(null);
 
-      if (!API_BASE_URL) {
-        throw new Error('VITE_API_BASE_URL is not configured');
-      }
-
-      const res = await fetch(`${API_BASE_URL}/api/predictions/generate`, {
+      // IMPORTANT:
+      // - In dev: apiUrl('/api/...') stays relative, so Vite proxy handles it (no CORS).
+      // - In prod: apiUrl can prepend a base if you ever choose to.
+      const res = await fetch(apiUrl('/api/predictions/generate'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

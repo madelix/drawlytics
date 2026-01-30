@@ -1,5 +1,7 @@
 // client/src/pages/MyPredictionsPage.tsx
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
+import { apiUrl } from '../api/apiClient';
 
 type Prediction = {
   id: number;
@@ -8,17 +10,13 @@ type Prediction = {
   model_name: string;
   main_numbers: number[];
   star_numbers: number[];
-  confidence: string; // numeric(5,2) comes back as string
+  confidence: string;
   status: string;
   created_at: string;
   matched_main: number | null;
   matched_stars: number | null;
   result_label: string | null;
 };
-
-// 👇 optional in dev; if missing we fall back to relative /api calls (works with Vite proxy)
-const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
 
 type CheckResponse = {
   ok: boolean;
@@ -30,7 +28,7 @@ type CheckResponse = {
 
 type DrawRow = {
   id: number;
-  draw_date: string; // YYYY-MM-DD
+  draw_date: string;
   n1: number;
   n2: number;
   n3: number;
@@ -45,9 +43,50 @@ type DrawMapEntry = {
   stars: Set<number>;
 };
 
+type PlayedStatusResponse = {
+  ok: boolean;
+  playedIds: number[];
+};
+
 function isHtml(text: string) {
   const t = text.trim().toLowerCase();
   return t.startsWith('<!doctype') || t.startsWith('<html');
+}
+
+async function fetchJsonOrThrow<T>(
+  path: string,
+  options?: RequestInit,
+): Promise<T> {
+  const res = await fetch(apiUrl(path), {
+    headers: {
+      Accept: 'application/json',
+      ...(options?.headers || {}),
+    },
+    ...options,
+  });
+
+  const text = await res.text().catch(() => '');
+
+  if (!res.ok) {
+    // Common failure mode: HTML from frontend (wrong host / proxy / missing route)
+    if (isHtml(text)) {
+      throw new Error(
+        `Hit HTML instead of JSON for ${path}. This usually means the API route is missing, the backend is down, or the request is going to the wrong origin.`,
+      );
+    }
+    throw new Error(`Request failed (${res.status}) for ${path}: ${text}`);
+  }
+
+  // empty body (e.g. 204)
+  if (!text) return {} as T;
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      `Non-JSON response for ${path}. First 200 chars:\n${text.slice(0, 200)}`,
+    );
+  }
 }
 
 export default function MyPredictionsPage() {
@@ -62,29 +101,59 @@ export default function MyPredictionsPage() {
 
   const [drawMap, setDrawMap] = useState<Record<string, DrawMapEntry>>({});
 
-  // Endpoint helper:
-  // - if VITE_API_BASE_URL is set => use it
-  // - else => use relative /api (works with Vite proxy)
-  const api = useMemo(() => {
-    const base = (API_BASE_URL || '').trim();
-    return (path: string) => (base ? `${base}${path}` : path);
-  }, []);
+  // played state
+  const [playedMap, setPlayedMap] = useState<Record<number, boolean>>({});
+  const [playingId, setPlayingId] = useState<number | null>(null);
+
+  async function loadPlayedStatus(ids: number[]) {
+    if (!ids.length) {
+      setPlayedMap({});
+      return;
+    }
+
+    try {
+      const data = await fetchJsonOrThrow<PlayedStatusResponse>(
+        `/api/played-predictions/status?ids=${ids.join(',')}`,
+      );
+
+      const next: Record<number, boolean> = {};
+      for (const id of data.playedIds ?? []) next[id] = true;
+
+      setPlayedMap(next);
+    } catch (e) {
+      console.warn('Played status error:', e);
+      // Don’t hard-fail the whole page just because this call failed
+    }
+  }
+
+  async function markPlayed(predictionId: number) {
+    return fetchJsonOrThrow(`/api/played-predictions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prediction_id: predictionId }),
+    });
+  }
+
+  async function unmarkPlayed(predictionId: number) {
+    // Some servers return 204/no body for DELETE; our helper handles empty bodies
+    return fetchJsonOrThrow(`/api/played-predictions/${predictionId}`, {
+      method: 'DELETE',
+    });
+  }
 
   async function loadPredictions() {
     try {
       setLoading(true);
       setError(null);
 
-      const res = await fetch(api('/api/predictions'));
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(
-          `Failed to load predictions (status ${res.status}): ${text}`,
-        );
-      }
+      const data = await fetchJsonOrThrow<{ predictions?: Prediction[] }>(
+        '/api/predictions',
+      );
 
-      const data = await res.json();
-      setPredictions(data.predictions ?? []);
+      const preds: Prediction[] = data?.predictions ?? [];
+      setPredictions(preds);
+
+      await loadPlayedStatus(preds.map((p) => p.id));
     } catch (err) {
       console.error(err);
       setError('Could not load predictions');
@@ -95,11 +164,10 @@ export default function MyPredictionsPage() {
 
   async function loadDrawsForHighlighting() {
     try {
-      // Pull enough to cover your recent predictions
-      const res = await fetch(api('/api/draws/all?limit=200&offset=0'));
-      if (!res.ok) return;
+      const data = await fetchJsonOrThrow<{ draws?: DrawRow[] }>(
+        '/api/draws/all?limit=200&offset=0',
+      );
 
-      const data = await res.json();
       const draws: DrawRow[] = data.draws ?? [];
 
       const map: Record<string, DrawMapEntry> = {};
@@ -130,18 +198,15 @@ export default function MyPredictionsPage() {
     try {
       setDeletingId(id);
 
-      const res = await fetch(api(`/api/predictions/${id}`), {
-        method: 'DELETE',
-      });
-
-      if (!res.ok && res.status !== 204) {
-        const text = await res.text();
-        throw new Error(
-          `Failed to delete (status ${res.status}): ${text || 'Unknown error'}`,
-        );
-      }
+      // DELETE may return 204; helper handles empty JSON by returning {}
+      await fetchJsonOrThrow(`/api/predictions/${id}`, { method: 'DELETE' });
 
       setPredictions((prev) => prev.filter((p) => p.id !== id));
+      setPlayedMap((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     } catch (err) {
       console.error('Delete prediction failed:', err);
       alert('Could not delete prediction. Check console/logs for details.');
@@ -156,28 +221,13 @@ export default function MyPredictionsPage() {
     try {
       setChecking(true);
 
-      const res = await fetch(api('/api/predictions/check'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const text = await res.text();
-
-      if (!res.ok) {
-        if (isHtml(text)) {
-          throw new Error(
-            `Your request hit the frontend server, not the API. Ensure VITE_API_BASE_URL is set to the API URL (port 3000 in dev) or rely on the Vite proxy.`,
-          );
-        }
-        throw new Error(text || `Request failed (${res.status})`);
-      }
-
-      let data: CheckResponse | null = null;
-      try {
-        data = text ? (JSON.parse(text) as CheckResponse) : null;
-      } catch {
-        data = null;
-      }
+      const data = await fetchJsonOrThrow<CheckResponse>(
+        '/api/predictions/check',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
 
       const checked = data?.checked ?? 0;
       const updated = data?.updated ?? 0;
@@ -197,14 +247,38 @@ export default function MyPredictionsPage() {
     }
   }
 
-  function hitStyle(isHit: boolean) {
-    // Only override when it’s a hit (so default pills match other pages)
+  async function handleTogglePlayed(predictionId: number) {
+    const isPlayed = Boolean(playedMap[predictionId]);
+
+    setPlayingId(predictionId);
+    setPlayedMap((prev) => ({ ...prev, [predictionId]: !isPlayed }));
+
+    try {
+      if (isPlayed) {
+        await unmarkPlayed(predictionId);
+      } else {
+        await markPlayed(predictionId);
+      }
+    } catch (e) {
+      console.error(e);
+      setPlayedMap((prev) => ({ ...prev, [predictionId]: isPlayed }));
+      alert(
+        isPlayed
+          ? 'Could not unmark as played. Please try again.'
+          : 'Could not mark as played. Please try again.',
+      );
+    } finally {
+      setPlayingId(null);
+    }
+  }
+
+  function hitStyle(isHit: boolean): CSSProperties | undefined {
     return isHit
-      ? ({
+      ? {
           background: '#ecfdf3',
           borderColor: '#86efac',
           color: '#166534',
-        } as React.CSSProperties)
+        }
       : undefined;
   }
 
@@ -306,6 +380,7 @@ export default function MyPredictionsPage() {
         >
           {predictions.map((p) => {
             const draw = drawMap[p.draw_date];
+            const isPlayed = Boolean(playedMap[p.id]);
 
             const mainHitCount = draw
               ? p.main_numbers.reduce(
@@ -325,10 +400,13 @@ export default function MyPredictionsPage() {
               <article
                 key={p.id}
                 style={{
-                  background: '#ffffff',
+                  background: isPlayed ? '#f8fafc' : '#ffffff',
                   borderRadius: '18px',
                   padding: '1rem 1.25rem',
                   boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
+                  border: isPlayed
+                    ? '1px solid #e5e7eb'
+                    : '1px solid transparent',
                 }}
               >
                 <div
@@ -371,16 +449,18 @@ export default function MyPredictionsPage() {
                         fontSize: '0.8rem',
                         padding: '0.2rem 0.6rem',
                         borderRadius: 999,
-                        background:
-                          p.status === 'won'
+                        background: isPlayed
+                          ? '#eef2ff'
+                          : p.status === 'won'
                             ? '#ecfdf3'
                             : p.status === 'lost'
                               ? '#fef2f2'
                               : p.status === 'checked'
                                 ? '#f5f3ff'
                                 : '#eff6ff',
-                        color:
-                          p.status === 'won'
+                        color: isPlayed
+                          ? '#3730a3'
+                          : p.status === 'won'
                             ? '#166534'
                             : p.status === 'lost'
                               ? '#991b1b'
@@ -389,7 +469,7 @@ export default function MyPredictionsPage() {
                                 : '#1d4ed8',
                       }}
                     >
-                      {p.status}
+                      {isPlayed ? 'played' : p.status}
                     </div>
 
                     <button
@@ -485,48 +565,82 @@ export default function MyPredictionsPage() {
                       marginLeft: 'auto',
                       textAlign: 'right',
                       minWidth: 170,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                      alignItems: 'flex-end',
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: '0.75rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                        color: '#6b7280',
-                      }}
-                    >
-                      Confidence
-                    </div>
-
-                    <div style={{ fontWeight: 600 }}>
-                      {Number(p.confidence).toFixed(2)}%
-                    </div>
-
-                    {(p.matched_main != null || p.matched_stars != null) && (
+                    <div style={{ textAlign: 'right' }}>
                       <div
                         style={{
                           fontSize: '0.75rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em',
                           color: '#6b7280',
-                          marginTop: 2,
                         }}
                       >
-                        Hits: {p.matched_main ?? 0} main /{' '}
-                        {p.matched_stars ?? 0} stars
-                        {p.result_label ? ` • ${p.result_label}` : ''}
+                        Confidence
                       </div>
-                    )}
 
-                    {!draw && (
-                      <div
-                        style={{
-                          fontSize: '0.75rem',
-                          color: '#9ca3af',
-                          marginTop: 6,
-                        }}
-                      >
-                        (No draw data loaded for {p.draw_date})
+                      <div style={{ fontWeight: 600 }}>
+                        {Number(p.confidence).toFixed(2)}%
                       </div>
-                    )}
+
+                      {(p.matched_main != null || p.matched_stars != null) && (
+                        <div
+                          style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginTop: 2,
+                          }}
+                        >
+                          Hits: {p.matched_main ?? 0} main /{' '}
+                          {p.matched_stars ?? 0} stars
+                          {p.result_label ? ` • ${p.result_label}` : ''}
+                        </div>
+                      )}
+
+                      {!draw && (
+                        <div
+                          style={{
+                            fontSize: '0.75rem',
+                            color: '#9ca3af',
+                            marginTop: 6,
+                          }}
+                        >
+                          (No draw data loaded for {p.draw_date})
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePlayed(p.id)}
+                      disabled={playingId === p.id}
+                      style={{
+                        border: '1px solid rgba(15,23,42,0.12)',
+                        background: isPlayed ? '#eef2ff' : '#ffffff',
+                        borderRadius: 999,
+                        padding: '0.45rem 0.8rem',
+                        fontSize: '0.85rem',
+                        cursor: playingId === p.id ? 'not-allowed' : 'pointer',
+                        fontWeight: 600,
+                        opacity: playingId === p.id ? 0.6 : 1,
+                        color: isPlayed ? '#3730a3' : '#0f172a',
+                      }}
+                      title={
+                        isPlayed
+                          ? 'Click to undo (unmark as played)'
+                          : 'Play this line'
+                      }
+                    >
+                      {playingId === p.id
+                        ? 'Saving…'
+                        : isPlayed
+                          ? 'Played (undo)'
+                          : 'Play this line'}
+                    </button>
                   </div>
                 </div>
               </article>

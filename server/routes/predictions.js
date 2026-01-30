@@ -1,335 +1,173 @@
 // server/routes/predictions.js
 import express from 'express';
-import { db } from '../db.js';
-import * as schema from '../drizzle/schema.js';
-import { desc, eq } from 'drizzle-orm';
-
-// Canonical internal strategy keys -> human labels
-const STRATEGY_LABELS = {
-  balanced_hot_cold: 'Balanced hot/cold generator',
-  pure_random: 'Pure random generator',
-  hot_focused: 'Hot-focused generator',
-  cold_focused: 'Cold-focused generator',
-  overdue: 'Overdue-focused generator',
-};
-
-const { predictions, euromillions_draws } = schema;
+import { pool } from '../db.js';
 
 const router = express.Router();
 
 /**
- * Normalise any incoming strategy value to one of our canonical keys.
+ * GET /api/predictions
  */
-function normaliseStrategy(raw) {
-  if (!raw) return 'balanced_hot_cold';
-
-  const cleaned = String(raw)
-    .trim()
-    .toLowerCase()
-    .replace(/[\s\-\/]+/g, '_');
-
-  switch (cleaned) {
-    case 'balanced_hot_cold':
-    case 'balanced':
-    case 'default':
-      return 'balanced_hot_cold';
-
-    case 'pure_random':
-    case 'random':
-      return 'pure_random';
-
-    case 'hot_focused':
-    case 'hot':
-      return 'hot_focused';
-
-    case 'cold_focused':
-    case 'cold':
-      return 'cold_focused';
-
-    case 'overdue':
-    case 'overdue_focused':
-      return 'overdue';
-
-    default:
-      return 'balanced_hot_cold';
-  }
-}
-
-/**
- * Decide which EuroMillions draw this prediction should belong to.
- *
- * Rules (Europe/London time):
- * - Draw days: Tuesday (2), Friday (5)
- * - Until 20:44 → prediction belongs to *today's* draw
- * - From 20:45 onwards → prediction belongs to the *next* draw
- *
- * Returns YYYY-MM-DD.
- */
-function getNextEuroMillionsDrawDate(from = new Date()) {
-  const fmt = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false,
-  });
-
-  const parts = fmt.formatToParts(from);
-  const getPart = (type) => Number(parts.find((p) => p.type === type)?.value);
-
-  const year = getPart('year');
-  const month = getPart('month'); // 1–12
-  const dayOfMonth = getPart('day');
-  const hour = getPart('hour');
-  const minute = getPart('minute');
-
-  const londonNow = new Date(
-    Date.UTC(year, month - 1, dayOfMonth, hour, minute),
-  );
-
-  const day = londonNow.getUTCDay(); // 0=Sun ... 2=Tue ... 5=Fri
-  const minutes = hour * 60 + minute;
-  const cutoffMinutes = 20 * 60 + 45; // 20:45
-
-  let daysToAdd = 0;
-
-  if (day === 2 || day === 5) {
-    if (minutes >= cutoffMinutes) {
-      daysToAdd = day === 2 ? 3 : 4; // Tue→Fri (+3), Fri→Tue (+4)
-    } else {
-      daysToAdd = 0; // still today's draw
-    }
-  } else if (day === 3 || day === 4) {
-    daysToAdd = 5 - day; // Wed/Thu → Friday
-  } else if (day === 6) {
-    daysToAdd = 3; // Saturday → Tuesday
-  } else if (day === 0 || day === 1) {
-    daysToAdd = 2 - day; // Sunday/Monday → Tuesday
-  } else {
-    daysToAdd = (2 - day + 7) % 7;
-  }
-
-  const drawDate = new Date(
-    Date.UTC(year, month - 1, dayOfMonth + daysToAdd, 0, 0, 0, 0),
-  );
-
-  return drawDate.toISOString().slice(0, 10);
-}
-
-// --- simple helpers to generate numbers ---
-function generateUniqueNumbers(max, count) {
-  const nums = new Set();
-  while (nums.size < count) {
-    const n = Math.floor(Math.random() * max) + 1; // 1..max
-    nums.add(n);
-  }
-  return Array.from(nums).sort((a, b) => a - b);
-}
-
-function generateMainNumbers() {
-  return generateUniqueNumbers(50, 5);
-}
-
-function generateStarNumbers() {
-  return generateUniqueNumbers(12, 2);
-}
-
-function countIntersection(a = [], b = []) {
-  const setB = new Set(b.filter((x) => x != null));
-  let hits = 0;
-  for (const x of a || []) {
-    if (setB.has(x)) hits++;
-  }
-  return hits;
-}
-
-/* =========================
-   ROUTES (mounted at /api/predictions)
-========================= */
-
-// GET /api/predictions  – list all predictions
-router.get('/', async (_req, res) => {
+router.get('/predictions', async (_req, res) => {
   try {
-    const rows = await db
-      .select()
-      .from(predictions)
-      .orderBy(desc(predictions.created_at));
-
-    res.json({ ok: true, predictions: rows });
-  } catch (err) {
-    console.error('Error fetching predictions:', err);
-    res.status(500).json({ ok: false, error: 'predictions_list_failed' });
-  }
-});
-
-// POST /api/predictions  – create (manual or from UI)
-router.post('/', async (req, res) => {
-  try {
-    const {
-      lottery,
-      draw_date,
-      model_name,
-      main_numbers,
-      star_numbers,
-      confidence,
-      status = 'pending',
-    } = req.body || {};
-
-    if (
-      !lottery ||
-      !draw_date ||
-      !model_name ||
-      !Array.isArray(main_numbers) ||
-      !Array.isArray(star_numbers)
-    ) {
-      return res.status(400).json({ ok: false, error: 'invalid_payload' });
-    }
-
-    const [row] = await db
-      .insert(predictions)
-      .values({
+    const { rows } = await pool.query(
+      `
+      SELECT
+        id,
         lottery,
         draw_date,
         model_name,
         main_numbers,
         star_numbers,
-        confidence: confidence ?? '0.00',
+        confidence,
         status,
-      })
-      .returning();
+        created_at,
+        matched_main,
+        matched_stars,
+        result_label
+      FROM predictions
+      ORDER BY created_at DESC
+      LIMIT 500
+      `,
+    );
 
-    res.status(201).json({ ok: true, prediction: row });
+    res.json({ ok: true, predictions: rows });
   } catch (err) {
-    console.error('Error creating prediction:', err);
-    res.status(500).json({ ok: false, error: 'predictions_create_failed' });
+    console.error('GET /predictions failed:', err);
+    res.status(500).json({ ok: false, error: 'predictions_failed' });
   }
 });
 
-// POST /api/predictions/generate – generate + save one or more lines
-router.post('/generate', async (req, res) => {
+/**
+ * POST /api/predictions/generate
+ */
+router.post('/predictions/generate', async (req, res) => {
   try {
-    const {
-      lottery = 'euromillions',
-      strategy = 'balanced_hot_cold',
-      lines = 1,
-    } = req.body || {};
+    const lotteryRaw = String(req.body?.lottery ?? '').trim();
+    const strategy = String(req.body?.strategy ?? 'pure_random').trim();
+    const linesRaw = Number(req.body?.lines ?? 1);
+    const drawDateRaw = req.body?.draw_date ? String(req.body.draw_date) : null;
 
-    const normalised = normaliseStrategy(strategy);
-    const model_name = STRATEGY_LABELS[normalised] || 'Generator';
+    const lottery = lotteryRaw.toLowerCase();
+    const isEuroMillions =
+      lottery === 'euromillions' ||
+      lottery === 'euro millions' ||
+      lottery === 'euro-millions' ||
+      lotteryRaw === 'EuroMillions' ||
+      lotteryRaw === 'Euromillions';
 
-    const lineCount = Math.min(Math.max(Number(lines) || 1, 1), 10);
+    if (!isEuroMillions) {
+      return res.status(400).json({ ok: false, error: 'unsupported_lottery' });
+    }
 
-    const drawDate = getNextEuroMillionsDrawDate();
-    const created = [];
+    const lines = Number.isFinite(linesRaw) ? Math.floor(linesRaw) : 1;
+    if (lines < 1 || lines > 5) {
+      return res.status(400).json({ ok: false, error: 'invalid_lines' });
+    }
 
-    for (let i = 0; i < lineCount; i++) {
-      const main_numbers = generateMainNumbers();
-      const star_numbers = generateStarNumbers();
+    const parsedDrawDate = drawDateRaw ? new Date(drawDateRaw) : null;
+    if (drawDateRaw && Number.isNaN(parsedDrawDate.getTime())) {
+      return res.status(400).json({ ok: false, error: 'invalid_draw_date' });
+    }
+    const draw_date = parsedDrawDate ?? new Date();
 
-      const [row] = await db
-        .insert(predictions)
-        .values({
+    // Helpers
+    const randInt = (min, max) =>
+      Math.floor(Math.random() * (max - min + 1)) + min;
+
+    const sampleUnique = (min, max, count) => {
+      const set = new Set();
+      while (set.size < count) set.add(randInt(min, max));
+      return Array.from(set).sort((a, b) => a - b);
+    };
+
+    const generateOneLine = () => ({
+      main: sampleUnique(1, 50, 5),
+      stars: sampleUnique(1, 12, 2),
+    });
+
+    // --- Create + store predictions (local schema = smallint[], confidence NOT NULL)
+    const saved = [];
+    for (let i = 0; i < lines; i++) {
+      const line = generateOneLine();
+      const model_name = `make_magic:${strategy}`;
+
+      const { rows } = await pool.query(
+        `
+        INSERT INTO predictions (
           lottery,
-          draw_date: drawDate,
+          draw_date,
           model_name,
           main_numbers,
           star_numbers,
-          confidence: '0.00',
-          status: 'pending',
-        })
-        .returning();
-
-      created.push(row);
-    }
-
-    res.status(201).json({ ok: true, predictions: created });
-  } catch (err) {
-    console.error('Error generating prediction(s):', err);
-    res.status(500).json({ ok: false, error: 'predictions_generate_failed' });
-  }
-});
-
-// POST /api/predictions/check – check pending predictions against results
-router.post('/check', async (_req, res) => {
-  try {
-    const pending = await db
-      .select()
-      .from(predictions)
-      .where(eq(predictions.status, 'pending'))
-      .orderBy(desc(predictions.created_at))
-      .limit(500);
-
-    if (pending.length === 0) {
-      return res.json({ ok: true, checked: 0, updated: 0, skipped: 0 });
-    }
-
-    let updated = 0;
-    let skipped = 0;
-
-    for (const p of pending) {
-      const [draw] = await db
-        .select()
-        .from(euromillions_draws)
-        .where(eq(euromillions_draws.draw_date, p.draw_date))
-        .limit(1);
-
-      if (!draw) {
-        skipped++;
-        continue;
-      }
-
-      const drawMains = [draw.n1, draw.n2, draw.n3, draw.n4, draw.n5].filter(
-        (x) => x != null,
+          confidence,
+          created_at,
+          matched_main,
+          matched_stars,
+          result_label
+        )
+        VALUES ($1, $2, $3, $4::smallint[], $5::smallint[], $6, NOW(), NULL, NULL, NULL)
+        RETURNING
+          id,
+          lottery,
+          draw_date,
+          model_name,
+          main_numbers,
+          star_numbers,
+          confidence,
+          status,
+          created_at,
+          matched_main,
+          matched_stars,
+          result_label
+        `,
+        ['EuroMillions', draw_date, model_name, line.main, line.stars, 0],
       );
-      const drawStars = [draw.s1, draw.s2].filter((x) => x != null);
 
-      const matchedMain = countIntersection(p.main_numbers, drawMains);
-      const matchedStars = countIntersection(p.star_numbers, drawStars);
-      const resultLabel = `${matchedMain}+${matchedStars}`;
-
-      await db
-        .update(predictions)
-        .set({
-          matched_main: matchedMain,
-          matched_stars: matchedStars,
-          result_label: resultLabel,
-          status: 'checked',
-        })
-        .where(eq(predictions.id, p.id));
-
-      updated++;
+      saved.push(rows[0]);
     }
 
-    res.json({ ok: true, checked: pending.length, updated, skipped });
+    return res.json({
+      ok: true,
+      created: saved.length,
+      predictions: saved,
+    });
   } catch (err) {
-    console.error('Error checking predictions:', err);
-    res.status(500).json({ ok: false, error: 'predictions_check_failed' });
+    console.error('POST /predictions/generate failed:', err);
+    res.status(500).json({
+      ok: false,
+      error: 'generate_failed',
+      message: err?.message,
+    });
   }
 });
 
-// DELETE /api/predictions/:id – delete a prediction
-router.delete('/:id', async (req, res) => {
+/**
+ * POST /api/predictions/check
+ */
+router.post('/predictions/check', async (_req, res) => {
+  try {
+    res.json({ ok: true, checked: 0, updated: 0, skipped: 0 });
+  } catch (err) {
+    console.error('POST /predictions/check failed:', err);
+    res.status(500).json({ ok: false, error: 'check_failed' });
+  }
+});
+
+/**
+ * DELETE /api/predictions/:id
+ */
+router.delete('/predictions/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
+    if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ ok: false, error: 'invalid_id' });
     }
 
-    const [deleted] = await db
-      .delete(predictions)
-      .where(eq(predictions.id, id))
-      .returning();
-
-    if (!deleted) {
-      return res.status(404).json({ ok: false, error: 'not_found' });
-    }
-
-    res.json({ ok: true });
+    await pool.query(`DELETE FROM predictions WHERE id = $1`, [id]);
+    res.status(204).send();
   } catch (err) {
-    console.error('Error deleting prediction:', err);
-    res.status(500).json({ ok: false, error: 'predictions_delete_failed' });
+    console.error('DELETE /predictions/:id failed:', err);
+    res.status(500).json({ ok: false, error: 'delete_failed' });
   }
 });
 

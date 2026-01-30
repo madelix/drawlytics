@@ -5,7 +5,7 @@ import {
   type DrawsListResponse,
   type EuromillionsDraw,
 } from '../api/draws';
-import { LatestDraw } from '../components/LatestDraw';
+import LatestDraw from '../components/LatestDraw';
 import { ScrollToTopButton } from '../components/ScrollToTopButton';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
@@ -70,7 +70,6 @@ export function AllDrawsPage() {
 
   return (
     <div className="dl-page dl-analysis-page">
-      {/* PAGE TITLE */}
       <header className="dl-analysis-header">
         <h1 className="dl-hero-title">EuroMillions draw history</h1>
         <p className="dl-section-subtitle">
@@ -79,7 +78,6 @@ export function AllDrawsPage() {
       </header>
 
       <main>
-        {/* Latest draw summary at top */}
         <section style={{ marginBottom: '2rem' }}>
           <LatestDraw />
         </section>
@@ -171,3 +169,5 @@ export function AllDrawsPage() {
     </div>
   );
 }
+
+export default AllDrawsPage;

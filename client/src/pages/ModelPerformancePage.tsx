@@ -1,3 +1,4 @@
+// client/src/pages/ModelPerformancePage.tsx
 import { useEffect, useMemo, useState } from 'react';
 import {
   getModelPerformance,
@@ -5,7 +6,7 @@ import {
 } from '../api/performance';
 
 function formatPct(n: number) {
-  if (Number.isNaN(n)) return '—';
+  if (!Number.isFinite(n)) return '—';
   return `${n.toFixed(1)}%`;
 }
 
@@ -204,7 +205,9 @@ export default function ModelPerformancePage() {
                       borderBottom: '1px solid #f1f5f9',
                     }}
                   >
-                    {r.avg_main_hits.toFixed(2)}
+                    {Number.isFinite(r.avg_main_hits)
+                      ? r.avg_main_hits.toFixed(2)
+                      : '—'}
                   </td>
 
                   <td
@@ -213,7 +216,9 @@ export default function ModelPerformancePage() {
                       borderBottom: '1px solid #f1f5f9',
                     }}
                   >
-                    {r.avg_star_hits.toFixed(2)}
+                    {Number.isFinite(r.avg_star_hits)
+                      ? r.avg_star_hits.toFixed(2)
+                      : '—'}
                   </td>
 
                   <td

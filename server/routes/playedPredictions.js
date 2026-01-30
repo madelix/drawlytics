@@ -60,6 +60,12 @@ router.post('/played-predictions', async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Prediction not found' });
     }
 
+    // ✅ FORCE model_name (local DB has NOT NULL on played_predictions.model_name)
+    const modelName =
+      typeof p.model_name === 'string' && p.model_name.trim() !== ''
+        ? p.model_name
+        : `unknown_model:${prediction_id}`;
+
     // 2) Fast path: already played?
     const [already] = await db
       .select({ id: played_predictions.id })
@@ -75,14 +81,13 @@ router.post('/played-predictions', async (req, res) => {
     }
 
     // 3) Insert played record
-    // IMPORTANT: played_predictions now has model_name NOT NULL, so we MUST insert it.
     const [inserted] = await db
       .insert(played_predictions)
       .values({
         lottery: p.lottery,
         draw_date: p.draw_date,
         prediction_id: p.id,
-        model_name: p.model_name,
+        model_name: modelName, // ✅ never undefined / empty
         notes,
       })
       .returning({
@@ -99,7 +104,6 @@ router.post('/played-predictions', async (req, res) => {
       ok: true,
       played: {
         ...inserted,
-        // return the prediction details too (handy for UI)
         main_numbers: p.main_numbers,
         star_numbers: p.star_numbers,
         confidence: p.confidence,
@@ -137,8 +141,41 @@ router.post('/played-predictions', async (req, res) => {
 });
 
 /**
+ * DELETE /api/played-predictions/:predictionId
+ * Unmarks a prediction as played by removing its played_predictions row.
+ */
+router.delete('/played-predictions/:predictionId', async (req, res) => {
+  try {
+    const predictionId = Number(req.params.predictionId);
+
+    if (!Number.isInteger(predictionId) || predictionId <= 0) {
+      return res
+        .status(400)
+        .json({ ok: false, error: 'invalid_prediction_id' });
+    }
+
+    const deleted = await db
+      .delete(played_predictions)
+      .where(eq(played_predictions.prediction_id, predictionId))
+      .returning({ id: played_predictions.id });
+
+    if (!deleted.length) {
+      return res.status(404).json({ ok: false, error: 'not_found' });
+    }
+
+    return res.json({ ok: true, deleted: deleted.length });
+  } catch (err) {
+    console.error('played-predictions DELETE error:', err);
+    return res.status(500).json({
+      ok: false,
+      error: 'server_error',
+      detail: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
+/**
  * GET /api/played-predictions?lottery=euromillions&draw_date=2025-12-30
- * Lists played lines, joined with the prediction details.
  */
 router.get('/played-predictions', async (req, res) => {
   try {
@@ -157,9 +194,8 @@ router.get('/played-predictions', async (req, res) => {
         draw_date: played_predictions.draw_date,
         played_at: played_predictions.played_at,
         notes: played_predictions.notes,
-        played_model_name: played_predictions.model_name, // stored at play time ✅
+        played_model_name: played_predictions.model_name,
 
-        // current prediction details (could change in theory, but usually stable)
         model_name: predictions.model_name,
         main_numbers: predictions.main_numbers,
         star_numbers: predictions.star_numbers,
@@ -192,7 +228,6 @@ router.get('/played-predictions', async (req, res) => {
 
 /**
  * GET /api/played-predictions/status?ids=1,2,3
- * Returns { playedIds: number[] } for quick UI highlighting.
  */
 router.get('/played-predictions/status', async (req, res) => {
   try {

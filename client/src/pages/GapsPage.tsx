@@ -53,13 +53,13 @@ export function GapsPage() {
 
   const mainGaps: GapDatum[] = mainGapsRaw.slice(0, 20).map((item) => ({
     label: String(item.number),
-    gap: item.gap,
+    gap: Number(item.gap), // ✅ coerce to number for charts
     lastSeenLabel: item.lastSeen ?? 'Never seen',
   }));
 
   const starGaps: GapDatum[] = starGapsRaw.slice(0, 12).map((item) => ({
     label: String(item.number),
-    gap: item.gap,
+    gap: Number(item.gap), // ✅ coerce to number for charts
     lastSeenLabel: item.lastSeen ?? 'Never seen',
   }));
 
