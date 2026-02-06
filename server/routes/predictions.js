@@ -179,7 +179,11 @@ router.post('/predictions/check', async (req, res) => {
       FROM predictions
       WHERE lottery = 'EuroMillions'
         AND (
-          ${onlyPending ? "status IS NULL OR status = 'pending' OR status = 'played'" : 'TRUE'}
+          ${
+            onlyPending
+              ? "status IS NULL OR status = 'pending' OR status = 'played'"
+              : 'TRUE'
+          }
         )
       ORDER BY created_at DESC
       LIMIT $1
@@ -291,7 +295,7 @@ router.post('/predictions/check', async (req, res) => {
             `
             SELECT draw_date, n1, n2, n3, n4, n5, s1, s2
             FROM euromillions_draws
-            WHERE draw_date = $1::date
+            WHERE draw_date = ($1::timestamptz AT TIME ZONE 'UTC')::date
             LIMIT 1
             `,
             [p.draw_date],
@@ -304,7 +308,7 @@ router.post('/predictions/check', async (req, res) => {
               `
               SELECT draw_date, main_numbers, star_numbers
               FROM euromillions_draws
-              WHERE draw_date = $1::date
+              WHERE draw_date = ($1::timestamptz AT TIME ZONE 'UTC')::date
               LIMIT 1
               `,
               [p.draw_date],
@@ -328,8 +332,7 @@ router.post('/predictions/check', async (req, res) => {
           SET
             matched_main = NULL,
             matched_stars = NULL,
-            result_label = 'no_draw_data',
-            status = 'checked'
+            result_label = 'no_draw_data'
           WHERE id = $1
           `,
           [p.id],
@@ -348,8 +351,7 @@ router.post('/predictions/check', async (req, res) => {
         SET
           matched_main = $2,
           matched_stars = $3,
-          result_label = $4,
-          status = 'checked'
+          result_label = $4
         WHERE id = $1
         `,
         [p.id, mMain, mStars, label],
