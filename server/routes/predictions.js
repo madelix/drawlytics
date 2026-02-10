@@ -4,68 +4,28 @@ import { pool } from '../db.js';
 
 const router = express.Router();
 
-/**
- * TEMP DEBUG (remove after diagnosing)
- * GET /api/predictions/debug-draws?date=YYYY-MM-DD
- *
- * Returns:
- * - draws_count
- * - latest_draw
- * - row for that date (n1..s2 if present)
- */
-router.get('/predictions/debug-draws', async (req, res) => {
-  try {
-    const date = req.query.date ? String(req.query.date) : null;
+/* --------------------------
+   Helpers
+-------------------------- */
+const toNums = (arr) =>
+  Array.isArray(arr) ? arr.map((n) => Number(n)).filter(Number.isFinite) : [];
 
-    const countQ = await pool.query(
-      `SELECT COUNT(*)::int AS draws_count, MAX(draw_date)::date AS latest_draw FROM euromillions_draws`,
-    );
+const countMatches = (a, b) => {
+  const setB = new Set(b);
+  let c = 0;
+  for (const x of a) if (setB.has(x)) c++;
+  return c;
+};
 
-    let rowForDate = null;
-    if (date) {
-      // Try n1..s2 schema first
-      try {
-        const q = await pool.query(
-          `
-          SELECT draw_date::date AS draw_date, n1,n2,n3,n4,n5,s1,s2
-          FROM euromillions_draws
-          WHERE draw_date::date = $1::date
-          LIMIT 1
-          `,
-          [date],
-        );
-        rowForDate = q.rows?.[0] ?? null;
-      } catch (_e) {
-        // Try array schema fallback
-        const q2 = await pool.query(
-          `
-          SELECT draw_date::date AS draw_date, main_numbers, star_numbers
-          FROM euromillions_draws
-          WHERE draw_date::date = $1::date
-          LIMIT 1
-          `,
-          [date],
-        );
-        rowForDate = q2.rows?.[0] ?? null;
-      }
-    }
+// YYYY-MM-DD in UTC
+const toYYYYMMDD = (d) => {
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString().slice(0, 10);
+};
 
-    return res.json({
-      ok: true,
-      draws_count: countQ.rows?.[0]?.draws_count ?? null,
-      latest_draw: countQ.rows?.[0]?.latest_draw ?? null,
-      requested_date: date,
-      row_for_date: rowForDate,
-    });
-  } catch (err) {
-    console.error('debug-draws error:', err);
-    return res.status(500).json({
-      ok: false,
-      error: 'debug_draws_failed',
-      message: err?.message,
-    });
-  }
-});
+// Case-insensitive “EuroMillions” (covers EuroMillions / Euromillions / EUROMILLIONS)
+const EURO_WHERE = `LOWER(lottery) = 'euromillions'`;
 
 /**
  * GET /api/predictions
@@ -97,6 +57,67 @@ router.get('/predictions', async (_req, res) => {
   } catch (err) {
     console.error('GET /predictions failed:', err);
     res.status(500).json({ ok: false, error: 'predictions_failed' });
+  }
+});
+
+/**
+ * GET /api/predictions/debug-draws
+ * Optional: ?date=YYYY-MM-DD
+ *
+ * Lets you verify draw coverage without Railway SQL.
+ */
+router.get('/predictions/debug-draws', async (req, res) => {
+  try {
+    const requested = req.query.date ? String(req.query.date) : null;
+
+    const { rows: countRows } = await pool.query(
+      `
+      SELECT COUNT(*)::int AS draws_count,
+             MAX(draw_date) AS latest_draw
+      FROM euromillions_draws
+      `,
+    );
+
+    let rowForDate = null;
+
+    if (requested) {
+      // Try n1..s2 schema
+      try {
+        const { rows } = await pool.query(
+          `
+          SELECT draw_date, n1,n2,n3,n4,n5, s1,s2
+          FROM euromillions_draws
+          WHERE draw_date::date = $1::date
+          LIMIT 1
+          `,
+          [requested],
+        );
+        if (rows.length) rowForDate = rows[0];
+      } catch (_e) {
+        // Try arrays schema
+        const { rows } = await pool.query(
+          `
+          SELECT draw_date, main_numbers, star_numbers
+          FROM euromillions_draws
+          WHERE draw_date::date = $1::date
+          LIMIT 1
+          `,
+          [requested],
+        );
+        if (rows.length) rowForDate = rows[0];
+      }
+    }
+
+    res.json({
+      ok: true,
+      draws_count: countRows?.[0]?.draws_count ?? null,
+      latest_draw: countRows?.[0]?.latest_draw ?? null,
+      requested_date: requested,
+      row_for_date: rowForDate,
+    });
+  } catch (err) {
+    console.error('GET /predictions/debug-draws failed:', err);
+    res.status(500).json({ ok: false, error: 'debug_draws_failed' });
   }
 });
 
@@ -152,6 +173,7 @@ router.post('/predictions/generate', async (req, res) => {
       const line = generateOneLine();
       const model_name = `make_magic:${strategy}`;
 
+      // local schema: smallint[] and confidence NOT NULL
       const { rows } = await pool.query(
         `
         INSERT INTO predictions (
@@ -201,16 +223,15 @@ router.post('/predictions/generate', async (req, res) => {
 /**
  * POST /api/predictions/check
  *
- * Robust + debuggable:
- * - Selects rows even when matched_* defaults to 0 (not null)
- * - Normalizes prediction draw_date -> YYYY-MM-DD UTC
- * - Fetches all draws for those dates in one go
- * - Matches correctly (no timezone surprises)
+ * Fixes:
+ * ✅ includes old rows where lottery is "Euromillions"
+ * ✅ avoids timezone issues by normalizing to YYYY-MM-DD (UTC)
+ * ✅ bulk fetches draws for those dates
  *
  * Query params:
- *  ?debug=1  -> returns extra debug info
+ *  ?debug=1 -> returns debug payload
  *
- * Body (optional):
+ * Body:
  *  { limit?: number, onlyUnchecked?: boolean }
  */
 router.post('/predictions/check', async (req, res) => {
@@ -225,12 +246,11 @@ router.post('/predictions/check', async (req, res) => {
     // default true
     const onlyUnchecked = req.body?.onlyUnchecked !== false;
 
-    // Pick predictions to check.
-    // IMPORTANT: handle NULLs and also defaults (0 / '' / 'no_draw%')
     const { rows: preds } = await pool.query(
       `
       SELECT
         id,
+        lottery,
         draw_date,
         main_numbers,
         star_numbers,
@@ -238,7 +258,7 @@ router.post('/predictions/check', async (req, res) => {
         matched_stars,
         result_label
       FROM predictions
-      WHERE lottery = 'EuroMillions'
+      WHERE ${EURO_WHERE}
         AND (
           $2::boolean = false
           OR matched_main IS NULL
@@ -254,12 +274,13 @@ router.post('/predictions/check', async (req, res) => {
     );
 
     let predictionsToCheck = preds;
+
     if (predictionsToCheck.length === 0 && onlyUnchecked) {
-      // fallback: check latest predictions anyway
       const fallback = await pool.query(
         `
         SELECT
           id,
+          lottery,
           draw_date,
           main_numbers,
           star_numbers,
@@ -267,7 +288,7 @@ router.post('/predictions/check', async (req, res) => {
           matched_stars,
           result_label
         FROM predictions
-        WHERE lottery = 'EuroMillions'
+        WHERE ${EURO_WHERE}
         ORDER BY created_at DESC
         LIMIT $1
         `,
@@ -280,27 +301,9 @@ router.post('/predictions/check', async (req, res) => {
       return res.json({ ok: true, checked: 0, updated: 0, skipped: 0 });
     }
 
-    const toNums = (arr) =>
-      Array.isArray(arr)
-        ? arr.map((n) => Number(n)).filter(Number.isFinite)
-        : [];
-
-    const countMatches = (a, b) => {
-      const setB = new Set(b);
-      let c = 0;
-      for (const x of a) if (setB.has(x)) c++;
-      return c;
-    };
-
-    const toYYYYMMDD = (d) => {
-      const dt = new Date(d);
-      if (Number.isNaN(dt.getTime())) return null;
-      return dt.toISOString().slice(0, 10); // YYYY-MM-DD in UTC
-    };
-
     // Build unique date list
     const dateSet = new Set();
-    const predMeta = []; // for debug
+    const predMeta = []; // debug
     for (const p of predictionsToCheck) {
       const day = toYYYYMMDD(p.draw_date);
       if (day) dateSet.add(day);
@@ -308,19 +311,17 @@ router.post('/predictions/check', async (req, res) => {
     }
     const days = Array.from(dateSet);
 
-    // Fetch draws for those days.
-    // Try n1.. style first; if it fails, fall back to array-style.
-    let drawsByDay = new Map(); // day -> { main:[], stars:[] }
+    // Fetch draws for those days (bulk)
+    let drawsByDay = new Map(); // day -> { main, stars }
     let drawSchema = 'unknown';
 
-    // Helper to insert into map
     const put = (day, main, stars) => {
       if (main.length === 5 && stars.length === 2) {
         drawsByDay.set(day, { main, stars });
       }
     };
 
-    // n1..n5/s1..s2
+    // Try n1..s2 schema first
     try {
       const { rows: drawRows } = await pool.query(
         `
@@ -341,7 +342,7 @@ router.post('/predictions/check', async (req, res) => {
       }
       drawSchema = 'n1..s2';
     } catch (_e) {
-      // array-style
+      // Fallback arrays schema
       const { rows: drawRows } = await pool.query(
         `
         SELECT draw_date, main_numbers, star_numbers
@@ -382,7 +383,8 @@ router.post('/predictions/check', async (req, res) => {
           UPDATE predictions
           SET matched_main = NULL,
               matched_stars = NULL,
-              result_label = 'invalid_prediction_draw_date'
+              result_label = 'invalid_prediction_draw_date',
+              status = 'checked'
           WHERE id = $1
           `,
           [p.id],
@@ -398,7 +400,8 @@ router.post('/predictions/check', async (req, res) => {
           UPDATE predictions
           SET matched_main = NULL,
               matched_stars = NULL,
-              result_label = 'no_draw_for_date'
+              result_label = 'no_draw_for_date',
+              status = 'checked'
           WHERE id = $1
           `,
           [p.id],
@@ -416,7 +419,8 @@ router.post('/predictions/check', async (req, res) => {
         UPDATE predictions
         SET matched_main = $2,
             matched_stars = $3,
-            result_label = $4
+            result_label = $4,
+            status = 'checked'
         WHERE id = $1
         `,
         [p.id, mMain, mStars, label],
