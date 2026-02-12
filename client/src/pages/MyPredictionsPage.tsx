@@ -41,6 +41,7 @@ type DrawRow = {
 type DrawMapEntry = {
   main: Set<number>;
   stars: Set<number>;
+  rawDate: string;
 };
 
 type PlayedStatusResponse = {
@@ -51,6 +52,28 @@ type PlayedStatusResponse = {
 function isHtml(text: string) {
   const t = text.trim().toLowerCase();
   return t.startsWith('<!doctype') || t.startsWith('<html');
+}
+
+/**
+ * Normalize any ISO-ish date string to YYYY-MM-DD in UTC.
+ * This avoids “same day, different timestamp string” mismatches.
+ */
+function toDayKey(input: string | Date): string | null {
+  try {
+    const d = input instanceof Date ? input : new Date(input);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+  } catch {
+    return null;
+  }
+}
+
+function formatDayLabel(dayKey: string) {
+  // dayKey: YYYY-MM-DD
+  // display as DD/MM/YYYY (UK-style)
+  const [y, m, d] = dayKey.split('-');
+  if (!y || !m || !d) return dayKey;
+  return `${d}/${m}/${y}`;
 }
 
 async function fetchJsonOrThrow<T>(
@@ -68,7 +91,6 @@ async function fetchJsonOrThrow<T>(
   const text = await res.text().catch(() => '');
 
   if (!res.ok) {
-    // Common failure mode: HTML from frontend (wrong host / proxy / missing route)
     if (isHtml(text)) {
       throw new Error(
         `Hit HTML instead of JSON for ${path}. This usually means the API route is missing, the backend is down, or the request is going to the wrong origin.`,
@@ -77,7 +99,6 @@ async function fetchJsonOrThrow<T>(
     throw new Error(`Request failed (${res.status}) for ${path}: ${text}`);
   }
 
-  // empty body (e.g. 204)
   if (!text) return {} as T;
 
   try {
@@ -99,9 +120,9 @@ export default function MyPredictionsPage() {
   const [checking, setChecking] = useState(false);
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
 
+  // drawMap keyed by YYYY-MM-DD
   const [drawMap, setDrawMap] = useState<Record<string, DrawMapEntry>>({});
 
-  // played state
   const [playedMap, setPlayedMap] = useState<Record<number, boolean>>({});
   const [playingId, setPlayingId] = useState<number | null>(null);
 
@@ -122,7 +143,6 @@ export default function MyPredictionsPage() {
       setPlayedMap(next);
     } catch (e) {
       console.warn('Played status error:', e);
-      // Don’t hard-fail the whole page just because this call failed
     }
   }
 
@@ -135,7 +155,6 @@ export default function MyPredictionsPage() {
   }
 
   async function unmarkPlayed(predictionId: number) {
-    // Some servers return 204/no body for DELETE; our helper handles empty bodies
     return fetchJsonOrThrow(`/api/played-predictions/${predictionId}`, {
       method: 'DELETE',
     });
@@ -164,6 +183,7 @@ export default function MyPredictionsPage() {
 
   async function loadDrawsForHighlighting() {
     try {
+      // We only need recent ones for highlighting; 200 is fine for now.
       const data = await fetchJsonOrThrow<{ draws?: DrawRow[] }>(
         '/api/draws/all?limit=200&offset=0',
       );
@@ -172,11 +192,18 @@ export default function MyPredictionsPage() {
 
       const map: Record<string, DrawMapEntry> = {};
       for (const d of draws) {
-        map[d.draw_date] = {
+        const dayKey = toDayKey(d.draw_date);
+        if (!dayKey) continue;
+
+        // If duplicates exist for the same day, the "last one wins" here.
+        // We'll fix duplicates on the backend afterwards.
+        map[dayKey] = {
           main: new Set([d.n1, d.n2, d.n3, d.n4, d.n5]),
           stars: new Set([d.s1, d.s2]),
+          rawDate: d.draw_date,
         };
       }
+
       setDrawMap(map);
     } catch (e) {
       console.warn('Could not load draws for highlighting:', e);
@@ -197,8 +224,6 @@ export default function MyPredictionsPage() {
 
     try {
       setDeletingId(id);
-
-      // DELETE may return 204; helper handles empty JSON by returning {}
       await fetchJsonOrThrow(`/api/predictions/${id}`, { method: 'DELETE' });
 
       setPredictions((prev) => prev.filter((p) => p.id !== id));
@@ -273,13 +298,16 @@ export default function MyPredictionsPage() {
   }
 
   function hitStyle(isHit: boolean): CSSProperties | undefined {
-    return isHit
-      ? {
-          background: '#ecfdf3',
-          borderColor: '#86efac',
-          color: '#166534',
-        }
-      : undefined;
+    if (!isHit) return undefined;
+
+    // More obvious green “hit” styling
+    return {
+      background: '#dcfce7', // stronger green fill
+      borderColor: '#22c55e',
+      color: '#14532d',
+      fontWeight: 700,
+      boxShadow: '0 0 0 2px rgba(34,197,94,0.15) inset',
+    };
   }
 
   return (
@@ -379,7 +407,9 @@ export default function MyPredictionsPage() {
           }}
         >
           {predictions.map((p) => {
-            const draw = drawMap[p.draw_date];
+            const dayKey = toDayKey(p.draw_date);
+            const draw = dayKey ? drawMap[dayKey] : undefined;
+
             const isPlayed = Boolean(playedMap[p.id]);
 
             const mainHitCount = draw
@@ -433,7 +463,8 @@ export default function MyPredictionsPage() {
                     </div>
 
                     <div style={{ fontWeight: 600 }}>
-                      {p.model_name} — draw {p.draw_date}
+                      {p.model_name} — draw{' '}
+                      {dayKey ? formatDayLabel(dayKey) : p.draw_date}
                     </div>
                   </div>
 
@@ -609,7 +640,8 @@ export default function MyPredictionsPage() {
                             marginTop: 6,
                           }}
                         >
-                          (No draw data loaded for {p.draw_date})
+                          (No draw data loaded for{' '}
+                          {dayKey ? formatDayLabel(dayKey) : p.draw_date})
                         </div>
                       )}
                     </div>
