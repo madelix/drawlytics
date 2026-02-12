@@ -4,94 +4,9 @@ import { pool } from '../db.js';
 
 const router = express.Router();
 
-/* ──────────────────────────────────────────────
-   Helpers
-   ────────────────────────────────────────────── */
-
-function toNums(arr) {
-  return Array.isArray(arr)
-    ? arr.map((n) => Number(n)).filter(Number.isFinite)
-    : [];
-}
-
-function countMatches(a, b) {
-  const setB = new Set(b);
-  let c = 0;
-  for (const x of a) if (setB.has(x)) c++;
-  return c;
-}
-
-function toYYYYMMDD(d) {
-  const dt = new Date(d);
-  if (Number.isNaN(dt.getTime())) return null;
-  return dt.toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
-}
-
-// Get "Europe/London" clock parts for a given Date
-function getLondonParts(date) {
-  const fmt = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-
-  const parts = fmt.formatToParts(date);
-  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
-  // weekday is like "Tue", "Fri"
-  return {
-    year: Number(map.year),
-    month: Number(map.month),
-    day: Number(map.day),
-    weekday: map.weekday,
-    hour: Number(map.hour),
-    minute: Number(map.minute),
-  };
-}
-
-// Compute next EuroMillions draw date (Tue/Fri) with a cutoff on draw day.
-// If today is Tue/Fri and before cutoff -> use today, else next Tue/Fri.
-function nextEuroMillionsDrawDate(
-  now = new Date(),
-  cutoffHour = 19,
-  cutoffMinute = 0,
-) {
-  const london = getLondonParts(now);
-  const isDrawDay = london.weekday === 'Tue' || london.weekday === 'Fri';
-  const beforeCutoff =
-    london.hour < cutoffHour ||
-    (london.hour === cutoffHour && london.minute < cutoffMinute);
-
-  // Base date at London "today"
-  const base = new Date(
-    Date.UTC(london.year, london.month - 1, london.day, 0, 0, 0),
-  );
-
-  if (isDrawDay && beforeCutoff) {
-    return base; // today (as UTC midnight date)
-  }
-
-  // Move forward day by day until Tue/Fri
-  let d = new Date(base);
-  for (let i = 0; i < 7; i++) {
-    d.setUTCDate(d.getUTCDate() + 1);
-    const w = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Europe/London',
-      weekday: 'short',
-    }).format(d);
-    if (w === 'Tue' || w === 'Fri') return d;
-  }
-
-  return d;
-}
-
-/* ──────────────────────────────────────────────
-   GET /api/predictions
-   ────────────────────────────────────────────── */
+/**
+ * GET /api/predictions
+ */
 router.get('/predictions', async (_req, res) => {
   try {
     const { rows } = await pool.query(
@@ -122,87 +37,11 @@ router.get('/predictions', async (_req, res) => {
   }
 });
 
-/* ──────────────────────────────────────────────
-   GET /api/predictions/debug-draws?date=YYYY-MM-DD
-   (useful when you can’t run SQL in Railway)
-   ────────────────────────────────────────────── */
-router.get('/predictions/debug-draws', async (req, res) => {
-  try {
-    const requested = req.query.date ? String(req.query.date) : null;
-
-    const qCount = await pool.query(
-      `SELECT COUNT(*)::int AS draws_count FROM euromillions_draws`,
-    );
-    const qLatest = await pool.query(
-      `SELECT draw_date FROM euromillions_draws ORDER BY draw_date DESC LIMIT 1`,
-    );
-
-    let rowForDate = null;
-    let nearest = null;
-
-    if (requested) {
-      const qRow = await pool.query(
-        `
-        SELECT draw_date, n1,n2,n3,n4,n5,s1,s2
-        FROM euromillions_draws
-        WHERE draw_date::date = $1::date
-        LIMIT 1
-        `,
-        [requested],
-      );
-
-      rowForDate = qRow.rows?.[0] ?? null;
-
-      // nearest prev/next
-      const qPrev = await pool.query(
-        `
-        SELECT draw_date
-        FROM euromillions_draws
-        WHERE draw_date::date < $1::date
-        ORDER BY draw_date DESC
-        LIMIT 1
-        `,
-        [requested],
-      );
-
-      const qNext = await pool.query(
-        `
-        SELECT draw_date
-        FROM euromillions_draws
-        WHERE draw_date::date > $1::date
-        ORDER BY draw_date ASC
-        LIMIT 1
-        `,
-        [requested],
-      );
-
-      nearest = {
-        prev: qPrev.rows?.[0]?.draw_date ?? null,
-        next: qNext.rows?.[0]?.draw_date ?? null,
-      };
-    }
-
-    return res.json({
-      ok: true,
-      draws_count: qCount.rows?.[0]?.draws_count ?? null,
-      latest_draw: qLatest.rows?.[0]?.draw_date ?? null,
-      requested_date: requested,
-      row_for_date: rowForDate,
-      nearest,
-    });
-  } catch (err) {
-    console.error('GET /predictions/debug-draws failed:', err);
-    return res
-      .status(500)
-      .json({ ok: false, error: 'debug_draws_failed', message: err?.message });
-  }
-});
-
-/* ──────────────────────────────────────────────
-   POST /api/predictions/generate
-   - draw date is automatic (next Tue/Fri), with cutoff on draw day
-   - still allows optional override via body.draw_date if you want
-   ────────────────────────────────────────────── */
+/**
+ * POST /api/predictions/generate
+ * NOTE: This keeps your current "save with provided draw_date" behavior.
+ * Your UI already sends draw_date_used automatically.
+ */
 router.post('/predictions/generate', async (req, res) => {
   try {
     const lotteryRaw = String(req.body?.lottery ?? '').trim();
@@ -227,20 +66,12 @@ router.post('/predictions/generate', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'invalid_lines' });
     }
 
-    // If draw_date provided, use it. Otherwise compute next draw day.
-    let draw_date;
-    if (drawDateRaw) {
-      const parsed = new Date(drawDateRaw);
-      if (Number.isNaN(parsed.getTime())) {
-        return res.status(400).json({ ok: false, error: 'invalid_draw_date' });
-      }
-      draw_date = parsed;
-    } else {
-      // cutoff: 19:00 London on Tue/Fri
-      draw_date = nextEuroMillionsDrawDate(new Date(), 19, 0);
+    const parsedDrawDate = drawDateRaw ? new Date(drawDateRaw) : null;
+    if (drawDateRaw && Number.isNaN(parsedDrawDate.getTime())) {
+      return res.status(400).json({ ok: false, error: 'invalid_draw_date' });
     }
+    const draw_date = parsedDrawDate ?? new Date();
 
-    // Helpers
     const randInt = (min, max) =>
       Math.floor(Math.random() * (max - min + 1)) + min;
 
@@ -255,7 +86,6 @@ router.post('/predictions/generate', async (req, res) => {
       stars: sampleUnique(1, 12, 2),
     });
 
-    // Store predictions
     const saved = [];
     for (let i = 0; i < lines; i++) {
       const line = generateOneLine();
@@ -276,7 +106,19 @@ router.post('/predictions/generate', async (req, res) => {
           result_label,
           status
         )
-        VALUES ($1, $2, $3, $4::smallint[], $5::smallint[], $6, NOW(), NULL, NULL, NULL, 'pending')
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4::smallint[],
+          $5::smallint[],
+          $6,
+          NOW(),
+          NULL,
+          NULL,
+          NULL,
+          'pending'
+        )
         RETURNING
           id,
           lottery,
@@ -313,15 +155,88 @@ router.post('/predictions/generate', async (req, res) => {
   }
 });
 
-/* ──────────────────────────────────────────────
-   POST /api/predictions/check
-   - fetches draws for all needed dates in one go
-   - if a prediction was saved on a non-draw day (e.g. Wed/Thu),
-     it can SHIFT to the nearest NEXT available draw date (within a few days)
-   - supports ?debug=1
-   Body:
-     { limit?: number, onlyUnchecked?: boolean, shiftToNextDraw?: boolean }
-   ────────────────────────────────────────────── */
+/**
+ * GET /api/predictions/debug-draws?date=YYYY-MM-DD
+ * Helps you verify whether a draw exists for a specific date without Railway SQL.
+ */
+router.get('/predictions/debug-draws', async (req, res) => {
+  try {
+    const date = req.query.date ? String(req.query.date) : null;
+
+    const c = await pool.query(
+      `SELECT COUNT(*)::int AS draws_count, MAX(draw_date) AS latest_draw FROM euromillions_draws`,
+    );
+
+    let rowForDate = null;
+    let nearest = null;
+
+    if (date) {
+      const r = await pool.query(
+        `
+        SELECT draw_date, n1,n2,n3,n4,n5, s1,s2
+        FROM euromillions_draws
+        WHERE draw_date = $1::date
+        LIMIT 1
+        `,
+        [date],
+      );
+      rowForDate = r.rows?.[0] ?? null;
+
+      const prev = await pool.query(
+        `
+        SELECT draw_date
+        FROM euromillions_draws
+        WHERE draw_date < $1::date
+        ORDER BY draw_date DESC
+        LIMIT 1
+        `,
+        [date],
+      );
+      const next = await pool.query(
+        `
+        SELECT draw_date
+        FROM euromillions_draws
+        WHERE draw_date > $1::date
+        ORDER BY draw_date ASC
+        LIMIT 1
+        `,
+        [date],
+      );
+
+      nearest = {
+        prev: prev.rows?.[0]?.draw_date ?? null,
+        next: next.rows?.[0]?.draw_date ?? null,
+      };
+    }
+
+    return res.json({
+      ok: true,
+      draws_count: c.rows?.[0]?.draws_count ?? null,
+      latest_draw: c.rows?.[0]?.latest_draw ?? null,
+      requested_date: date,
+      row_for_date: rowForDate,
+      nearest,
+    });
+  } catch (err) {
+    console.error('debug-draws error:', err);
+    return res.status(500).json({ ok: false, error: 'debug_failed' });
+  }
+});
+
+/**
+ * POST /api/predictions/check
+ *
+ * Fix:
+ * - Updates status='checked' so UI can reliably show match info.
+ * - Supports both "EuroMillions" and "Euromillions" casing in DB.
+ * - If no draw exists on the saved prediction date, tries shifting forward 1-3 days.
+ *
+ * Query params:
+ *  ?debug=1  -> returns extra debug info
+ *
+ * Body:
+ *  { limit?: number, onlyUnchecked?: boolean }
+ */
 router.post('/predictions/check', async (req, res) => {
   try {
     const debug = String(req.query.debug ?? '') === '1';
@@ -334,10 +249,7 @@ router.post('/predictions/check', async (req, res) => {
     // default true
     const onlyUnchecked = req.body?.onlyUnchecked !== false;
 
-    // default true (this is the “you saved on Wed/Thu -> use next Tue/Fri draw” fix)
-    const shiftToNextDraw = req.body?.shiftToNextDraw !== false;
-
-    // IMPORTANT: handle both "EuroMillions" and "Euromillions" old rows
+    // IMPORTANT: handle NULLs and also defaults (0 / '' / 'no_draw%')
     const { rows: preds } = await pool.query(
       `
       SELECT
@@ -348,9 +260,10 @@ router.post('/predictions/check', async (req, res) => {
         star_numbers,
         matched_main,
         matched_stars,
-        result_label
+        result_label,
+        status
       FROM predictions
-      WHERE lower(lottery) = 'euromillions'
+      WHERE (lottery = 'EuroMillions' OR lottery = 'Euromillions')
         AND (
           $2::boolean = false
           OR matched_main IS NULL
@@ -358,6 +271,8 @@ router.post('/predictions/check', async (req, res) => {
           OR result_label IS NULL
           OR result_label = ''
           OR result_label LIKE 'no_draw%'
+          OR status IS NULL
+          OR status = 'pending'
         )
       ORDER BY created_at DESC
       LIMIT $1
@@ -365,36 +280,39 @@ router.post('/predictions/check', async (req, res) => {
       [limit, onlyUnchecked],
     );
 
-    let predictionsToCheck = preds ?? [];
-    if (predictionsToCheck.length === 0 && onlyUnchecked) {
-      const fallback = await pool.query(
-        `
-        SELECT
-          id,
-          lottery,
-          draw_date,
-          main_numbers,
-          star_numbers,
-          matched_main,
-          matched_stars,
-          result_label
-        FROM predictions
-        WHERE lower(lottery) = 'euromillions'
-        ORDER BY created_at DESC
-        LIMIT $1
-        `,
-        [limit],
-      );
-      predictionsToCheck = fallback.rows ?? [];
-    }
+    let predictionsToCheck = preds;
 
     if (!predictionsToCheck.length) {
       return res.json({ ok: true, checked: 0, updated: 0, skipped: 0 });
     }
 
+    const toNums = (arr) =>
+      Array.isArray(arr)
+        ? arr.map((n) => Number(n)).filter(Number.isFinite)
+        : [];
+
+    const countMatches = (a, b) => {
+      const setB = new Set(b);
+      let c = 0;
+      for (const x of a) if (setB.has(x)) c++;
+      return c;
+    };
+
+    const toYYYYMMDD = (d) => {
+      const dt = new Date(d);
+      if (Number.isNaN(dt.getTime())) return null;
+      return dt.toISOString().slice(0, 10); // YYYY-MM-DD in UTC
+    };
+
+    const addDays = (yyyyMmDd, plusDays) => {
+      const dt = new Date(`${yyyyMmDd}T00:00:00.000Z`);
+      dt.setUTCDate(dt.getUTCDate() + plusDays);
+      return dt.toISOString().slice(0, 10);
+    };
+
     // Build unique date list
     const dateSet = new Set();
-    const predMeta = [];
+    const predMeta = []; // for debug
     for (const p of predictionsToCheck) {
       const day = toYYYYMMDD(p.draw_date);
       if (day) dateSet.add(day);
@@ -407,16 +325,25 @@ router.post('/predictions/check', async (req, res) => {
     }
     const days = Array.from(dateSet);
 
-    // Fetch draws for those days (n1..s2 schema)
-    const drawsByDay = new Map(); // day -> { drawDay, main, stars }
+    // Fetch draws for those days (+ a few “forward shift” days)
+    const expandedDays = new Set(days);
+    for (const d of days) {
+      expandedDays.add(addDays(d, 1));
+      expandedDays.add(addDays(d, 2));
+      expandedDays.add(addDays(d, 3));
+    }
+    const daysQuery = Array.from(expandedDays);
+
+    let drawsByDay = new Map(); // day -> { main:[], stars:[] }
     let drawSchema = 'unknown';
 
     const put = (day, main, stars) => {
-      if (day && main.length === 5 && stars.length === 2) {
-        drawsByDay.set(day, { drawDay: day, main, stars });
+      if (main.length === 5 && stars.length === 2) {
+        drawsByDay.set(day, { main, stars });
       }
     };
 
+    // n1..n5/s1..s2
     try {
       const { rows: drawRows } = await pool.query(
         `
@@ -424,7 +351,7 @@ router.post('/predictions/check', async (req, res) => {
         FROM euromillions_draws
         WHERE draw_date::date = ANY($1::date[])
         `,
-        [days],
+        [daysQuery],
       );
 
       for (const r of drawRows) {
@@ -433,53 +360,28 @@ router.post('/predictions/check', async (req, res) => {
           .map(Number)
           .filter(Number.isFinite);
         const stars = [r.s1, r.s2].map(Number).filter(Number.isFinite);
-        put(day, main, stars);
+        if (day) put(day, main, stars);
       }
       drawSchema = 'n1..s2';
     } catch (e) {
-      // if your draws table schema ever changes, you’ll see it here
-      console.error('draw fetch failed:', e);
-      return res
-        .status(500)
-        .json({ ok: false, error: 'draw_fetch_failed', message: e?.message });
-    }
-
-    // Optional: shift missing days to nearest NEXT draw day (within 4 days)
-    const shifted = [];
-    if (shiftToNextDraw) {
-      for (const day of days) {
-        if (drawsByDay.has(day)) continue;
-
-        const q = await pool.query(
-          `
-          SELECT draw_date, n1,n2,n3,n4,n5, s1,s2
-          FROM euromillions_draws
-          WHERE draw_date::date > $1::date
-            AND draw_date::date <= ($1::date + INTERVAL '4 days')
-          ORDER BY draw_date ASC
-          LIMIT 1
-          `,
-          [day],
-        );
-
-        const r = q.rows?.[0];
-        if (r) {
-          const nextDay = toYYYYMMDD(r.draw_date);
-          const main = [r.n1, r.n2, r.n3, r.n4, r.n5]
-            .map(Number)
-            .filter(Number.isFinite);
-          const stars = [r.s1, r.s2].map(Number).filter(Number.isFinite);
-          put(day, main, stars); // store under original day, but note it’s nextDay draw numbers
-          // overwrite drawDay so label can show the real draw date
-          drawsByDay.set(day, { drawDay: nextDay, main, stars });
-          shifted.push([day, nextDay]);
-        }
-      }
+      console.error('Draw fetch failed (n1..s2).', e);
+      return res.status(500).json({ ok: false, error: 'draw_fetch_failed' });
     }
 
     let checked = 0;
     let updated = 0;
     let skipped = 0;
+
+    const shifted = []; // [fromDay,toDay]
+    const findDrawDay = (day) => {
+      if (drawsByDay.has(day)) return day;
+      // Shift forward up to 3 days
+      for (let i = 1; i <= 3; i++) {
+        const d2 = addDays(day, i);
+        if (drawsByDay.has(d2)) return d2;
+      }
+      return null;
+    };
 
     for (const p of predictionsToCheck) {
       checked++;
@@ -509,8 +411,8 @@ router.post('/predictions/check', async (req, res) => {
         continue;
       }
 
-      const draw = drawsByDay.get(day);
-      if (!draw) {
+      const drawDay = findDrawDay(day);
+      if (!drawDay) {
         await pool.query(
           `
           UPDATE predictions
@@ -526,14 +428,15 @@ router.post('/predictions/check', async (req, res) => {
         continue;
       }
 
+      if (drawDay !== day) shifted.push([day, drawDay]);
+
+      const draw = drawsByDay.get(drawDay);
       const mMain = countMatches(pMain, draw.main);
       const mStars = countMatches(pStars, draw.stars);
-
-      const realDrawDay =
-        draw.drawDay && draw.drawDay !== day ? draw.drawDay : null;
-      const label = realDrawDay
-        ? `${mMain}+${mStars} (draw:${realDrawDay})`
-        : `${mMain}+${mStars}`;
+      const label =
+        drawDay !== day
+          ? `${mMain}+${mStars} (draw:${drawDay})`
+          : `${mMain}+${mStars}`;
 
       await pool.query(
         `
@@ -580,9 +483,9 @@ router.post('/predictions/check', async (req, res) => {
   }
 });
 
-/* ──────────────────────────────────────────────
-   DELETE /api/predictions/:id
-   ────────────────────────────────────────────── */
+/**
+ * DELETE /api/predictions/:id
+ */
 router.delete('/predictions/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);

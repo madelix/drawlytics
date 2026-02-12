@@ -10,6 +10,7 @@ import * as schema from './drizzle/schema.js';
 import predictionsRouter from './routes/predictions.js';
 import performanceRouter from './routes/performance.js';
 import playedPredictionsRouter from './routes/playedPredictions.js';
+import drawsRouter from './routes/draws.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -28,6 +29,7 @@ app.use(express.json());
 app.use('/api', predictionsRouter);
 app.use('/api', performanceRouter);
 app.use('/api', playedPredictionsRouter);
+app.use('/api', drawsRouter);
 
 /* ──────────────────────────────────────────────
    Health check
