@@ -19,7 +19,6 @@ const { euromillions_draws } = schema;
 function normalizeDayString(input) {
   if (!input) return null;
 
-  // Already YYYY-MM-DD
   if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.trim())) {
     return input.trim();
   }
@@ -27,40 +26,32 @@ function normalizeDayString(input) {
   const d = new Date(input);
   if (Number.isNaN(d.getTime())) return null;
 
-  // UTC day boundary -> YYYY-MM-DD
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
     .toISOString()
     .slice(0, 10);
 }
 
-function dayOut(value) {
-  // DB might return Date, string, etc. Normalize to YYYY-MM-DD for API output.
-  return normalizeDayString(value);
-}
-
+/**
+ * Admin auth:
+ * - Prefer Authorization: Bearer <key>  (more proxy-friendly)
+ * - Also allow x-admin-key: <key>
+ */
 function requireAdmin(req, res, next) {
   const expected = process.env.ADMIN_KEY;
-
-  // Header (normal)
-  const headerKey = req.get('x-admin-key');
-
-  // Query param fallback (needed because Vercel rewrites may drop custom headers)
-  // Example: /api/draws/euromillions/debug?date=2026-02-10&key=YOURKEY
-  const queryKeyRaw = req.query?.key ?? req.query?.admin_key;
-  const queryKey =
-    typeof queryKeyRaw === 'string'
-      ? queryKeyRaw
-      : Array.isArray(queryKeyRaw)
-        ? queryKeyRaw[0]
-        : undefined;
-
-  const got = headerKey || queryKey;
 
   if (!expected) {
     return res
       .status(500)
       .json({ ok: false, error: 'admin_key_not_configured' });
   }
+
+  const auth = req.get('authorization') || '';
+  const bearer = auth.toLowerCase().startsWith('bearer ')
+    ? auth.slice(7).trim()
+    : null;
+
+  const headerKey = req.get('x-admin-key') || null;
+  const got = bearer || headerKey;
 
   if (!got || got !== expected) {
     return res.status(401).json({ ok: false, error: 'unauthorized' });
@@ -127,7 +118,7 @@ router.get('/draws/all', async (req, res) => {
 
 /* ──────────────────────────────────────────────
    POST /api/draws/euromillions/upsert
-   Requires: x-admin-key header
+   Requires admin auth
    Body: { draw_date:"YYYY-MM-DD", n1..n5, s1..s2 }
 
    NOTE: relies on UNIQUE(draw_date) in DB.
@@ -144,7 +135,6 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
     const nums = [n1, n2, n3, n4, n5];
     const stars = [s1, s2];
 
-    // type check
     if (
       nums.some((v) => typeof v !== 'number' || !Number.isFinite(v)) ||
       stars.some((v) => typeof v !== 'number' || !Number.isFinite(v))
@@ -152,7 +142,6 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'invalid_numbers' });
     }
 
-    // range check
     const inRange = (x, min, max) => x >= min && x <= max;
     if (
       nums.some((x) => !inRange(x, 1, 50)) ||
@@ -161,7 +150,6 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'numbers_out_of_range' });
     }
 
-    // UPSERT by draw_date
     await db
       .insert(euromillions_draws)
       .values({ draw_date: day, n1, n2, n3, n4, n5, s1, s2 })
@@ -170,7 +158,6 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
         set: { n1, n2, n3, n4, n5, s1, s2 },
       });
 
-    // read back the authoritative row
     const rows = await db
       .select()
       .from(euromillions_draws)
@@ -186,11 +173,7 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
 
 /* ──────────────────────────────────────────────
    GET /api/draws/euromillions/debug?date=YYYY-MM-DD
-   Admin-only. Helps you verify data without Railway SQL.
-
-   Works with:
-   - Header: x-admin-key: ...
-   - OR query param: ?key=...
+   Admin-only.
    ────────────────────────────────────────────── */
 router.get('/draws/euromillions/debug', requireAdmin, async (req, res) => {
   try {
@@ -213,7 +196,7 @@ router.get('/draws/euromillions/debug', requireAdmin, async (req, res) => {
       return res.json({
         ok: true,
         draws_count: total,
-        latest_draw: latest ? dayOut(latest) : null,
+        latest_draw: latest ?? null,
         requested_date: raw || null,
         row_for_date: null,
         note: 'invalid_date_param',
@@ -252,17 +235,12 @@ router.get('/draws/euromillions/debug', requireAdmin, async (req, res) => {
     res.json({
       ok: true,
       draws_count: total,
-      latest_draw: latest ? dayOut(latest) : null,
+      latest_draw: latest ?? null,
       requested_date: day,
-      row_for_date: rowForDate[0]
-        ? {
-            ...rowForDate[0],
-            draw_date: dayOut(rowForDate[0].draw_date),
-          }
-        : null,
+      row_for_date: rowForDate[0] ?? null,
       nearest: {
-        prev: prev[0]?.draw_date ? dayOut(prev[0].draw_date) : null,
-        next: next[0]?.draw_date ? dayOut(next[0].draw_date) : null,
+        prev: prev[0]?.draw_date ?? null,
+        next: next[0]?.draw_date ?? null,
       },
     });
   } catch (e) {
