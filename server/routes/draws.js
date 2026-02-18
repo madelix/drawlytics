@@ -33,11 +33,22 @@ function normalizeDayString(input) {
 
 /**
  * Admin auth:
- * - Prefer Authorization: Bearer <key>  (more proxy-friendly)
- * - Also allow x-admin-key: <key>
+ * - Prefer header: x-admin-key
+ * - Fallback: query param ?admin_key=...
+ *
+ * Why: some proxies (Vercel rewrites) can drop custom headers.
  */
 function requireAdmin(req, res, next) {
   const expected = process.env.ADMIN_KEY;
+
+  // accept either header OR query param (useful when proxies drop headers)
+  const gotHeader = req.headers['x-admin-key'];
+  const gotQuery = req.query?.admin_key;
+
+  const got =
+    (typeof gotHeader === 'string' && gotHeader.trim()) ||
+    (typeof gotQuery === 'string' && gotQuery.trim()) ||
+    null;
 
   if (!expected) {
     return res
@@ -45,16 +56,14 @@ function requireAdmin(req, res, next) {
       .json({ ok: false, error: 'admin_key_not_configured' });
   }
 
-  const auth = req.get('authorization') || '';
-  const bearer = auth.toLowerCase().startsWith('bearer ')
-    ? auth.slice(7).trim()
-    : null;
-
-  const headerKey = req.get('x-admin-key') || null;
-  const got = bearer || headerKey;
-
   if (!got || got !== expected) {
-    return res.status(401).json({ ok: false, error: 'unauthorized' });
+    return res.status(401).json({
+      ok: false,
+      error: 'unauthorized',
+      // tiny diagnostics (safe: no secrets revealed)
+      expected_set: true,
+      got_from: gotHeader ? 'header' : gotQuery ? 'query' : 'missing',
+    });
   }
 
   next();
@@ -118,7 +127,7 @@ router.get('/draws/all', async (req, res) => {
 
 /* ──────────────────────────────────────────────
    POST /api/draws/euromillions/upsert
-   Requires admin auth
+   Requires: x-admin-key header OR ?admin_key=...
    Body: { draw_date:"YYYY-MM-DD", n1..n5, s1..s2 }
 
    NOTE: relies on UNIQUE(draw_date) in DB.
@@ -173,7 +182,8 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
 
 /* ──────────────────────────────────────────────
    GET /api/draws/euromillions/debug?date=YYYY-MM-DD
-   Admin-only.
+   Admin-only. Helps you verify data without Railway SQL.
+   Accepts admin key via header OR query param.
    ────────────────────────────────────────────── */
 router.get('/draws/euromillions/debug', requireAdmin, async (req, res) => {
   try {
