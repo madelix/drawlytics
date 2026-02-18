@@ -33,18 +33,39 @@ function normalizeDayString(input) {
     .slice(0, 10);
 }
 
+function dayOut(value) {
+  // DB might return Date, string, etc. Normalize to YYYY-MM-DD for API output.
+  return normalizeDayString(value);
+}
+
 function requireAdmin(req, res, next) {
   const expected = process.env.ADMIN_KEY;
-  const got = req.headers['x-admin-key'];
+
+  // Header (normal)
+  const headerKey = req.get('x-admin-key');
+
+  // Query param fallback (needed because Vercel rewrites may drop custom headers)
+  // Example: /api/draws/euromillions/debug?date=2026-02-10&key=YOURKEY
+  const queryKeyRaw = req.query?.key ?? req.query?.admin_key;
+  const queryKey =
+    typeof queryKeyRaw === 'string'
+      ? queryKeyRaw
+      : Array.isArray(queryKeyRaw)
+        ? queryKeyRaw[0]
+        : undefined;
+
+  const got = headerKey || queryKey;
 
   if (!expected) {
     return res
       .status(500)
       .json({ ok: false, error: 'admin_key_not_configured' });
   }
+
   if (!got || got !== expected) {
     return res.status(401).json({ ok: false, error: 'unauthorized' });
   }
+
   next();
 }
 
@@ -166,6 +187,10 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
 /* ──────────────────────────────────────────────
    GET /api/draws/euromillions/debug?date=YYYY-MM-DD
    Admin-only. Helps you verify data without Railway SQL.
+
+   Works with:
+   - Header: x-admin-key: ...
+   - OR query param: ?key=...
    ────────────────────────────────────────────── */
 router.get('/draws/euromillions/debug', requireAdmin, async (req, res) => {
   try {
@@ -188,7 +213,7 @@ router.get('/draws/euromillions/debug', requireAdmin, async (req, res) => {
       return res.json({
         ok: true,
         draws_count: total,
-        latest_draw: latest ?? null,
+        latest_draw: latest ? dayOut(latest) : null,
         requested_date: raw || null,
         row_for_date: null,
         note: 'invalid_date_param',
@@ -227,12 +252,17 @@ router.get('/draws/euromillions/debug', requireAdmin, async (req, res) => {
     res.json({
       ok: true,
       draws_count: total,
-      latest_draw: latest ?? null,
+      latest_draw: latest ? dayOut(latest) : null,
       requested_date: day,
-      row_for_date: rowForDate[0] ?? null,
+      row_for_date: rowForDate[0]
+        ? {
+            ...rowForDate[0],
+            draw_date: dayOut(rowForDate[0].draw_date),
+          }
+        : null,
       nearest: {
-        prev: prev[0]?.draw_date ?? null,
-        next: next[0]?.draw_date ?? null,
+        prev: prev[0]?.draw_date ? dayOut(prev[0].draw_date) : null,
+        next: next[0]?.draw_date ? dayOut(next[0].draw_date) : null,
       },
     });
   } catch (e) {
