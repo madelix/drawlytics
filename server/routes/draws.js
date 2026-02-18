@@ -1,6 +1,6 @@
 // server/routes/draws.js
 import express from 'express';
-import { desc, eq, sql, lt, gt, asc } from 'drizzle-orm';
+import { asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
 import { db } from '../db.js';
 import * as schema from '../drizzle/schema.js';
 
@@ -19,6 +19,7 @@ const { euromillions_draws } = schema;
 function normalizeDayString(input) {
   if (!input) return null;
 
+  // Already YYYY-MM-DD
   if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.trim())) {
     return input.trim();
   }
@@ -26,29 +27,49 @@ function normalizeDayString(input) {
   const d = new Date(input);
   if (Number.isNaN(d.getTime())) return null;
 
+  // UTC day boundary -> YYYY-MM-DD
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
     .toISOString()
     .slice(0, 10);
 }
 
 /**
- * Admin auth:
- * - Prefer header: x-admin-key
- * - Fallback: query param ?admin_key=...
- *
- * Why: some proxies (Vercel rewrites) can drop custom headers.
+ * Removes surrounding quotes + trims.
+ * Helps when secrets are stored like: "abc123" or 'abc123'
  */
+function normalizeSecret(v) {
+  if (!v) return '';
+  const s = String(v).trim();
+  // strip ONE pair of surrounding quotes if present
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    return s.slice(1, -1).trim();
+  }
+  return s;
+}
+
+function getAdminKeyFromRequest(req) {
+  // Express lowercases header names in req.headers
+  const headerVal = req.headers['x-admin-key'];
+  const queryVal = req.query?.admin_key;
+
+  // If header is like: ['abc'] (rare but possible), coerce safely
+  const headerKey = Array.isArray(headerVal) ? headerVal[0] : headerVal;
+  const queryKey = Array.isArray(queryVal) ? queryVal[0] : queryVal;
+
+  if (headerKey) return { key: String(headerKey), got_from: 'header' };
+  if (queryKey) return { key: String(queryKey), got_from: 'query' };
+  return { key: '', got_from: 'missing' };
+}
+
 function requireAdmin(req, res, next) {
-  const expected = process.env.ADMIN_KEY;
+  const expectedRaw = process.env.ADMIN_KEY;
+  const expected = normalizeSecret(expectedRaw);
 
-  // accept either header OR query param (useful when proxies drop headers)
-  const gotHeader = req.headers['x-admin-key'];
-  const gotQuery = req.query?.admin_key;
-
-  const got =
-    (typeof gotHeader === 'string' && gotHeader.trim()) ||
-    (typeof gotQuery === 'string' && gotQuery.trim()) ||
-    null;
+  const { key: gotRaw, got_from } = getAdminKeyFromRequest(req);
+  const got = normalizeSecret(gotRaw);
 
   if (!expected) {
     return res
@@ -57,12 +78,14 @@ function requireAdmin(req, res, next) {
   }
 
   if (!got || got !== expected) {
+    // Important: do NOT leak secrets; only metadata
     return res.status(401).json({
       ok: false,
       error: 'unauthorized',
-      // tiny diagnostics (safe: no secrets revealed)
-      expected_set: true,
-      got_from: gotHeader ? 'header' : gotQuery ? 'query' : 'missing',
+      expected_set: Boolean(expected),
+      got_from,
+      expected_len: expected.length,
+      got_len: got.length,
     });
   }
 
@@ -144,6 +167,7 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
     const nums = [n1, n2, n3, n4, n5];
     const stars = [s1, s2];
 
+    // type check
     if (
       nums.some((v) => typeof v !== 'number' || !Number.isFinite(v)) ||
       stars.some((v) => typeof v !== 'number' || !Number.isFinite(v))
@@ -151,6 +175,7 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'invalid_numbers' });
     }
 
+    // range check
     const inRange = (x, min, max) => x >= min && x <= max;
     if (
       nums.some((x) => !inRange(x, 1, 50)) ||
@@ -159,6 +184,7 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'numbers_out_of_range' });
     }
 
+    // UPSERT by draw_date
     await db
       .insert(euromillions_draws)
       .values({ draw_date: day, n1, n2, n3, n4, n5, s1, s2 })
@@ -167,6 +193,7 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
         set: { n1, n2, n3, n4, n5, s1, s2 },
       });
 
+    // read back the authoritative row
     const rows = await db
       .select()
       .from(euromillions_draws)
@@ -183,7 +210,9 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
 /* ──────────────────────────────────────────────
    GET /api/draws/euromillions/debug?date=YYYY-MM-DD
    Admin-only. Helps you verify data without Railway SQL.
-   Accepts admin key via header OR query param.
+   Pass admin via:
+     - header: x-admin-key: ...
+     - or query: ?admin_key=...
    ────────────────────────────────────────────── */
 router.get('/draws/euromillions/debug', requireAdmin, async (req, res) => {
   try {
