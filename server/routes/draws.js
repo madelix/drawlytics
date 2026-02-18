@@ -1,6 +1,6 @@
 // server/routes/draws.js
 import express from 'express';
-import { asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
+import { desc, eq, sql, lt, gt, asc } from 'drizzle-orm';
 import { db } from '../db.js';
 import * as schema from '../drizzle/schema.js';
 
@@ -34,58 +34,46 @@ function normalizeDayString(input) {
 }
 
 /**
- * Removes surrounding quotes + trims.
- * Helps when secrets are stored like: "abc123" or 'abc123'
+ * Admin guard:
+ * - Reads ADMIN_KEY from env
+ * - Accepts x-admin-key header OR ?admin_key= query param
+ * - Trims both sides to avoid invisible whitespace issues (Railway env/UI can do this)
  */
-function normalizeSecret(v) {
-  if (!v) return '';
-  const s = String(v).trim();
-  // strip ONE pair of surrounding quotes if present
-  if (
-    (s.startsWith('"') && s.endsWith('"')) ||
-    (s.startsWith("'") && s.endsWith("'"))
-  ) {
-    return s.slice(1, -1).trim();
-  }
-  return s;
-}
-
-function getAdminKeyFromRequest(req) {
-  // Express lowercases header names in req.headers
-  const headerVal = req.headers['x-admin-key'];
-  const queryVal = req.query?.admin_key;
-
-  // If header is like: ['abc'] (rare but possible), coerce safely
-  const headerKey = Array.isArray(headerVal) ? headerVal[0] : headerVal;
-  const queryKey = Array.isArray(queryVal) ? queryVal[0] : queryVal;
-
-  if (headerKey) return { key: String(headerKey), got_from: 'header' };
-  if (queryKey) return { key: String(queryKey), got_from: 'query' };
-  return { key: '', got_from: 'missing' };
-}
-
 function requireAdmin(req, res, next) {
   const expectedRaw = process.env.ADMIN_KEY;
-  const expected = normalizeSecret(expectedRaw);
 
-  const { key: gotRaw, got_from } = getAdminKeyFromRequest(req);
-  const got = normalizeSecret(gotRaw);
-
-  if (!expected) {
+  if (!expectedRaw) {
     return res
       .status(500)
       .json({ ok: false, error: 'admin_key_not_configured' });
   }
 
+  const expected = String(expectedRaw).trim();
+
+  // Prefer header; allow query param as fallback (useful when debugging redirects/proxies)
+  const headerVal = req.get('x-admin-key');
+  const queryVal = req.query.admin_key;
+
+  const gotRaw =
+    headerVal != null ? headerVal : queryVal != null ? String(queryVal) : null;
+
+  const got = gotRaw == null ? '' : String(gotRaw).trim();
+
   if (!got || got !== expected) {
-    // Important: do NOT leak secrets; only metadata
+    // Return *non-sensitive* debug: lengths + source + last 4 chars
+    const tail = (s) => (s ? s.slice(-4) : '');
+    const gotFrom =
+      headerVal != null ? 'header' : queryVal != null ? 'query' : 'none';
+
     return res.status(401).json({
       ok: false,
       error: 'unauthorized',
-      expected_set: Boolean(expected),
-      got_from,
+      expected_set: Boolean(expectedRaw),
+      got_from: gotFrom,
       expected_len: expected.length,
       got_len: got.length,
+      expected_tail: tail(expected),
+      got_tail: tail(got),
     });
   }
 
@@ -150,7 +138,7 @@ router.get('/draws/all', async (req, res) => {
 
 /* ──────────────────────────────────────────────
    POST /api/draws/euromillions/upsert
-   Requires: x-admin-key header OR ?admin_key=...
+   Requires: x-admin-key header
    Body: { draw_date:"YYYY-MM-DD", n1..n5, s1..s2 }
 
    NOTE: relies on UNIQUE(draw_date) in DB.
@@ -210,9 +198,6 @@ router.post('/draws/euromillions/upsert', requireAdmin, async (req, res) => {
 /* ──────────────────────────────────────────────
    GET /api/draws/euromillions/debug?date=YYYY-MM-DD
    Admin-only. Helps you verify data without Railway SQL.
-   Pass admin via:
-     - header: x-admin-key: ...
-     - or query: ?admin_key=...
    ────────────────────────────────────────────── */
 router.get('/draws/euromillions/debug', requireAdmin, async (req, res) => {
   try {

@@ -1,21 +1,42 @@
 // client/src/pages/MyPredictionsPage.tsx
-import { useEffect, useState } from 'react';
-import type { CSSProperties } from 'react';
-import { apiUrl } from '../api/apiClient';
+import React, { CSSProperties, useEffect, useMemo, useState } from 'react';
 
-type Prediction = {
+type PredictionRow = {
   id: number;
   lottery: string;
-  draw_date: string;
   model_name: string;
+  draw_date: string; // "YYYY-MM-DD" or ISO
   main_numbers: number[];
   star_numbers: number[];
-  confidence: string;
-  status: string;
-  created_at: string;
+  confidence: number;
+  status: 'pending' | 'checked' | 'won' | 'lost' | 'error';
   matched_main: number | null;
   matched_stars: number | null;
   result_label: string | null;
+};
+
+type DrawRow = {
+  id: number;
+  draw_date: string; // "YYYY-MM-DD" or ISO
+  n1: number;
+  n2: number;
+  n3: number;
+  n4: number;
+  n5: number;
+  s1: number;
+  s2: number;
+};
+
+type PredictionsResponse = {
+  ok: boolean;
+  predictions?: PredictionRow[];
+  error?: string;
+};
+
+type DrawsAllResponse = {
+  ok: boolean;
+  draws?: DrawRow[];
+  error?: string;
 };
 
 type CheckResponse = {
@@ -26,195 +47,173 @@ type CheckResponse = {
   error?: string;
 };
 
-type DrawRow = {
-  id: number;
-  draw_date: string;
-  n1: number;
-  n2: number;
-  n3: number;
-  n4: number;
-  n5: number;
-  s1: number;
-  s2: number;
-};
-
-type DrawMapEntry = {
-  main: Set<number>;
-  stars: Set<number>;
-  rawDate: string;
-};
-
-type PlayedStatusResponse = {
+type PlayedMapResponse = {
   ok: boolean;
-  playedIds: number[];
+  played?: Array<{ prediction_id: number }>;
+  error?: string;
 };
 
-function isHtml(text: string) {
-  const t = text.trim().toLowerCase();
-  return t.startsWith('<!doctype') || t.startsWith('<html');
-}
+async function fetchJsonOrThrow<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<T> {
+  const res = await fetch(url, init);
+  const text = await res.text();
+  let json: any = null;
 
-/**
- * Normalize any ISO-ish date string to YYYY-MM-DD in UTC.
- * This avoids “same day, different timestamp string” mismatches.
- */
-function toDayKey(input: string | Date): string | null {
   try {
-    const d = input instanceof Date ? input : new Date(input);
-    if (Number.isNaN(d.getTime())) return null;
-    return d.toISOString().slice(0, 10);
+    json = text ? JSON.parse(text) : null;
   } catch {
-    return null;
+    // ignore parse error, we’ll throw below
   }
+
+  if (!res.ok) {
+    const msg = json?.error || json?.message || text || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+
+  return json as T;
 }
 
-function formatDayLabel(dayKey: string) {
-  // dayKey: YYYY-MM-DD
-  // display as DD/MM/YYYY (UK-style)
+function toDayKey(value: string | Date | null | undefined): string | null {
+  if (!value) return null;
+
+  // If already YYYY-MM-DD
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    return value.trim();
+  }
+
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+
+  return d.toISOString().slice(0, 10);
+}
+
+function formatDayLabel(dayKey: string): string {
+  // dayKey is YYYY-MM-DD
   const [y, m, d] = dayKey.split('-');
-  if (!y || !m || !d) return dayKey;
   return `${d}/${m}/${y}`;
 }
 
-async function fetchJsonOrThrow<T>(
-  path: string,
-  options?: RequestInit,
-): Promise<T> {
-  const res = await fetch(apiUrl(path), {
-    headers: {
-      Accept: 'application/json',
-      ...(options?.headers || {}),
-    },
-    ...options,
-  });
-
-  const text = await res.text().catch(() => '');
-
-  if (!res.ok) {
-    if (isHtml(text)) {
-      throw new Error(
-        `Hit HTML instead of JSON for ${path}. This usually means the API route is missing, the backend is down, or the request is going to the wrong origin.`,
-      );
-    }
-    throw new Error(`Request failed (${res.status}) for ${path}: ${text}`);
-  }
-
-  if (!text) return {} as T;
-
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    throw new Error(
-      `Non-JSON response for ${path}. First 200 chars:\n${text.slice(0, 200)}`,
-    );
-  }
-}
+type DrawLookup = {
+  main: Set<number>;
+  stars: Set<number>;
+};
 
 export default function MyPredictionsPage() {
-  const [predictions, setPredictions] = useState<Prediction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-
-  const [checking, setChecking] = useState(false);
+  const [predictions, setPredictions] = useState<PredictionRow[]>([]);
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
 
-  // drawMap keyed by YYYY-MM-DD
-  const [drawMap, setDrawMap] = useState<Record<string, DrawMapEntry>>({});
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [playedMap, setPlayedMap] = useState<Record<number, boolean>>({});
   const [playingId, setPlayingId] = useState<number | null>(null);
 
-  async function loadPlayedStatus(ids: number[]) {
-    if (!ids.length) {
-      setPlayedMap({});
-      return;
-    }
+  const [drawMap, setDrawMap] = useState<Record<string, DrawLookup>>({});
 
-    try {
-      const data = await fetchJsonOrThrow<PlayedStatusResponse>(
-        `/api/played-predictions/status?ids=${ids.join(',')}`,
-      );
-
-      const next: Record<number, boolean> = {};
-      for (const id of data.playedIds ?? []) next[id] = true;
-
-      setPlayedMap(next);
-    } catch (e) {
-      console.warn('Played status error:', e);
-    }
-  }
-
-  async function markPlayed(predictionId: number) {
-    return fetchJsonOrThrow(`/api/played-predictions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prediction_id: predictionId }),
-    });
-  }
-
-  async function unmarkPlayed(predictionId: number) {
-    return fetchJsonOrThrow(`/api/played-predictions/${predictionId}`, {
-      method: 'DELETE',
-    });
-  }
+  useEffect(() => {
+    void loadPredictions();
+    void loadPlayedMap();
+    void loadDrawsForHighlighting();
+  }, []);
 
   async function loadPredictions() {
+    setError(null);
+    setLoading(true);
+
     try {
-      setLoading(true);
-      setError(null);
+      const data =
+        await fetchJsonOrThrow<PredictionsResponse>('/api/predictions');
 
-      const data = await fetchJsonOrThrow<{ predictions?: Prediction[] }>(
-        '/api/predictions',
-      );
+      if (!data.ok) {
+        throw new Error(data.error || 'Could not load predictions');
+      }
 
-      const preds: Prediction[] = data?.predictions ?? [];
-      setPredictions(preds);
-
-      await loadPlayedStatus(preds.map((p) => p.id));
-    } catch (err) {
+      setPredictions(data.predictions ?? []);
+    } catch (err: any) {
       console.error(err);
-      setError('Could not load predictions');
+      setError(err?.message ?? 'Could not load predictions');
+      setPredictions([]);
     } finally {
       setLoading(false);
     }
   }
 
+  async function loadPlayedMap() {
+    try {
+      const data = await fetchJsonOrThrow<PlayedMapResponse>(
+        '/api/predictions/played',
+      );
+
+      if (!data.ok) return;
+
+      const next: Record<number, boolean> = {};
+      for (const row of data.played ?? []) {
+        next[row.prediction_id] = true;
+      }
+
+      setPlayedMap(next);
+    } catch (e) {
+      console.warn('Could not load played map:', e);
+    }
+  }
+
+  async function markPlayed(predictionId: number) {
+    await fetchJsonOrThrow(`/api/predictions/${predictionId}/played`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  async function unmarkPlayed(predictionId: number) {
+    await fetchJsonOrThrow(`/api/predictions/${predictionId}/played`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   async function loadDrawsForHighlighting() {
     try {
-      // We only need recent ones for highlighting; 200 is fine for now.
-      const data = await fetchJsonOrThrow<{ draws?: DrawRow[] }>(
+      // We only need enough to cover recent predictions, but keep it simple.
+      // If you later paginate predictions, we can request draws per-range.
+      const data = await fetchJsonOrThrow<DrawsAllResponse>(
         '/api/draws/all?limit=200&offset=0',
       );
 
-      const draws: DrawRow[] = data.draws ?? [];
+      if (!data.ok) return;
 
-      const map: Record<string, DrawMapEntry> = {};
-      for (const d of draws) {
-        const dayKey = toDayKey(d.draw_date);
+      const nextMap: Record<string, DrawLookup> = {};
+
+      for (const row of data.draws ?? []) {
+        const dayKey = toDayKey(row.draw_date);
         if (!dayKey) continue;
 
-        // If duplicates exist for the same day, the "last one wins" here.
-        // We'll fix duplicates on the backend afterwards.
-        map[dayKey] = {
-          main: new Set([d.n1, d.n2, d.n3, d.n4, d.n5]),
-          stars: new Set([d.s1, d.s2]),
-          rawDate: d.draw_date,
+        nextMap[dayKey] = {
+          main: new Set([row.n1, row.n2, row.n3, row.n4, row.n5]),
+          stars: new Set([row.s1, row.s2]),
         };
       }
 
-      setDrawMap(map);
+      setDrawMap(nextMap);
     } catch (e) {
       console.warn('Could not load draws for highlighting:', e);
     }
   }
 
-  useEffect(() => {
-    loadPredictions();
-    loadDrawsForHighlighting();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const predictionsSorted = useMemo(() => {
+    // Sort newest first by draw_date (string compare works for YYYY-MM-DD)
+    const copy = [...predictions];
+    copy.sort((a, b) => {
+      const da = toDayKey(a.draw_date) ?? a.draw_date;
+      const db = toDayKey(b.draw_date) ?? b.draw_date;
+      return db.localeCompare(da);
+    });
+    return copy;
+  }, [predictions]);
 
   async function handleDelete(id: number) {
     const ok = window.confirm(
@@ -392,11 +391,11 @@ export default function MyPredictionsPage() {
       {loading && <p>Loading predictions…</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
 
-      {!loading && !error && predictions.length === 0 && (
+      {!loading && !error && predictionsSorted.length === 0 && (
         <p>No predictions saved yet.</p>
       )}
 
-      {!loading && !error && predictions.length > 0 && (
+      {!loading && !error && predictionsSorted.length > 0 && (
         <section
           style={{
             width: '100%',
@@ -406,7 +405,7 @@ export default function MyPredictionsPage() {
             gap: '1rem',
           }}
         >
-          {predictions.map((p) => {
+          {predictionsSorted.map((p) => {
             const dayKey = toDayKey(p.draw_date);
             const draw = dayKey ? drawMap[dayKey] : undefined;
 
