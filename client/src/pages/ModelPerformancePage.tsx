@@ -1,9 +1,15 @@
 // client/src/pages/ModelPerformancePage.tsx
 import { useEffect, useMemo, useState } from 'react';
+import { ResponsiveBar } from '@nivo/bar';
 import {
   getModelPerformance,
   type ModelPerformanceRow,
 } from '../api/performance';
+
+function toNum(v: unknown, fallback = 0) {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
 
 function formatPctFromString(s: string) {
   const n = Number(s);
@@ -11,19 +17,54 @@ function formatPctFromString(s: string) {
   return `${n.toFixed(1)}%`;
 }
 
-function formatNumFromString(s: string, decimals = 2) {
-  const n = Number(s);
+function formatNum(n: number, decimals = 2) {
   if (!Number.isFinite(n)) return '—';
   return n.toFixed(decimals);
 }
+
+// Stable “hash -> hue” so each model always gets the same colour
+function hashString(str: string) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function modelColor(modelName: string) {
+  const h = hashString(modelName);
+  const hue = 220 + (h % 90); // 220..309
+  const sat = 62 + (h % 10); // 62..71
+  const light = 46 + (h % 10); // 46..55
+  return `hsl(${hue} ${sat}% ${light}%)`;
+}
+
+type ChartRow = {
+  model: string;
+  checked: number;
+  total: number;
+  checked_rate_pct: string;
+
+  avg_main_n: number;
+  avg_stars_n: number;
+  avg_total_hits: number;
+  jackpots: number;
+
+  color: string;
+};
+
+type NivoBarRow = {
+  model: string;
+  avg_total_hits: number;
+};
 
 export default function ModelPerformancePage() {
   const [lottery, setLottery] = useState('euromillions');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<ModelPerformanceRow[]>([]);
 
-  const MIN_CHECKED = 5;
+  const [rows, setRows] = useState<ModelPerformanceRow[]>([]);
+  const [minChecked, setMinChecked] = useState(5);
 
   async function load() {
     setLoading(true);
@@ -44,26 +85,66 @@ export default function ModelPerformancePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filteredRows = useMemo(
-    () => rows.filter((r) => r.checked_predictions >= MIN_CHECKED),
-    [rows],
-  );
-
   const summary = useMemo(() => {
-    const checked = filteredRows.reduce(
-      (acc, r) => acc + r.checked_predictions,
+    const checked = rows.reduce(
+      (acc, r) => acc + (r.checked_predictions || 0),
       0,
     );
-    const total = filteredRows.reduce((acc, r) => acc + r.total_predictions, 0);
+    const total = rows.reduce((acc, r) => acc + (r.total_predictions || 0), 0);
     return { total, checked };
-  }, [filteredRows]);
+  }, [rows]);
+
+  const chartRows = useMemo<ChartRow[]>(() => {
+    return (rows || [])
+      .map((r) => {
+        const avgMain = toNum(r.avg_main, 0);
+        const avgStars = toNum(r.avg_stars, 0);
+        const avgTotal = avgMain + avgStars;
+
+        return {
+          model: r.model_name,
+          checked: r.checked_predictions,
+          total: r.total_predictions,
+          checked_rate_pct: r.checked_rate_pct,
+
+          avg_main_n: avgMain,
+          avg_stars_n: avgStars,
+          avg_total_hits: avgTotal,
+          jackpots: r.jackpots ?? 0,
+
+          color: modelColor(r.model_name),
+        };
+      })
+      .sort((a, b) => b.avg_total_hits - a.avg_total_hits);
+  }, [rows]);
+
+  const filtered = useMemo(() => {
+    return chartRows.filter((r) => r.checked >= minChecked);
+  }, [chartRows, minChecked]);
+
+  const byModel = useMemo(() => {
+    const m = new Map<string, ChartRow>();
+    for (const r of filtered) m.set(r.model, r);
+    return m;
+  }, [filtered]);
+
+  const barData = useMemo<NivoBarRow[]>(() => {
+    return filtered.map((r) => ({
+      model: r.model,
+      avg_total_hits: r.avg_total_hits,
+    }));
+  }, [filtered]);
+
+  const bestModel = useMemo(() => {
+    return filtered.length > 0 ? filtered[0] : null;
+  }, [filtered]);
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '28px 16px' }}>
       <header style={{ textAlign: 'center', marginBottom: 18 }}>
         <h1 style={{ fontSize: '2.2rem', margin: 0 }}>Model performance</h1>
         <p style={{ margin: '10px 0 0', color: '#6b7280' }}>
-          Based on checked predictions (matched_main / matched_stars).
+          A simple view: higher bars = more matches on average (main + stars).
         </p>
       </header>
 
@@ -91,6 +172,26 @@ export default function ModelPerformancePage() {
           />
         </label>
 
+        <label style={{ fontSize: 14, color: '#6b7280' }}>
+          Min checked&nbsp;
+          <input
+            type="number"
+            value={minChecked}
+            min={0}
+            max={9999}
+            onChange={(e) =>
+              setMinChecked(Math.max(0, parseInt(e.target.value || '0', 10)))
+            }
+            style={{
+              width: 110,
+              padding: '8px 10px',
+              borderRadius: 10,
+              border: '1px solid #e5e7eb',
+              background: '#fff',
+            }}
+          />
+        </label>
+
         <button
           onClick={load}
           disabled={loading}
@@ -108,14 +209,174 @@ export default function ModelPerformancePage() {
       </div>
 
       <div style={{ textAlign: 'center', color: '#6b7280', marginBottom: 18 }}>
-        Models: {filteredRows.length} · Total predictions: {summary.total} ·
-        Checked: {summary.checked}
+        Models: {filtered.length} (of {rows.length}) · Total predictions:{' '}
+        {summary.total} · Checked: {summary.checked}
       </div>
+
+      {bestModel && (
+        <div
+          style={{
+            margin: '0 auto 14px',
+            maxWidth: 760,
+            background: '#fff',
+            border: '1px solid #eef2f7',
+            borderRadius: 16,
+            padding: 14,
+            boxShadow: '0 1px 0 rgba(0,0,0,0.02)',
+          }}
+        >
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
+            Best (by avg total hits, with min checked filter)
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              gap: 10,
+              alignItems: 'baseline',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: 16 }}>
+              {bestModel.model}
+            </div>
+            <div style={{ color: '#6b7280' }}>
+              Avg total hits:{' '}
+              <strong>{formatNum(bestModel.avg_total_hits, 2)}</strong>{' '}
+              <span style={{ fontSize: 12 }}>
+                (main {formatNum(bestModel.avg_main_n, 2)} + stars{' '}
+                {formatNum(bestModel.avg_stars_n, 2)})
+              </span>
+            </div>
+            <div style={{ color: '#6b7280' }}>
+              Checked: <strong>{bestModel.checked}</strong> · Checked %:{' '}
+              <strong>{formatPctFromString(bestModel.checked_rate_pct)}</strong>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <p style={{ color: '#b91c1c', textAlign: 'center' }}>{error}</p>
       )}
 
+      {/* Chart */}
+      <div
+        style={{
+          background: '#fff',
+          border: '1px solid #eef2f7',
+          borderRadius: 16,
+          overflow: 'hidden',
+          marginBottom: 12,
+        }}
+      >
+        <div
+          style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f7' }}
+        >
+          <div style={{ fontWeight: 800 }}>Average hits per prediction</div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+            Bars = avg(main + stars). Hover for details.
+          </div>
+        </div>
+
+        <div
+          style={{
+            height: Math.max(260, 48 + filtered.length * 38),
+            padding: 10,
+          }}
+        >
+          <ResponsiveBar
+            data={barData}
+            keys={['avg_total_hits']}
+            indexBy="model"
+            layout="horizontal"
+            margin={{ top: 10, right: 24, bottom: 40, left: 220 }}
+            padding={0.3}
+            enableGridY={false}
+            enableGridX={true}
+            enableLabel={true}
+            label={(d) => formatNum(toNum(d.value, 0), 2)}
+            labelSkipWidth={36}
+            labelTextColor={{ from: 'color', modifiers: [['darker', 3]] }}
+            colors={(bar) => {
+              const model = String(bar.indexValue);
+              return byModel.get(model)?.color ?? '#7c3aed';
+            }}
+            axisTop={null}
+            axisRight={null}
+            axisLeft={{
+              tickSize: 0,
+              tickPadding: 10,
+              tickRotation: 0,
+            }}
+            axisBottom={{
+              tickSize: 5,
+              tickPadding: 6,
+              legend: 'Avg total hits (main + stars)',
+              legendPosition: 'middle',
+              legendOffset: 32,
+            }}
+            tooltip={({ indexValue, value }) => {
+              const model = String(indexValue);
+              const meta = byModel.get(model);
+              if (!meta) return null;
+
+              return (
+                <div
+                  style={{
+                    background: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 10,
+                    padding: 10,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
+                    maxWidth: 320,
+                  }}
+                >
+                  <div style={{ fontWeight: 800, marginBottom: 6 }}>
+                    {meta.model}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#111827' }}>
+                    Avg total hits:{' '}
+                    <strong>{formatNum(toNum(value, 0), 2)}</strong>
+                    <div
+                      style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}
+                    >
+                      main {formatNum(meta.avg_main_n, 2)} + stars{' '}
+                      {formatNum(meta.avg_stars_n, 2)}
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
+                    Checked: <strong>{meta.checked}</strong> / {meta.total} ·
+                    Checked %:{' '}
+                    <strong>
+                      {formatPctFromString(meta.checked_rate_pct)}
+                    </strong>
+                    <br />
+                    Jackpots: <strong>{meta.jackpots}</strong>
+                  </div>
+                </div>
+              );
+            }}
+            theme={{
+              axis: {
+                ticks: {
+                  text: { fill: '#6b7280', fontSize: 12 },
+                },
+                legend: {
+                  text: { fill: '#6b7280', fontSize: 12 },
+                },
+              },
+              grid: {
+                line: { stroke: '#eef2f7', strokeWidth: 1 },
+              },
+              labels: {
+                text: { fontSize: 12, fontWeight: 700 },
+              },
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Table */}
       <div
         style={{
           background: '#fff',
@@ -134,12 +395,13 @@ export default function ModelPerformancePage() {
                   'Checked %',
                   'Avg main',
                   'Avg stars',
+                  'Avg total',
                   'Jackpots',
                 ].map((h) => (
                   <th
                     key={h}
                     style={{
-                      padding: '12px',
+                      padding: '12px 12px',
                       fontSize: 12,
                       color: '#6b7280',
                       borderBottom: '1px solid #eef2f7',
@@ -153,17 +415,30 @@ export default function ModelPerformancePage() {
             </thead>
 
             <tbody>
-              {filteredRows.map((r) => (
-                <tr key={r.model_name}>
+              {filtered.map((r) => (
+                <tr key={r.model}>
                   <td
                     style={{
                       padding: '12px',
                       borderBottom: '1px solid #f1f5f9',
-                      fontWeight: 600,
+                      fontWeight: 700,
                       whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
                     }}
                   >
-                    {r.model_name}
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 999,
+                        background: r.color,
+                        display: 'inline-block',
+                      }}
+                    />
+                    {r.model}
                   </td>
 
                   <td
@@ -172,7 +447,7 @@ export default function ModelPerformancePage() {
                       borderBottom: '1px solid #f1f5f9',
                     }}
                   >
-                    {r.checked_predictions}/{r.total_predictions}
+                    {r.checked}/{r.total}
                   </td>
 
                   <td
@@ -190,7 +465,7 @@ export default function ModelPerformancePage() {
                       borderBottom: '1px solid #f1f5f9',
                     }}
                   >
-                    {formatNumFromString(r.avg_main)}
+                    {formatNum(r.avg_main_n, 2)}
                   </td>
 
                   <td
@@ -199,7 +474,17 @@ export default function ModelPerformancePage() {
                       borderBottom: '1px solid #f1f5f9',
                     }}
                   >
-                    {formatNumFromString(r.avg_stars)}
+                    {formatNum(r.avg_stars_n, 2)}
+                  </td>
+
+                  <td
+                    style={{
+                      padding: '12px',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {formatNum(r.avg_total_hits, 2)}
                   </td>
 
                   <td
@@ -213,18 +498,18 @@ export default function ModelPerformancePage() {
                 </tr>
               ))}
 
-              {!loading && filteredRows.length === 0 && (
+              {!loading && filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     style={{
                       padding: 18,
                       textAlign: 'center',
                       color: '#6b7280',
                     }}
                   >
-                    No models meet the minimum checked prediction threshold (
-                    {MIN_CHECKED}).
+                    No models match the current filter (try lowering “Min
+                    checked”).
                   </td>
                 </tr>
               )}
@@ -234,7 +519,7 @@ export default function ModelPerformancePage() {
       </div>
 
       <p style={{ marginTop: 14, textAlign: 'center', color: '#6b7280' }}>
-        Minimum sample size applied: {MIN_CHECKED} checked predictions.
+        Minimum sample size applied: {minChecked} checked predictions.
       </p>
     </div>
   );
