@@ -58,6 +58,55 @@ type NivoBarRow = {
   avg_total_hits: number;
 };
 
+function Card({
+  title,
+  value,
+  sub,
+  right,
+}: {
+  title: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: '1px solid #eef2f7',
+        borderRadius: 16,
+        padding: 14,
+        boxShadow: '0 1px 0 rgba(0,0,0,0.02)',
+        minWidth: 220,
+        flex: '1 1 240px',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 12,
+          marginBottom: 6,
+        }}
+      >
+        <div style={{ fontSize: 12, color: '#6b7280' }}>{title}</div>
+        {right}
+      </div>
+
+      <div style={{ fontWeight: 900, fontSize: 18, color: '#111827' }}>
+        {value}
+      </div>
+
+      {sub && (
+        <div style={{ marginTop: 6, fontSize: 12, color: '#6b7280' }}>
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ModelPerformancePage() {
   const [lottery, setLottery] = useState('euromillions');
   const [loading, setLoading] = useState(false);
@@ -122,6 +171,15 @@ export default function ModelPerformancePage() {
     return chartRows.filter((r) => r.checked >= minChecked);
   }, [chartRows, minChecked]);
 
+  const hiddenCount = useMemo(() => {
+    return Math.max(0, rows.length - filtered.length);
+  }, [rows.length, filtered.length]);
+
+  // Best model “for humans”: top of the filtered list (sorted by avg_total_hits desc)
+  const bestModel = useMemo(() => {
+    return filtered.length > 0 ? filtered[0] : null;
+  }, [filtered]);
+
   const byModel = useMemo(() => {
     const m = new Map<string, ChartRow>();
     for (const r of filtered) m.set(r.model, r);
@@ -135,9 +193,10 @@ export default function ModelPerformancePage() {
     }));
   }, [filtered]);
 
-  const bestModel = useMemo(() => {
-    return filtered.length > 0 ? filtered[0] : null;
-  }, [filtered]);
+  const checkedCoveragePct = useMemo(() => {
+    if (!summary.total) return null;
+    return (100 * summary.checked) / summary.total;
+  }, [summary.total, summary.checked]);
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '28px 16px' }}>
@@ -153,7 +212,7 @@ export default function ModelPerformancePage() {
           display: 'flex',
           gap: 10,
           justifyContent: 'center',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           flexWrap: 'wrap',
           marginBottom: 14,
         }}
@@ -172,6 +231,7 @@ export default function ModelPerformancePage() {
           />
         </label>
 
+        {/* UPDATED: Min checked presets */}
         <label style={{ fontSize: 14, color: '#6b7280' }}>
           Min checked&nbsp;
           <input
@@ -190,6 +250,42 @@ export default function ModelPerformancePage() {
               background: '#fff',
             }}
           />
+          <div
+            style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}
+          >
+            {[
+              { label: 'All', v: 0 },
+              { label: 'Small', v: 5 },
+              { label: 'Medium', v: 25 },
+              { label: 'Large', v: 100 },
+            ].map((p) => {
+              const active = minChecked === p.v;
+              return (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => setMinChecked(p.v)}
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: 999,
+                    border: '1px solid #e5e7eb',
+                    background: active ? '#111827' : '#fff',
+                    color: active ? '#fff' : '#111827',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    fontSize: 12,
+                  }}
+                  aria-pressed={active}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12, color: '#9ca3af' }}>
+            Hide models with fewer than <strong>{minChecked}</strong> checked
+            predictions.
+          </div>
         </label>
 
         <button
@@ -208,52 +304,96 @@ export default function ModelPerformancePage() {
         </button>
       </div>
 
-      <div style={{ textAlign: 'center', color: '#6b7280', marginBottom: 18 }}>
+      <div style={{ textAlign: 'center', color: '#6b7280', marginBottom: 14 }}>
         Models: {filtered.length} (of {rows.length}) · Total predictions:{' '}
         {summary.total} · Checked: {summary.checked}
       </div>
 
-      {bestModel && (
-        <div
-          style={{
-            margin: '0 auto 14px',
-            maxWidth: 760,
-            background: '#fff',
-            border: '1px solid #eef2f7',
-            borderRadius: 16,
-            padding: 14,
-            boxShadow: '0 1px 0 rgba(0,0,0,0.02)',
-          }}
-        >
-          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
-            Best (by avg total hits, with min checked filter)
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              gap: 10,
-              alignItems: 'baseline',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ fontWeight: 800, fontSize: 16 }}>
-              {bestModel.model}
-            </div>
-            <div style={{ color: '#6b7280' }}>
-              Avg total hits:{' '}
-              <strong>{formatNum(bestModel.avg_total_hits, 2)}</strong>{' '}
-              <span style={{ fontSize: 12 }}>
-                (main {formatNum(bestModel.avg_main_n, 2)} + stars{' '}
-                {formatNum(bestModel.avg_stars_n, 2)})
-              </span>
-            </div>
-            <div style={{ color: '#6b7280' }}>
-              Checked: <strong>{bestModel.checked}</strong> · Checked %:{' '}
-              <strong>{formatPctFromString(bestModel.checked_rate_pct)}</strong>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Summary cards (human-readable) */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 12,
+          flexWrap: 'wrap',
+          margin: '0 auto 14px',
+          maxWidth: 980,
+        }}
+      >
+        <Card
+          title="Top model (avg hits)"
+          value={bestModel ? bestModel.model : '—'}
+          sub={
+            bestModel ? (
+              <>
+                Avg hits{' '}
+                <strong>{formatNum(bestModel.avg_total_hits, 2)}</strong>{' '}
+                <span style={{ fontSize: 12 }}>
+                  (main {formatNum(bestModel.avg_main_n, 2)} + stars{' '}
+                  {formatNum(bestModel.avg_stars_n, 2)})
+                </span>
+              </>
+            ) : (
+              <>No models meet “Min checked”.</>
+            )
+          }
+          right={
+            bestModel ? (
+              <span
+                aria-hidden
+                title="Model colour"
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 999,
+                  background: bestModel.color,
+                  display: 'inline-block',
+                  marginTop: 2,
+                }}
+              />
+            ) : null
+          }
+        />
+
+        <Card
+          title="Checked predictions"
+          value={
+            <>
+              {summary.checked} <span style={{ fontWeight: 700 }}>/</span>{' '}
+              {summary.total}
+            </>
+          }
+          sub={
+            checkedCoveragePct === null ? (
+              <>No predictions yet.</>
+            ) : (
+              <>
+                Coverage: <strong>{checkedCoveragePct.toFixed(1)}%</strong> of
+                saved predictions are checked.
+              </>
+            )
+          }
+        />
+
+        <Card
+          title="Models shown"
+          value={
+            <>
+              {filtered.length} <span style={{ fontWeight: 700 }}>/</span>{' '}
+              {rows.length}
+            </>
+          }
+          sub={
+            hiddenCount > 0 ? (
+              <>
+                Hidden by filter: <strong>{hiddenCount}</strong> (need ≥{' '}
+                <strong>{minChecked}</strong> checked)
+              </>
+            ) : (
+              <>Nothing hidden by the filter.</>
+            )
+          }
+        />
+      </div>
 
       {error && (
         <p style={{ color: '#b91c1c', textAlign: 'center' }}>{error}</p>
