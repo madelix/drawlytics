@@ -1,0 +1,20 @@
+                                          Table "public.predictions"
+    Column     |            Type             | Collation | Nullable |                 Default                 
+---------------+-----------------------------+-----------+----------+-----------------------------------------
+ id            | integer                     |           | not null | nextval('predictions_id_seq'::regclass)
+ lottery       | character varying(40)       |           | not null | 
+ draw_date     | date                        |           | not null | 
+ model_name    | character varying(120)      |           | not null | 
+ main_numbers  | smallint[]                  |           | not null | 
+ star_numbers  | smallint[]                  |           | not null | 
+ confidence    | numeric(5,2)                |           | not null | 
+ status        | character varying(24)       |           | not null | 'pending'::character varying
+ matched_main  | smallint                    |           |          | 
+ matched_stars | smallint                    |           |          | 
+ result_label  | character varying(24)       |           |          | 
+ created_at    | timestamp without time zone |           | not null | now()
+Indexes:
+    "predictions_pkey" PRIMARY KEY, btree (id)
+Referenced by:
+    TABLE "played_predictions" CONSTRAINT "played_predictions_prediction_id_predictions_id_fk" FOREIGN KEY (prediction_id) REFERENCES predictions(id) ON DELETE CASCADE
+
