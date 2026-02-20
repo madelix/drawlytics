@@ -5,32 +5,32 @@ import {
   type ModelPerformanceRow,
 } from '../api/performance';
 
-function formatPct(n: number) {
+function formatPctFromString(s: string) {
+  const n = Number(s);
   if (!Number.isFinite(n)) return '—';
   return `${n.toFixed(1)}%`;
 }
 
-function formatDate(iso: string | null) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
+function formatNumFromString(s: string, decimals = 2) {
+  const n = Number(s);
+  if (!Number.isFinite(n)) return '—';
+  return n.toFixed(decimals);
 }
 
 export default function ModelPerformancePage() {
   const [lottery, setLottery] = useState('euromillions');
-  const [limit, setLimit] = useState(500);
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ModelPerformanceRow[]>([]);
+
+  const MIN_CHECKED = 5;
 
   async function load() {
     setLoading(true);
     setError(null);
 
     try {
-      const data = await getModelPerformance({ lottery, limit });
+      const data = await getModelPerformance({ lottery });
       setRows(data.models || []);
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load model performance');
@@ -44,11 +44,19 @@ export default function ModelPerformancePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const filteredRows = useMemo(
+    () => rows.filter((r) => r.checked_predictions >= MIN_CHECKED),
+    [rows],
+  );
+
   const summary = useMemo(() => {
-    const checked = rows.reduce((acc, r) => acc + (r.checked || 0), 0);
-    const total = rows.reduce((acc, r) => acc + (r.total || 0), 0);
+    const checked = filteredRows.reduce(
+      (acc, r) => acc + r.checked_predictions,
+      0,
+    );
+    const total = filteredRows.reduce((acc, r) => acc + r.total_predictions, 0);
     return { total, checked };
-  }, [rows]);
+  }, [filteredRows]);
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '28px 16px' }}>
@@ -83,24 +91,6 @@ export default function ModelPerformancePage() {
           />
         </label>
 
-        <label style={{ fontSize: 14, color: '#6b7280' }}>
-          Limit&nbsp;
-          <input
-            type="number"
-            value={limit}
-            min={1}
-            max={5000}
-            onChange={(e) => setLimit(parseInt(e.target.value || '500', 10))}
-            style={{
-              width: 110,
-              padding: '8px 10px',
-              borderRadius: 10,
-              border: '1px solid #e5e7eb',
-              background: '#fff',
-            }}
-          />
-        </label>
-
         <button
           onClick={load}
           disabled={loading}
@@ -118,8 +108,8 @@ export default function ModelPerformancePage() {
       </div>
 
       <div style={{ textAlign: 'center', color: '#6b7280', marginBottom: 18 }}>
-        Models: {rows.length} · Total predictions: {summary.total} · Checked:{' '}
-        {summary.checked}
+        Models: {filteredRows.length} · Total predictions: {summary.total} ·
+        Checked: {summary.checked}
       </div>
 
       {error && (
@@ -141,20 +131,15 @@ export default function ModelPerformancePage() {
                 {[
                   'Model',
                   'Checked',
-                  'Hit rate (any)',
+                  'Checked %',
                   'Avg main',
                   'Avg stars',
-                  '2+ main',
-                  '3+ main',
-                  '4+ main',
-                  '5 main',
-                  'Saved conf',
-                  'Last run',
+                  'Jackpots',
                 ].map((h) => (
                   <th
                     key={h}
                     style={{
-                      padding: '12px 12px',
+                      padding: '12px',
                       fontSize: 12,
                       color: '#6b7280',
                       borderBottom: '1px solid #eef2f7',
@@ -168,7 +153,7 @@ export default function ModelPerformancePage() {
             </thead>
 
             <tbody>
-              {rows.map((r) => (
+              {filteredRows.map((r) => (
                 <tr key={r.model_name}>
                   <td
                     style={{
@@ -187,7 +172,7 @@ export default function ModelPerformancePage() {
                       borderBottom: '1px solid #f1f5f9',
                     }}
                   >
-                    {r.checked}/{r.total}
+                    {r.checked_predictions}/{r.total_predictions}
                   </td>
 
                   <td
@@ -196,7 +181,7 @@ export default function ModelPerformancePage() {
                       borderBottom: '1px solid #f1f5f9',
                     }}
                   >
-                    {formatPct(r.hit_rate_any)}
+                    {formatPctFromString(r.checked_rate_pct)}
                   </td>
 
                   <td
@@ -205,9 +190,7 @@ export default function ModelPerformancePage() {
                       borderBottom: '1px solid #f1f5f9',
                     }}
                   >
-                    {Number.isFinite(r.avg_main_hits)
-                      ? r.avg_main_hits.toFixed(2)
-                      : '—'}
+                    {formatNumFromString(r.avg_main)}
                   </td>
 
                   <td
@@ -216,9 +199,7 @@ export default function ModelPerformancePage() {
                       borderBottom: '1px solid #f1f5f9',
                     }}
                   >
-                    {Number.isFinite(r.avg_star_hits)
-                      ? r.avg_star_hits.toFixed(2)
-                      : '—'}
+                    {formatNumFromString(r.avg_stars)}
                   </td>
 
                   <td
@@ -227,69 +208,23 @@ export default function ModelPerformancePage() {
                       borderBottom: '1px solid #f1f5f9',
                     }}
                   >
-                    {r.main_2plus}
-                  </td>
-
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {r.main_3plus}
-                  </td>
-
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {r.main_4plus}
-                  </td>
-
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {r.main_5}
-                  </td>
-
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {formatPct(r.avg_saved_confidence)}
-                  </td>
-
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {formatDate(r.last_created_at)}
+                    {r.jackpots}
                   </td>
                 </tr>
               ))}
 
-              {!loading && rows.length === 0 && (
+              {!loading && filteredRows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={11}
+                    colSpan={6}
                     style={{
                       padding: 18,
                       textAlign: 'center',
                       color: '#6b7280',
                     }}
                   >
-                    No performance data yet (no predictions found / none
-                    checked).
+                    No models meet the minimum checked prediction threshold (
+                    {MIN_CHECKED}).
                   </td>
                 </tr>
               )}
@@ -299,8 +234,7 @@ export default function ModelPerformancePage() {
       </div>
 
       <p style={{ marginTop: 14, textAlign: 'center', color: '#6b7280' }}>
-        Note: “Played model” selection is legacy and has been removed. Use the
-        “Play this line” flow on prediction cards instead.
+        Minimum sample size applied: {MIN_CHECKED} checked predictions.
       </p>
     </div>
   );
