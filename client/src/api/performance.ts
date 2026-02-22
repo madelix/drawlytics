@@ -2,7 +2,9 @@
 import { apiGetJson } from './apiClient';
 
 export type ModelPerformanceRow = {
-  model_name: string;
+  // ✅ new backend fields
+  model_key: string;
+  model_display_name: string;
 
   total_predictions: number;
   checked_predictions: number;

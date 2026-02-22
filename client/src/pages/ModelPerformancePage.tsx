@@ -31,8 +31,8 @@ function hashString(str: string) {
   }
   return h >>> 0;
 }
-function modelColor(modelName: string) {
-  const h = hashString(modelName);
+function modelColor(stableKey: string) {
+  const h = hashString(stableKey);
   const hue = 220 + (h % 90); // 220..309
   const sat = 62 + (h % 10); // 62..71
   const light = 46 + (h % 10); // 46..55
@@ -40,7 +40,9 @@ function modelColor(modelName: string) {
 }
 
 type ChartRow = {
-  model: string;
+  model_key: string;
+  model_display_name: string;
+
   checked: number;
   total: number;
   checked_rate_pct: string;
@@ -54,6 +56,7 @@ type ChartRow = {
 };
 
 type NivoBarRow = {
+  // indexBy uses this string, so this is what appears on the Y axis
   model: string;
   avg_total_hits: number;
 };
@@ -122,10 +125,6 @@ export default function ModelPerformancePage() {
     try {
       const data = await getModelPerformance({ lottery });
       setRows(data.models || []);
-      console.log(
-        'MODEL NAMES RAW:',
-        data.models?.map((m) => m.model_name),
-      );
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load model performance');
     } finally {
@@ -155,7 +154,9 @@ export default function ModelPerformancePage() {
         const avgTotal = avgMain + avgStars;
 
         return {
-          model: r.model_name,
+          model_key: r.model_key,
+          model_display_name: r.model_display_name,
+
           checked: r.checked_predictions,
           total: r.total_predictions,
           checked_rate_pct: r.checked_rate_pct,
@@ -165,7 +166,8 @@ export default function ModelPerformancePage() {
           avg_total_hits: avgTotal,
           jackpots: r.jackpots ?? 0,
 
-          color: modelColor(r.model_name),
+          // ✅ stable colour by canonical key
+          color: modelColor(r.model_key),
         };
       })
       .sort((a, b) => b.avg_total_hits - a.avg_total_hits);
@@ -179,20 +181,20 @@ export default function ModelPerformancePage() {
     return Math.max(0, rows.length - filtered.length);
   }, [rows.length, filtered.length]);
 
-  // Best model “for humans”: top of the filtered list (sorted by avg_total_hits desc)
   const bestModel = useMemo(() => {
     return filtered.length > 0 ? filtered[0] : null;
   }, [filtered]);
 
-  const byModel = useMemo(() => {
+  // Map by display label for chart tooltip/color, but include stable key inside the value.
+  const byLabel = useMemo(() => {
     const m = new Map<string, ChartRow>();
-    for (const r of filtered) m.set(r.model, r);
+    for (const r of filtered) m.set(r.model_display_name, r);
     return m;
   }, [filtered]);
 
   const barData = useMemo<NivoBarRow[]>(() => {
     return filtered.map((r) => ({
-      model: r.model,
+      model: r.model_display_name,
       avg_total_hits: r.avg_total_hits,
     }));
   }, [filtered]);
@@ -235,7 +237,6 @@ export default function ModelPerformancePage() {
           />
         </label>
 
-        {/* UPDATED: Min checked presets */}
         <label style={{ fontSize: 14, color: '#6b7280' }}>
           Min checked&nbsp;
           <input
@@ -255,7 +256,12 @@ export default function ModelPerformancePage() {
             }}
           />
           <div
-            style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}
+            style={{
+              display: 'flex',
+              gap: 6,
+              marginTop: 6,
+              flexWrap: 'wrap',
+            }}
           >
             {[
               { label: 'All', v: 0 },
@@ -313,7 +319,7 @@ export default function ModelPerformancePage() {
         {summary.total} · Checked: {summary.checked}
       </div>
 
-      {/* Summary cards (human-readable) */}
+      {/* Summary cards */}
       <div
         style={{
           display: 'flex',
@@ -325,7 +331,7 @@ export default function ModelPerformancePage() {
       >
         <Card
           title="Top model (avg hits)"
-          value={bestModel ? bestModel.model : '—'}
+          value={bestModel ? bestModel.model_display_name : '—'}
           sub={
             bestModel ? (
               <>
@@ -442,8 +448,8 @@ export default function ModelPerformancePage() {
             labelSkipWidth={36}
             labelTextColor={{ from: 'color', modifiers: [['darker', 3]] }}
             colors={(bar) => {
-              const model = String(bar.indexValue);
-              return byModel.get(model)?.color ?? '#7c3aed';
+              const label = String(bar.indexValue);
+              return byLabel.get(label)?.color ?? '#7c3aed';
             }}
             axisTop={null}
             axisRight={null}
@@ -460,8 +466,8 @@ export default function ModelPerformancePage() {
               legendOffset: 32,
             }}
             tooltip={({ indexValue, value }) => {
-              const model = String(indexValue);
-              const meta = byModel.get(model);
+              const label = String(indexValue);
+              const meta = byLabel.get(label);
               if (!meta) return null;
 
               return (
@@ -476,7 +482,7 @@ export default function ModelPerformancePage() {
                   }}
                 >
                   <div style={{ fontWeight: 800, marginBottom: 6 }}>
-                    {meta.model}
+                    {meta.model_display_name}
                   </div>
                   <div style={{ fontSize: 13, color: '#111827' }}>
                     Avg total hits:{' '}
@@ -560,7 +566,7 @@ export default function ModelPerformancePage() {
 
             <tbody>
               {filtered.map((r) => (
-                <tr key={r.model}>
+                <tr key={r.model_key}>
                   <td
                     style={{
                       padding: '12px',
@@ -582,7 +588,7 @@ export default function ModelPerformancePage() {
                         display: 'inline-block',
                       }}
                     />
-                    {r.model}
+                    {r.model_display_name}
                   </td>
 
                   <td
