@@ -95,6 +95,63 @@ function formatDayLabel(dayKey: string): string {
   return `${d}/${m}/${y}`;
 }
 
+function formatModelDisplayName(raw: string): string {
+  const s = String(raw ?? '').trim();
+  if (!s) return 'Unknown model';
+
+  const lower = s.toLowerCase();
+
+  // If the DB already stores a nice name, keep it.
+  // (But still normalize common “generator” suffix/prefix patterns.)
+  const stripGenerator = (x: string) => x.replace(/\s+generator$/i, '').trim();
+
+  // 1) make_magic:* canonical mappings
+  if (lower.startsWith('make_magic:')) {
+    const key = lower.slice('make_magic:'.length).trim();
+
+    const map: Record<string, string> = {
+      cold_focused: 'Cold Focused',
+      hot_focused: 'Hot Focused',
+      balanced_hot_cold: 'Balanced Hot/Cold',
+      pure_random: 'Pure Random',
+      overdue: 'Overdue',
+    };
+
+    if (map[key]) return map[key];
+
+    // Fallback: prettify unknown keys
+    return key
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+      .trim();
+  }
+
+  // 2) Older human strings (from your screenshot)
+  // Examples: "Cold-focused generator", "Overdue-focused generator", etc.
+  if (lower.includes('generator')) {
+    let cleaned = stripGenerator(s);
+
+    // Normalize "-focused" variants
+    cleaned = cleaned.replace(/-focused\b/gi, '');
+    cleaned = cleaned.replace(/\s{2,}/g, ' ').trim();
+
+    // Special-case “Balanced hot/cold”
+    if (/balanced\s+hot\/cold/i.test(cleaned)) return 'Balanced Hot/Cold';
+
+    // Title case
+    return cleaned
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+      .trim();
+  }
+
+  // 3) Default: just clean underscores and title-case
+  return s
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+}
+
 type DrawLookup = {
   main: Set<number>;
   stars: Set<number>;
@@ -178,8 +235,6 @@ export default function MyPredictionsPage() {
 
   async function loadDrawsForHighlighting() {
     try {
-      // We only need enough to cover recent predictions, but keep it simple.
-      // If you later paginate predictions, we can request draws per-range.
       const data = await fetchJsonOrThrow<DrawsAllResponse>(
         '/api/draws/all?limit=200&offset=0',
       );
@@ -205,7 +260,6 @@ export default function MyPredictionsPage() {
   }
 
   const predictionsSorted = useMemo(() => {
-    // Sort newest first by draw_date (string compare works for YYYY-MM-DD)
     const copy = [...predictions];
     copy.sort((a, b) => {
       const da = toDayKey(a.draw_date) ?? a.draw_date;
@@ -299,9 +353,8 @@ export default function MyPredictionsPage() {
   function hitStyle(isHit: boolean): CSSProperties | undefined {
     if (!isHit) return undefined;
 
-    // More obvious green “hit” styling
     return {
-      background: '#dcfce7', // stronger green fill
+      background: '#dcfce7',
       borderColor: '#22c55e',
       color: '#14532d',
       fontWeight: 700,
@@ -462,7 +515,7 @@ export default function MyPredictionsPage() {
                     </div>
 
                     <div style={{ fontWeight: 600 }}>
-                      {p.model_name} — draw{' '}
+                      {formatModelDisplayName(p.model_name)} — draw{' '}
                       {dayKey ? formatDayLabel(dayKey) : p.draw_date}
                     </div>
                   </div>
