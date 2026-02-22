@@ -122,6 +122,10 @@ export default function ModelPerformancePage() {
     try {
       const data = await getModelPerformance({ lottery });
       setRows(data.models || []);
+      console.log(
+        'MODEL NAMES RAW:',
+        data.models?.map((m) => m.model_name),
+      );
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load model performance');
     } finally {

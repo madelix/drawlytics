@@ -5,6 +5,100 @@ import { pool } from '../db.js';
 const router = express.Router();
 
 /**
+ * Resolve EuroMillions draw date:
+ * - If client provides draw_date: validate and use it (date-only UTC midnight)
+ * - If not provided:
+ *    1) try euromillions_draws for a future draw_date (only works if table has future rows)
+ *    2) fallback: compute next Tue/Fri
+ *       - if today is Tue/Fri AND it's <= 19:20 Europe/London, use TODAY
+ *       - otherwise use the next Tue/Fri
+ */
+async function resolveEuroMillionsDrawDate(drawDateRaw) {
+  // 1) Client provided draw date -> validate and use it
+  if (drawDateRaw) {
+    const parsed = new Date(String(drawDateRaw));
+    if (Number.isNaN(parsed.getTime())) {
+      return { ok: false, error: 'invalid_draw_date' };
+    }
+
+    // Normalize to date-only (UTC midnight) to avoid timezone drift
+    const yyyyMmDd = parsed.toISOString().slice(0, 10);
+    const dt = new Date(`${yyyyMmDd}T00:00:00.000Z`);
+    return { ok: true, draw_date: dt };
+  }
+
+  // 2) Try next draw from draws table (only works if table includes future dates)
+  try {
+    const next = await pool.query(
+      `
+      SELECT draw_date
+      FROM euromillions_draws
+      WHERE draw_date >= CURRENT_DATE
+      ORDER BY draw_date ASC
+      LIMIT 1
+      `,
+    );
+
+    if (next.rows?.length) {
+      return { ok: true, draw_date: next.rows[0].draw_date };
+    }
+  } catch (e) {
+    // If the table doesn't exist or query fails, we still have the fallback below.
+    console.error('resolveEuroMillionsDrawDate: draw table lookup failed:', e);
+  }
+
+  // 3) Fallback: compute next Tuesday/Friday (EuroMillions draws)
+  // Use UTC for date math, but apply cutoff time using Europe/London.
+  const now = new Date();
+  const todayUtc = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+
+  const day = todayUtc.getUTCDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
+  const isDrawDay = day === 2 || day === 5; // Tue/Fri
+
+  // Cutoff: 19:20 Europe/London on draw days
+  const cutoffHour = 19;
+  const cutoffMinute = 20;
+
+  const londonParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(now);
+
+  const hStr = londonParts.find((p) => p.type === 'hour')?.value ?? '00';
+  const mStr = londonParts.find((p) => p.type === 'minute')?.value ?? '00';
+  const londonHour = Number(hStr);
+  const londonMinute = Number(mStr);
+
+  const beforeCutoff =
+    londonHour < cutoffHour ||
+    (londonHour === cutoffHour && londonMinute <= cutoffMinute);
+
+  // If today is a draw day and it's before cutoff, use TODAY (date-only)
+  if (isDrawDay && beforeCutoff) {
+    return { ok: true, draw_date: todayUtc };
+  }
+
+  // Otherwise, compute the next draw day after today
+  const daysUntil = (target) => {
+    const diff = (target - day + 7) % 7;
+    return diff === 0 ? 7 : diff;
+  };
+
+  const toTue = daysUntil(2);
+  const toFri = daysUntil(5);
+  const add = Math.min(toTue, toFri);
+
+  const nextDraw = new Date(todayUtc);
+  nextDraw.setUTCDate(nextDraw.getUTCDate() + add);
+
+  return { ok: true, draw_date: nextDraw };
+}
+
+/**
  * GET /api/predictions
  */
 router.get('/predictions', async (_req, res) => {
@@ -39,8 +133,9 @@ router.get('/predictions', async (_req, res) => {
 
 /**
  * POST /api/predictions/generate
- * NOTE: This keeps your current "save with provided draw_date" behavior.
- * Your UI already sends draw_date_used automatically.
+ * If draw_date is not provided, save for:
+ * - today's draw if Tue/Fri and <= 19:20 UK time
+ * - otherwise the next Tue/Fri draw
  */
 router.post('/predictions/generate', async (req, res) => {
   try {
@@ -66,11 +161,11 @@ router.post('/predictions/generate', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'invalid_lines' });
     }
 
-    const parsedDrawDate = drawDateRaw ? new Date(drawDateRaw) : null;
-    if (drawDateRaw && Number.isNaN(parsedDrawDate.getTime())) {
-      return res.status(400).json({ ok: false, error: 'invalid_draw_date' });
+    const resolved = await resolveEuroMillionsDrawDate(drawDateRaw);
+    if (!resolved.ok) {
+      return res.status(400).json({ ok: false, error: resolved.error });
     }
-    const draw_date = parsedDrawDate ?? new Date();
+    const draw_date = resolved.draw_date;
 
     const randInt = (min, max) =>
       Math.floor(Math.random() * (max - min + 1)) + min;
@@ -157,7 +252,6 @@ router.post('/predictions/generate', async (req, res) => {
 
 /**
  * GET /api/predictions/debug-draws?date=YYYY-MM-DD
- * Helps you verify whether a draw exists for a specific date without Railway SQL.
  */
 router.get('/predictions/debug-draws', async (req, res) => {
   try {
@@ -225,17 +319,7 @@ router.get('/predictions/debug-draws', async (req, res) => {
 
 /**
  * POST /api/predictions/check
- *
- * Fix:
- * - Updates status='checked' so UI can reliably show match info.
- * - Supports both "EuroMillions" and "Euromillions" casing in DB.
- * - If no draw exists on the saved prediction date, tries shifting forward 1-3 days.
- *
- * Query params:
- *  ?debug=1  -> returns extra debug info
- *
- * Body:
- *  { limit?: number, onlyUnchecked?: boolean }
+ * (unchanged)
  */
 router.post('/predictions/check', async (req, res) => {
   try {
@@ -246,10 +330,8 @@ router.post('/predictions/check', async (req, res) => {
       ? Math.max(1, Math.min(500, Math.floor(limitRaw)))
       : 200;
 
-    // default true
     const onlyUnchecked = req.body?.onlyUnchecked !== false;
 
-    // IMPORTANT: handle NULLs and also defaults (0 / '' / 'no_draw%')
     const { rows: preds } = await pool.query(
       `
       SELECT
@@ -301,7 +383,7 @@ router.post('/predictions/check', async (req, res) => {
     const toYYYYMMDD = (d) => {
       const dt = new Date(d);
       if (Number.isNaN(dt.getTime())) return null;
-      return dt.toISOString().slice(0, 10); // YYYY-MM-DD in UTC
+      return dt.toISOString().slice(0, 10);
     };
 
     const addDays = (yyyyMmDd, plusDays) => {
@@ -310,9 +392,8 @@ router.post('/predictions/check', async (req, res) => {
       return dt.toISOString().slice(0, 10);
     };
 
-    // Build unique date list
     const dateSet = new Set();
-    const predMeta = []; // for debug
+    const predMeta = [];
     for (const p of predictionsToCheck) {
       const day = toYYYYMMDD(p.draw_date);
       if (day) dateSet.add(day);
@@ -325,7 +406,6 @@ router.post('/predictions/check', async (req, res) => {
     }
     const days = Array.from(dateSet);
 
-    // Fetch draws for those days (+ a few “forward shift” days)
     const expandedDays = new Set(days);
     for (const d of days) {
       expandedDays.add(addDays(d, 1));
@@ -334,8 +414,7 @@ router.post('/predictions/check', async (req, res) => {
     }
     const daysQuery = Array.from(expandedDays);
 
-    let drawsByDay = new Map(); // day -> { main:[], stars:[] }
-    let drawSchema = 'unknown';
+    const drawsByDay = new Map();
 
     const put = (day, main, stars) => {
       if (main.length === 5 && stars.length === 2) {
@@ -343,7 +422,6 @@ router.post('/predictions/check', async (req, res) => {
       }
     };
 
-    // n1..n5/s1..s2
     try {
       const { rows: drawRows } = await pool.query(
         `
@@ -362,7 +440,6 @@ router.post('/predictions/check', async (req, res) => {
         const stars = [r.s1, r.s2].map(Number).filter(Number.isFinite);
         if (day) put(day, main, stars);
       }
-      drawSchema = 'n1..s2';
     } catch (e) {
       console.error('Draw fetch failed (n1..s2).', e);
       return res.status(500).json({ ok: false, error: 'draw_fetch_failed' });
@@ -372,10 +449,9 @@ router.post('/predictions/check', async (req, res) => {
     let updated = 0;
     let skipped = 0;
 
-    const shifted = []; // [fromDay,toDay]
+    const shifted = [];
     const findDrawDay = (day) => {
       if (drawsByDay.has(day)) return day;
-      // Shift forward up to 3 days
       for (let i = 1; i <= 3; i++) {
         const d2 = addDays(day, i);
         if (drawsByDay.has(d2)) return d2;
@@ -456,19 +532,11 @@ router.post('/predictions/check', async (req, res) => {
     const payload = { ok: true, checked, updated, skipped };
 
     if (debug) {
-      const foundDays = Array.from(drawsByDay.keys()).sort();
-      const missingDays = days.filter((d) => !drawsByDay.has(d)).sort();
-
       return res.json({
         ...payload,
         debug: {
-          drawSchema,
-          daysRequested: days.length,
-          foundDaysCount: foundDays.length,
-          missingDaysCount: missingDays.length,
           shiftedCount: shifted.length,
           samplePredictions: predMeta.slice(0, 10),
-          sampleMissingDays: missingDays.slice(0, 10),
           sampleShifted: shifted.slice(0, 10),
         },
       });
