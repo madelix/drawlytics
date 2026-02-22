@@ -5,6 +5,52 @@ import { pool } from '../db.js';
 const router = express.Router();
 
 /**
+ * TEMP: GET /api/predictions/debug-schema
+ * Returns columns for predictions table.
+ */
+router.get('/predictions/debug-schema', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `
+      SELECT column_name, data_type
+      FROM information_schema.columns
+      WHERE table_name = 'predictions'
+      ORDER BY ordinal_position;
+      `,
+    );
+    return res.json({ ok: true, columns: rows });
+  } catch (err) {
+    console.error('debug-schema error:', err);
+    return res.status(500).json({ ok: false, error: 'debug_schema_failed' });
+  }
+});
+
+/**
+ * TEMP: POST /api/predictions/debug-migrate-user
+ * Adds user_id to predictions and backfills existing rows.
+ */
+router.post('/predictions/debug-migrate-user', async (_req, res) => {
+  try {
+    await pool.query(
+      `ALTER TABLE predictions ADD COLUMN IF NOT EXISTS user_id integer;`,
+    );
+    await pool.query(
+      `UPDATE predictions SET user_id = 1 WHERE user_id IS NULL;`,
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_predictions_user_id ON predictions(user_id);`,
+    );
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('debug-migrate-user error:', err);
+    return res
+      .status(500)
+      .json({ ok: false, error: 'debug_migrate_user_failed' });
+  }
+});
+
+/**
  * Resolve EuroMillions draw date:
  * - If client provides draw_date: validate and use it (date-only UTC midnight)
  * - If not provided:
@@ -119,8 +165,9 @@ router.get('/predictions', async (_req, res) => {
         matched_stars,
         result_label
       FROM predictions
-      ORDER BY created_at DESC
-      LIMIT 500
+WHERE user_id = 1
+ORDER BY created_at DESC
+LIMIT 500
       `,
     );
 
@@ -128,6 +175,32 @@ router.get('/predictions', async (_req, res) => {
   } catch (err) {
     console.error('GET /predictions failed:', err);
     res.status(500).json({ ok: false, error: 'predictions_failed' });
+  }
+});
+
+/**
+ * GET /api/predictions/usage
+ * Returns usage for current user (temporary: user_id = 1).
+ */
+router.get('/predictions/usage', async (_req, res) => {
+  try {
+    const LIMIT_FREE = 50;
+    const disableLimits =
+      String(process.env.DISABLE_LIMITS ?? '').trim() === '1';
+
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS used FROM predictions WHERE user_id = 1`,
+    );
+
+    return res.json({
+      ok: true,
+      used: rows?.[0]?.used ?? 0,
+      limit: disableLimits ? null : LIMIT_FREE,
+      limits_disabled: disableLimits,
+    });
+  } catch (err) {
+    console.error('GET /predictions/usage failed:', err);
+    return res.status(500).json({ ok: false, error: 'usage_failed' });
   }
 });
 
@@ -182,6 +255,33 @@ router.post('/predictions/generate', async (req, res) => {
     });
 
     const saved = [];
+    // Free plan limit (temporary)
+    const { rows: countRows } = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM predictions WHERE user_id = 1`,
+    );
+
+    const currentCount = countRows[0]?.count ?? 0;
+    const LIMIT_FREE = 50;
+
+    // Owner/dev override (set DISABLE_LIMITS=1)
+    const disableLimits =
+      String(process.env.DISABLE_LIMITS ?? '').trim() === '1';
+
+    if (!disableLimits && currentCount + lines > LIMIT_FREE) {
+      return res.status(403).json({
+        ok: false,
+        error: 'prediction_limit_reached',
+        message: `Free plan allows up to ${LIMIT_FREE} saved predictions.`,
+      });
+    }
+
+    if (currentCount + lines > LIMIT_FREE) {
+      return res.status(403).json({
+        ok: false,
+        error: 'prediction_limit_reached',
+        message: `Free plan allows up to ${LIMIT_FREE} saved predictions.`,
+      });
+    }
     for (let i = 0; i < lines; i++) {
       const line = generateOneLine();
       const model_name = `make_magic:${strategy}`;
@@ -189,31 +289,33 @@ router.post('/predictions/generate', async (req, res) => {
       const { rows } = await pool.query(
         `
         INSERT INTO predictions (
-          lottery,
-          draw_date,
-          model_name,
-          main_numbers,
-          star_numbers,
-          confidence,
-          created_at,
-          matched_main,
-          matched_stars,
-          result_label,
-          status
-        )
+  lottery,
+  draw_date,
+  model_name,
+  main_numbers,
+  star_numbers,
+  confidence,
+  created_at,
+  matched_main,
+  matched_stars,
+  result_label,
+  status,
+  user_id
+)
         VALUES (
-          $1,
-          $2,
-          $3,
-          $4::smallint[],
-          $5::smallint[],
-          $6,
-          NOW(),
-          NULL,
-          NULL,
-          NULL,
-          'pending'
-        )
+  $1,
+  $2,
+  $3,
+  $4::smallint[],
+  $5::smallint[],
+  $6,
+  NOW(),
+  NULL,
+  NULL,
+  NULL,
+  'pending',
+  1
+)
         RETURNING
           id,
           lottery,

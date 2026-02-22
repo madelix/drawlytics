@@ -172,10 +172,17 @@ export default function MyPredictionsPage() {
 
   const [drawMap, setDrawMap] = useState<Record<string, DrawLookup>>({});
 
+  const [usage, setUsage] = useState<{
+    used: number;
+    limit: number | null;
+    limits_disabled: boolean;
+  } | null>(null);
+
   useEffect(() => {
     void loadPredictions();
     void loadPlayedMap();
     void loadDrawsForHighlighting();
+    void loadUsage();
   }, []);
 
   async function loadPredictions() {
@@ -259,6 +266,18 @@ export default function MyPredictionsPage() {
     }
   }
 
+  async function loadUsage() {
+    try {
+      const res = await fetch('/api/predictions/usage');
+      const json = await res.json();
+      if (json?.ok) {
+        setUsage(json);
+      }
+    } catch (err) {
+      console.warn('Could not load usage', err);
+    }
+  }
+
   const predictionsSorted = useMemo(() => {
     const copy = [...predictions];
     copy.sort((a, b) => {
@@ -280,6 +299,7 @@ export default function MyPredictionsPage() {
       await fetchJsonOrThrow(`/api/predictions/${id}`, { method: 'DELETE' });
 
       setPredictions((prev) => prev.filter((p) => p.id !== id));
+      void loadUsage();
       setPlayedMap((prev) => {
         const next = { ...prev };
         delete next[id];
@@ -375,6 +395,45 @@ export default function MyPredictionsPage() {
         >
           <h1 style={{ margin: 0 }}>My Predictions</h1>
 
+          {usage && (
+            <div
+              style={{
+                marginTop: 10,
+                display: 'flex',
+                justifyContent: 'center',
+              }}
+            >
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  border: '1px solid rgba(15,23,42,0.12)',
+                  background: '#ffffff',
+                  fontSize: '0.85rem',
+                  color: '#6b7280',
+                  boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 999,
+                    background: usage.limits_disabled ? '#10b981' : '#6366f1',
+                    display: 'inline-block',
+                  }}
+                />
+                {usage.limits_disabled
+                  ? `Predictions saved: ${usage.used} (unlimited – dev mode)`
+                  : `Predictions saved: ${usage.used} / ${usage.limit}`}
+              </span>
+            </div>
+          )}
+
           <p className="dl-section-subtitle" style={{ marginTop: 8 }}>
             View saved predictions across your lotteries. (Generator &amp;
             performance analytics coming next.)
@@ -411,6 +470,7 @@ export default function MyPredictionsPage() {
               onClick={async () => {
                 await loadPredictions();
                 await loadDrawsForHighlighting();
+                await loadUsage();
               }}
               disabled={loading || checking}
               style={{
