@@ -270,7 +270,7 @@ export default function MyPredictionsPage() {
   async function loadPlayedMap() {
     try {
       const data = await fetchJsonOrThrow<PlayedMapResponse>(
-        '/api/predictions/played',
+        '/api/played-predictions',
       );
 
       if (!data.ok) return;
@@ -287,14 +287,16 @@ export default function MyPredictionsPage() {
   }
 
   async function markPlayed(predictionId: number) {
-    await fetchJsonOrThrow(`/api/predictions/${predictionId}/played`, {
+    await fetchJsonOrThrow('/api/played-predictions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      // send both keys to be safe with backend naming
+      body: JSON.stringify({ predictionId, prediction_id: predictionId }),
     });
   }
 
   async function unmarkPlayed(predictionId: number) {
-    await fetchJsonOrThrow(`/api/predictions/${predictionId}/played`, {
+    await fetchJsonOrThrow(`/api/played-predictions/${predictionId}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -659,7 +661,69 @@ export default function MyPredictionsPage() {
             const hasDraw = dayKey !== 'unknown' && Boolean(drawMap[dayKey]);
             const resultsCount = hasDraw ? items.length : 0;
 
-            const bestLabel = bestLabelForGroup(dayKey, items, drawMap);
+            const bestResult = (() => {
+              if (dayKey === 'unknown' || !drawMap[dayKey]) return null;
+
+              const draw = drawMap[dayKey];
+
+              let bestMain = 0;
+              let bestStars = 0;
+              let bestModel: string | null = null;
+
+              for (const p of items) {
+                const hits = countHits(p, draw);
+                if (!hits) continue;
+
+                if (
+                  hits.main > bestMain ||
+                  (hits.main === bestMain && hits.stars > bestStars)
+                ) {
+                  bestMain = hits.main;
+                  bestStars = hits.stars;
+                  bestModel = formatModelDisplayName(p.model_name);
+                }
+              }
+
+              return {
+                label: `${bestMain}+${bestStars}`,
+                model: bestModel,
+              };
+            })();
+
+            const bestPlayedResult = (() => {
+              if (dayKey === 'unknown' || !drawMap[dayKey]) return null;
+
+              const draw = drawMap[dayKey];
+
+              let bestMain = 0;
+              let bestStars = 0;
+              let bestModel: string | null = null;
+              let anyPlayed = false;
+
+              for (const p of items) {
+                if (!playedMap[p.id]) continue;
+                anyPlayed = true;
+
+                const hits = countHits(p, draw);
+                if (!hits) continue;
+
+                if (
+                  hits.main > bestMain ||
+                  (hits.main === bestMain && hits.stars > bestStars)
+                ) {
+                  bestMain = hits.main;
+                  bestStars = hits.stars;
+                  bestModel = formatModelDisplayName(p.model_name);
+                }
+              }
+
+              if (!anyPlayed) return null;
+
+              return {
+                label: `${bestMain}+${bestStars}`,
+                model: bestModel,
+              };
+            })();
 
             const winning =
               dayKey !== 'unknown' && drawMap[dayKey]
@@ -680,18 +744,10 @@ export default function MyPredictionsPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    setOpenDraws((prev) => {
-                      const next = {
-                        ...prev,
-                        [dayKey]: !(prev[dayKey] ?? true),
-                      };
-
-                      localStorage.setItem(
-                        'drawlytics_open_draws',
-                        JSON.stringify(next),
-                      );
-                      return next;
-                    })
+                    setOpenDraws((prev) => ({
+                      ...prev,
+                      [dayKey]: !(prev[dayKey] ?? true),
+                    }))
                   }
                   onMouseDown={(e) => {
                     e.currentTarget.style.transform = 'translateY(1px)';
@@ -728,7 +784,7 @@ export default function MyPredictionsPage() {
                     style={{
                       display: 'flex',
                       gap: 10,
-                      alignItems: 'baseline',
+                      alignItems: 'center',
                       minWidth: 0,
                     }}
                   >
@@ -767,7 +823,7 @@ export default function MyPredictionsPage() {
                       flexWrap: 'nowrap',
                       whiteSpace: 'nowrap',
                       justifyContent: 'flex-end',
-                      alignItems: 'baseline',
+                      alignItems: 'center',
                       textAlign: 'right',
                       flexBasis: 260,
                       marginLeft: 'auto',
@@ -782,7 +838,16 @@ export default function MyPredictionsPage() {
                     >
                       {items.length} {items.length === 1 ? 'line' : 'lines'} ·
                       Results {resultsCount}/{items.length} · Played{' '}
-                      {playedCount}/{items.length} · Best: {bestLabel}
+                      {playedCount}/{items.length} ·{' '}
+                      {bestPlayedResult
+                        ? `Played: ${bestPlayedResult.label}${
+                            bestPlayedResult.model
+                              ? ` (${bestPlayedResult.model})`
+                              : ''
+                          }`
+                        : `Best saved: ${bestResult?.label ?? '—'}${
+                            bestResult?.model ? ` (${bestResult.model})` : ''
+                          }`}
                       {winning ? ` · ${winning}` : ''}
                     </span>
                   </span>
@@ -792,6 +857,7 @@ export default function MyPredictionsPage() {
                   items.map((p) => {
                     const predDayKey = toDayKey(p.draw_date);
                     const draw = predDayKey ? drawMap[predDayKey] : undefined;
+                    const canTogglePlayed = !draw; // lock played when results exist
 
                     const isPlayed = Boolean(playedMap[p.id]);
 
@@ -1033,10 +1099,14 @@ export default function MyPredictionsPage() {
                             <button
                               type="button"
                               onClick={() => handleTogglePlayed(p.id)}
-                              disabled={playingId === p.id}
+                              disabled={playingId === p.id || !canTogglePlayed}
                               style={{
                                 border: '1px solid rgba(15,23,42,0.12)',
-                                background: isPlayed ? '#eef2ff' : '#ffffff',
+                                background: !canTogglePlayed
+                                  ? '#f3f4f6'
+                                  : isPlayed
+                                    ? '#eef2ff'
+                                    : '#ffffff',
                                 borderRadius: 999,
                                 padding: '0.45rem 0.8rem',
                                 fontSize: '0.85rem',
@@ -1045,20 +1115,33 @@ export default function MyPredictionsPage() {
                                     ? 'not-allowed'
                                     : 'pointer',
                                 fontWeight: 600,
-                                opacity: playingId === p.id ? 0.6 : 1,
-                                color: isPlayed ? '#3730a3' : '#0f172a',
+                                opacity:
+                                  playingId === p.id || !canTogglePlayed
+                                    ? 0.6
+                                    : 1,
+                                color: !canTogglePlayed
+                                  ? '#9ca3af'
+                                  : isPlayed
+                                    ? '#3730a3'
+                                    : '#0f172a',
                               }}
                               title={
-                                isPlayed
-                                  ? 'Click to undo (unmark as played)'
-                                  : 'Play this line'
+                                !canTogglePlayed
+                                  ? 'This draw already has results, so played status is locked.'
+                                  : isPlayed
+                                    ? 'Click to undo (unmark as played)'
+                                    : 'Play this line'
                               }
                             >
-                              {playingId === p.id
-                                ? 'Saving…'
-                                : isPlayed
-                                  ? 'Played (undo)'
-                                  : 'Play this line'}
+                              {!canTogglePlayed
+                                ? isPlayed
+                                  ? 'Played (locked)'
+                                  : 'Locked'
+                                : playingId === p.id
+                                  ? 'Saving…'
+                                  : isPlayed
+                                    ? 'Played (undo)'
+                                    : 'Play this line'}
                             </button>
                           </div>
                         </div>
