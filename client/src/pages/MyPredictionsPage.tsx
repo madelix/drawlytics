@@ -362,6 +362,41 @@ export default function MyPredictionsPage() {
     return entries;
   }, [predictionsByDraw]);
 
+  // Keep openDraws in sync with the current drawGroups keys (persisted)
+  useEffect(() => {
+    setOpenDraws((prev) => {
+      const keys = new Set(drawGroups.map(([k]) => k));
+
+      let changed = false;
+      const next: Record<string, boolean> = { ...prev };
+
+      // Add new draws (default open)
+      for (const k of keys) {
+        if (next[k] === undefined) {
+          next[k] = true;
+          changed = true;
+        }
+      }
+
+      // Remove draws that no longer exist
+      for (const k of Object.keys(next)) {
+        if (!keys.has(k)) {
+          delete next[k];
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        try {
+          localStorage.setItem('drawlytics_open_draws', JSON.stringify(next));
+        } catch {}
+        return next;
+      }
+
+      return prev;
+    });
+  }, [drawGroups]);
+
   async function handleDelete(id: number) {
     const ok = window.confirm(
       'Delete this prediction? This action cannot be undone.',
@@ -744,10 +779,19 @@ export default function MyPredictionsPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    setOpenDraws((prev) => ({
-                      ...prev,
-                      [dayKey]: !(prev[dayKey] ?? true),
-                    }))
+                    setOpenDraws((prev) => {
+                      const next = {
+                        ...prev,
+                        [dayKey]: !(prev[dayKey] ?? true),
+                      };
+                      try {
+                        localStorage.setItem(
+                          'drawlytics_open_draws',
+                          JSON.stringify(next),
+                        );
+                      } catch {}
+                      return next;
+                    })
                   }
                   onMouseDown={(e) => {
                     e.currentTarget.style.transform = 'translateY(1px)';
@@ -764,7 +808,7 @@ export default function MyPredictionsPage() {
                   aria-expanded={isOpen}
                   style={{
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems: 'flex-start',
                     justifyContent: 'space-between',
                     gap: 12,
                     flexWrap: 'wrap',
@@ -815,66 +859,39 @@ export default function MyPredictionsPage() {
                     </span>
                   </div>
 
-                  <span
+                  <div
                     style={{
-                      fontSize: '0.8rem',
-                      color: 'rgba(255,255,255,0.75)',
-                      display: 'flex',
-                      flexWrap: 'nowrap',
-                      whiteSpace: 'normal',
-                      justifyContent: 'flex-end',
-                      alignItems: 'flex-start',
-                      textAlign: 'right',
-                      flexBasis: 260,
                       marginLeft: 'auto',
+                      display: 'grid',
+                      gap: 4,
+                      justifyItems: 'end',
+                      textAlign: 'right',
+                      color: 'rgba(255,255,255,0.85)',
+                      fontSize: '0.78rem',
+                      lineHeight: 1.2,
+                      flexBasis: 260,
+                      maxWidth: 420,
+                      minWidth: 220,
                     }}
                   >
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        flexWrap: 'wrap',
-                        gap: '2px 8px',
-                        justifyContent: 'flex-end',
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      <span>
-                        {items.length} {items.length === 1 ? 'line' : 'lines'}
-                      </span>
-                      <span aria-hidden style={{ opacity: 0.85 }}>
-                        ·
-                      </span>
-                      <span>
-                        Results {resultsCount}/{items.length}
-                      </span>
-                      <span aria-hidden style={{ opacity: 0.85 }}>
-                        ·
-                      </span>
-                      <span>
-                        Played {playedCount}/{items.length}
-                      </span>
+                    <div style={{ opacity: 0.9 }}>
+                      {items.length} {items.length === 1 ? 'line' : 'lines'} ·
+                      Results {resultsCount}/{items.length} · Played{' '}
+                      {playedCount}/{items.length}
+                    </div>
 
-                      <span aria-hidden style={{ opacity: 0.85 }}>
-                        ·
-                      </span>
-                      <span>
-                        {bestPlayedResult
-                          ? `Best played: ${bestPlayedResult.model ?? 'Model'} (${bestPlayedResult.label})`
-                          : `Best saved: ${bestResult?.label ?? '—'}${
-                              bestResult?.model ? ` (${bestResult.model})` : ''
-                            }`}
-                      </span>
+                    <div style={{ opacity: 0.95 }}>
+                      {bestPlayedResult
+                        ? `Best played: ${bestPlayedResult.model ?? 'Model'} (${bestPlayedResult.label})`
+                        : `Best saved: ${bestResult?.label ?? '—'}${
+                            bestResult?.model ? ` (${bestResult.model})` : ''
+                          }`}
+                    </div>
 
-                      {winning ? (
-                        <>
-                          <span aria-hidden style={{ opacity: 0.85 }}>
-                            ·
-                          </span>
-                          <span style={{ opacity: 0.9 }}>{winning}</span>
-                        </>
-                      ) : null}
-                    </span>
-                  </span>
+                    {winning ? (
+                      <div style={{ opacity: 0.85 }}>{winning}</div>
+                    ) : null}
+                  </div>
                 </button>
 
                 {isOpen &&
