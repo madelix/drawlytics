@@ -821,9 +821,9 @@ export default function MyPredictionsPage() {
                       color: 'rgba(255,255,255,0.75)',
                       display: 'flex',
                       flexWrap: 'nowrap',
-                      whiteSpace: 'nowrap',
+                      whiteSpace: 'normal',
                       justifyContent: 'flex-end',
-                      alignItems: 'center',
+                      alignItems: 'flex-start',
                       textAlign: 'right',
                       flexBasis: 260,
                       marginLeft: 'auto',
@@ -831,24 +831,48 @@ export default function MyPredictionsPage() {
                   >
                     <span
                       style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
+                        display: 'inline-flex',
+                        flexWrap: 'wrap',
+                        gap: '2px 8px',
+                        justifyContent: 'flex-end',
+                        lineHeight: 1.2,
                       }}
-                      title={winning ?? undefined}
                     >
-                      {items.length} {items.length === 1 ? 'line' : 'lines'} ·
-                      Results {resultsCount}/{items.length} · Played{' '}
-                      {playedCount}/{items.length} ·{' '}
-                      {bestPlayedResult
-                        ? `Played: ${bestPlayedResult.label}${
-                            bestPlayedResult.model
-                              ? ` (${bestPlayedResult.model})`
-                              : ''
-                          }`
-                        : `Best saved: ${bestResult?.label ?? '—'}${
-                            bestResult?.model ? ` (${bestResult.model})` : ''
-                          }`}
-                      {winning ? ` · ${winning}` : ''}
+                      <span>
+                        {items.length} {items.length === 1 ? 'line' : 'lines'}
+                      </span>
+                      <span aria-hidden style={{ opacity: 0.85 }}>
+                        ·
+                      </span>
+                      <span>
+                        Results {resultsCount}/{items.length}
+                      </span>
+                      <span aria-hidden style={{ opacity: 0.85 }}>
+                        ·
+                      </span>
+                      <span>
+                        Played {playedCount}/{items.length}
+                      </span>
+
+                      <span aria-hidden style={{ opacity: 0.85 }}>
+                        ·
+                      </span>
+                      <span>
+                        {bestPlayedResult
+                          ? `Best played: ${bestPlayedResult.model ?? 'Model'} (${bestPlayedResult.label})`
+                          : `Best saved: ${bestResult?.label ?? '—'}${
+                              bestResult?.model ? ` (${bestResult.model})` : ''
+                            }`}
+                      </span>
+
+                      {winning ? (
+                        <>
+                          <span aria-hidden style={{ opacity: 0.85 }}>
+                            ·
+                          </span>
+                          <span style={{ opacity: 0.9 }}>{winning}</span>
+                        </>
+                      ) : null}
                     </span>
                   </span>
                 </button>
@@ -858,8 +882,16 @@ export default function MyPredictionsPage() {
                     const predDayKey = toDayKey(p.draw_date);
                     const draw = predDayKey ? drawMap[predDayKey] : undefined;
                     const canTogglePlayed = !draw; // lock played when results exist
-
                     const isPlayed = Boolean(playedMap[p.id]);
+
+                    const statusText = draw
+                      ? 'checked'
+                      : isPlayed
+                        ? 'played'
+                        : p.status;
+                    const statusKey = String(statusText ?? '')
+                      .toLowerCase()
+                      .trim();
 
                     const hits = countHits(p, draw);
                     const mainHitCount = hits ? hits.main : null;
@@ -918,30 +950,35 @@ export default function MyPredictionsPage() {
                           >
                             <div
                               style={{
-                                fontSize: '0.8rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                letterSpacing: '0.02em',
+                                textTransform: 'capitalize',
                                 padding: '0.2rem 0.6rem',
                                 borderRadius: 999,
-                                background: isPlayed
-                                  ? '#eef2ff'
-                                  : p.status === 'won'
-                                    ? '#ecfdf3'
-                                    : p.status === 'lost'
-                                      ? '#fef2f2'
-                                      : p.status === 'checked'
-                                        ? '#f5f3ff'
-                                        : '#eff6ff',
-                                color: isPlayed
-                                  ? '#3730a3'
-                                  : p.status === 'won'
-                                    ? '#166534'
-                                    : p.status === 'lost'
-                                      ? '#991b1b'
-                                      : p.status === 'checked'
-                                        ? '#6d28d9'
-                                        : '#1d4ed8',
+                                background:
+                                  statusKey === 'played'
+                                    ? '#eef2ff'
+                                    : statusKey === 'won'
+                                      ? '#ecfdf3'
+                                      : statusKey === 'lost'
+                                        ? '#fef2f2'
+                                        : statusKey === 'checked'
+                                          ? '#f5f3ff'
+                                          : '#eff6ff',
+                                color:
+                                  statusKey === 'played'
+                                    ? '#3730a3'
+                                    : statusKey === 'won'
+                                      ? '#166534'
+                                      : statusKey === 'lost'
+                                        ? '#991b1b'
+                                        : statusKey === 'checked'
+                                          ? '#6d28d9'
+                                          : '#1d4ed8',
                               }}
                             >
-                              {isPlayed ? 'played' : p.status}
+                              {statusText}
                             </div>
 
                             <button
