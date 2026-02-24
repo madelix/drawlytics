@@ -64,7 +64,7 @@ async function fetchJsonOrThrow<T>(
   try {
     json = text ? JSON.parse(text) : null;
   } catch {
-    // ignore parse error, we’ll throw below
+    // ignore parse error
   }
 
   if (!res.ok) {
@@ -90,7 +90,6 @@ function toDayKey(value: string | Date | null | undefined): string | null {
 }
 
 function formatDayLabel(dayKey: string): string {
-  // dayKey is YYYY-MM-DD
   const [y, m, d] = dayKey.split('-');
   return `${d}/${m}/${y}`;
 }
@@ -101,11 +100,9 @@ function formatModelDisplayName(raw: string): string {
 
   const lower = s.toLowerCase();
 
-  // If the DB already stores a nice name, keep it.
-  // (But still normalize common “generator” suffix/prefix patterns.)
   const stripGenerator = (x: string) => x.replace(/\s+generator$/i, '').trim();
 
-  // 1) make_magic:* canonical mappings
+  // make_magic:* canonical mappings
   if (lower.startsWith('make_magic:')) {
     const key = lower.slice('make_magic:'.length).trim();
 
@@ -119,33 +116,29 @@ function formatModelDisplayName(raw: string): string {
 
     if (map[key]) return map[key];
 
-    // Fallback: prettify unknown keys
+    // Fallback for unknown keys
     return key
       .replace(/_/g, ' ')
       .replace(/\b\w/g, (c) => c.toUpperCase())
       .trim();
   }
 
-  // 2) Older human strings (from your screenshot)
-  // Examples: "Cold-focused generator", "Overdue-focused generator", etc.
+  // Older strings like "Cold-focused generator"
   if (lower.includes('generator')) {
     let cleaned = stripGenerator(s);
 
-    // Normalize "-focused" variants
     cleaned = cleaned.replace(/-focused\b/gi, '');
     cleaned = cleaned.replace(/\s{2,}/g, ' ').trim();
 
-    // Special-case “Balanced hot/cold”
     if (/balanced\s+hot\/cold/i.test(cleaned)) return 'Balanced Hot/Cold';
 
-    // Title case
     return cleaned
       .replace(/_/g, ' ')
       .replace(/\b\w/g, (c) => c.toUpperCase())
       .trim();
   }
 
-  // 3) Default: just clean underscores and title-case
+  // Default
   return s
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
@@ -156,6 +149,53 @@ type DrawLookup = {
   main: Set<number>;
   stars: Set<number>;
 };
+
+function countHits(
+  pred: PredictionRow,
+  draw: DrawLookup | undefined,
+): { main: number; stars: number; total: number } | null {
+  if (!draw) return null;
+
+  const main = pred.main_numbers.reduce(
+    (acc, n) => acc + (draw.main.has(n) ? 1 : 0),
+    0,
+  );
+  const stars = pred.star_numbers.reduce(
+    (acc, n) => acc + (draw.stars.has(n) ? 1 : 0),
+    0,
+  );
+
+  return { main, stars, total: main + stars };
+}
+
+function bestLabelForGroup(
+  dayKey: string,
+  items: PredictionRow[],
+  drawMap: Record<string, DrawLookup>,
+): string {
+  if (dayKey === 'unknown') return '—';
+
+  const draw = drawMap[dayKey];
+  if (!draw) return '—';
+
+  let bestMain = 0;
+  let bestStars = 0;
+
+  for (const p of items) {
+    const hits = countHits(p, draw);
+    if (!hits) continue;
+
+    if (
+      hits.main > bestMain ||
+      (hits.main === bestMain && hits.stars > bestStars)
+    ) {
+      bestMain = hits.main;
+      bestStars = hits.stars;
+    }
+  }
+
+  return `${bestMain}+${bestStars}`;
+}
 
 export default function MyPredictionsPage() {
   const [loading, setLoading] = useState(false);
@@ -178,12 +218,32 @@ export default function MyPredictionsPage() {
     limits_disabled: boolean;
   } | null>(null);
 
+  // Collapsible state
+  const [openDraws, setOpenDraws] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('drawlytics_open_draws');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
   useEffect(() => {
     void loadPredictions();
     void loadPlayedMap();
     void loadDrawsForHighlighting();
     void loadUsage();
   }, []);
+
+  async function loadUsage() {
+    try {
+      const res = await fetch('/api/predictions/usage');
+      const json = await res.json();
+      if (json?.ok) setUsage(json);
+    } catch (err) {
+      console.warn('Could not load usage', err);
+    }
+  }
 
   async function loadPredictions() {
     setError(null);
@@ -266,18 +326,6 @@ export default function MyPredictionsPage() {
     }
   }
 
-  async function loadUsage() {
-    try {
-      const res = await fetch('/api/predictions/usage');
-      const json = await res.json();
-      if (json?.ok) {
-        setUsage(json);
-      }
-    } catch (err) {
-      console.warn('Could not load usage', err);
-    }
-  }
-
   const predictionsSorted = useMemo(() => {
     const copy = [...predictions];
     copy.sort((a, b) => {
@@ -287,6 +335,30 @@ export default function MyPredictionsPage() {
     });
     return copy;
   }, [predictions]);
+
+  const predictionsByDraw = useMemo(() => {
+    const map: Record<string, PredictionRow[]> = {};
+    for (const p of predictionsSorted) {
+      const dayKey = toDayKey(p.draw_date) ?? 'unknown';
+      if (!map[dayKey]) map[dayKey] = [];
+      map[dayKey].push(p);
+    }
+    return map;
+  }, [predictionsSorted]);
+
+  const drawGroups = useMemo(() => {
+    const entries = Object.entries(predictionsByDraw);
+
+    // newest draw first, unknown last
+    entries.sort(([a], [b]) => {
+      if (a === 'unknown' && b === 'unknown') return 0;
+      if (a === 'unknown') return 1;
+      if (b === 'unknown') return -1;
+      return b.localeCompare(a);
+    });
+
+    return entries;
+  }, [predictionsByDraw]);
 
   async function handleDelete(id: number) {
     const ok = window.confirm(
@@ -299,12 +371,13 @@ export default function MyPredictionsPage() {
       await fetchJsonOrThrow(`/api/predictions/${id}`, { method: 'DELETE' });
 
       setPredictions((prev) => prev.filter((p) => p.id !== id));
-      void loadUsage();
       setPlayedMap((prev) => {
         const next = { ...prev };
         delete next[id];
         return next;
       });
+
+      void loadUsage();
     } catch (err) {
       console.error('Delete prediction failed:', err);
       alert('Could not delete prediction. Check console/logs for details.');
@@ -337,6 +410,7 @@ export default function MyPredictionsPage() {
 
       await loadPredictions();
       await loadDrawsForHighlighting();
+      await loadUsage();
     } catch (err: any) {
       console.error(err);
       setCheckMsg(`Check failed: ${err?.message ?? 'Unknown error'}`);
@@ -484,6 +558,57 @@ export default function MyPredictionsPage() {
             >
               {loading ? 'Loading…' : 'Refresh'}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                const next: Record<string, boolean> = {};
+                for (const [dayKey] of drawGroups) next[dayKey] = true;
+                setOpenDraws(next);
+                try {
+                  localStorage.setItem(
+                    'drawlytics_open_draws',
+                    JSON.stringify(next),
+                  );
+                } catch {}
+              }}
+              disabled={loading || checking}
+              style={{
+                border: '1px solid rgba(15,23,42,0.12)',
+                background: '#ffffff',
+                borderRadius: 999,
+                padding: '0.5rem 0.85rem',
+                fontSize: '0.85rem',
+                cursor: loading || checking ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Open all
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const next: Record<string, boolean> = {};
+                for (const [dayKey] of drawGroups) next[dayKey] = false;
+                setOpenDraws(next);
+                try {
+                  localStorage.setItem(
+                    'drawlytics_open_draws',
+                    JSON.stringify(next),
+                  );
+                } catch {}
+              }}
+              disabled={loading || checking}
+              style={{
+                border: '1px solid rgba(15,23,42,0.12)',
+                background: '#ffffff',
+                borderRadius: 999,
+                padding: '0.5rem 0.85rem',
+                fontSize: '0.85rem',
+                cursor: loading || checking ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Collapse all
+            </button>
           </div>
 
           {checkMsg && (
@@ -515,279 +640,411 @@ export default function MyPredictionsPage() {
             maxWidth: 960,
             margin: '0 auto',
             display: 'grid',
-            gap: '1rem',
+            gap: '1.25rem',
           }}
         >
-          {predictionsSorted.map((p) => {
-            const dayKey = toDayKey(p.draw_date);
-            const draw = dayKey ? drawMap[dayKey] : undefined;
+          {drawGroups.map(([dayKey, items]) => {
+            const groupLabel =
+              dayKey === 'unknown'
+                ? 'Unknown draw date'
+                : `Draw ${formatDayLabel(dayKey)}`;
 
-            const isPlayed = Boolean(playedMap[p.id]);
+            const isOpen = openDraws[dayKey] ?? true;
 
-            const mainHitCount = draw
-              ? p.main_numbers.reduce(
-                  (acc, n) => acc + (draw.main.has(n) ? 1 : 0),
-                  0,
-                )
-              : null;
+            const playedCount = items.reduce(
+              (acc, p) => acc + (playedMap[p.id] ? 1 : 0),
+              0,
+            );
 
-            const starHitCount = draw
-              ? p.star_numbers.reduce(
-                  (acc, n) => acc + (draw.stars.has(n) ? 1 : 0),
-                  0,
-                )
-              : null;
+            const hasDraw = dayKey !== 'unknown' && Boolean(drawMap[dayKey]);
+            const resultsCount = hasDraw ? items.length : 0;
+
+            const bestLabel = bestLabelForGroup(dayKey, items, drawMap);
 
             return (
-              <article
-                key={p.id}
-                style={{
-                  background: isPlayed ? '#f8fafc' : '#ffffff',
-                  borderRadius: '18px',
-                  padding: '1rem 1.25rem',
-                  boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
-                  border: isPlayed
-                    ? '1px solid #e5e7eb'
-                    : '1px solid transparent',
-                }}
-              >
-                <div
+              <div key={dayKey} style={{ display: 'grid', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenDraws((prev) => {
+                      const next = {
+                        ...prev,
+                        [dayKey]: !(prev[dayKey] ?? true),
+                      };
+
+                      localStorage.setItem(
+                        'drawlytics_open_draws',
+                        JSON.stringify(next),
+                      );
+                      return next;
+                    })
+                  }
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = 'translateY(1px)';
+                    e.currentTarget.style.filter = 'brightness(0.98)';
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = '';
+                    e.currentTarget.style.filter = '';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = '';
+                    e.currentTarget.style.filter = '';
+                  }}
+                  aria-expanded={isOpen}
                   style={{
                     display: 'flex',
+                    alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: '0.75rem',
-                    marginBottom: '0.4rem',
-                    alignItems: 'baseline',
+                    gap: 12,
                     flexWrap: 'wrap',
+                    padding: '10px 12px',
+                    borderRadius: 14,
+                    border: 'none',
+                    background: 'linear-gradient(90deg, #21409a, #804198)',
+                    color: '#ffffff',
+                    boxShadow: '0 6px 18px rgba(15,23,42,0.12)',
+                    transition:
+                      'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease',
+                    cursor: 'pointer',
+                    textAlign: 'left',
                   }}
                 >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: '0.8rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                        color: '#6b7280',
-                        marginBottom: 2,
-                      }}
-                    >
-                      {p.lottery}
-                    </div>
-
-                    <div style={{ fontWeight: 600 }}>
-                      {formatModelDisplayName(p.model_name)} — draw{' '}
-                      {dayKey ? formatDayLabel(dayKey) : p.draw_date}
-                    </div>
-                  </div>
-
                   <div
                     style={{
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
+                      gap: 10,
+                      alignItems: 'baseline',
+                      minWidth: 0,
                     }}
                   >
-                    <div
+                    <span
                       style={{
-                        fontSize: '0.8rem',
-                        padding: '0.2rem 0.6rem',
-                        borderRadius: 999,
-                        background: isPlayed
-                          ? '#eef2ff'
-                          : p.status === 'won'
-                            ? '#ecfdf3'
-                            : p.status === 'lost'
-                              ? '#fef2f2'
-                              : p.status === 'checked'
-                                ? '#f5f3ff'
-                                : '#eff6ff',
-                        color: isPlayed
-                          ? '#3730a3'
-                          : p.status === 'won'
-                            ? '#166534'
-                            : p.status === 'lost'
-                              ? '#991b1b'
-                              : p.status === 'checked'
-                                ? '#6d28d9'
-                                : '#1d4ed8',
+                        fontSize: '0.9rem',
+                        color: 'rgba(255,255,255,0.85)',
+                        opacity: 0.9,
+                        display: 'inline-block',
+                        transition: 'transform 180ms ease',
+                        transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                      }}
+                      aria-hidden
+                    >
+                      ▸
+                    </span>
+
+                    <span
+                      style={{
+                        fontWeight: 800,
+                        color: '#ffffff',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                     >
-                      {isPlayed ? 'played' : p.status}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(p.id)}
-                      disabled={deletingId === p.id}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: '#9ca3af',
-                        fontSize: '0.8rem',
-                        cursor: deletingId === p.id ? 'default' : 'pointer',
-                        padding: '0.1rem 0.4rem',
-                      }}
-                    >
-                      {deletingId === p.id ? 'Deleting…' : 'Delete'}
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '0.75rem',
-                    alignItems: 'flex-start',
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: '0.75rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                        color: '#6b7280',
-                        marginBottom: 4,
-                      }}
-                    >
-                      Main numbers
-                      {mainHitCount != null ? ` (hits: ${mainHitCount})` : ''}
-                    </div>
-
-                    <div>
-                      {p.main_numbers.map((n) => {
-                        const isHit = Boolean(draw?.main.has(n));
-                        return (
-                          <span
-                            key={n}
-                            className="dl-draw-pill dl-draw-pill--main"
-                            style={hitStyle(isHit)}
-                            title={isHit ? 'Hit' : undefined}
-                          >
-                            {n}
-                          </span>
-                        );
-                      })}
-                    </div>
+                      {groupLabel}
+                    </span>
                   </div>
 
-                  <div>
-                    <div
-                      style={{
-                        fontSize: '0.75rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                        color: '#6b7280',
-                        marginBottom: 4,
-                      }}
-                    >
-                      Stars
-                      {starHitCount != null ? ` (hits: ${starHitCount})` : ''}
-                    </div>
-
-                    <div>
-                      {p.star_numbers.map((n) => {
-                        const isHit = Boolean(draw?.stars.has(n));
-                        return (
-                          <span
-                            key={n}
-                            className="dl-draw-pill dl-draw-pill--star"
-                            style={hitStyle(isHit)}
-                            title={isHit ? 'Hit' : undefined}
-                          >
-                            {n}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div
+                  <span
                     style={{
-                      marginLeft: 'auto',
+                      fontSize: '0.8rem',
+                      color: 'rgba(255,255,255,0.75)',
+                      display: 'flex',
+                      flexWrap: 'nowrap',
+                      whiteSpace: 'nowrap',
+                      justifyContent: 'flex-end',
+                      alignItems: 'baseline',
                       textAlign: 'right',
-                      minWidth: 170,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 8,
-                      alignItems: 'flex-end',
+                      flexBasis: 260,
+                      marginLeft: 'auto',
                     }}
                   >
-                    <div style={{ textAlign: 'right' }}>
-                      <div
+                    <span>
+                      {items.length} {items.length === 1 ? 'line' : 'lines'} ·
+                      Results {resultsCount}/{items.length} · Played{' '}
+                      {playedCount}/{items.length} · Best: {bestLabel}
+                    </span>
+                  </span>
+                </button>
+
+                {isOpen &&
+                  items.map((p) => {
+                    const predDayKey = toDayKey(p.draw_date);
+                    const draw = predDayKey ? drawMap[predDayKey] : undefined;
+
+                    const isPlayed = Boolean(playedMap[p.id]);
+
+                    const hits = countHits(p, draw);
+                    const mainHitCount = hits ? hits.main : null;
+                    const starHitCount = hits ? hits.stars : null;
+
+                    return (
+                      <article
+                        key={p.id}
                         style={{
-                          fontSize: '0.75rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.06em',
-                          color: '#6b7280',
+                          background: isPlayed ? '#f8fafc' : '#ffffff',
+                          borderRadius: '18px',
+                          padding: '1rem 1.25rem',
+                          boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
+                          border: isPlayed
+                            ? '1px solid #e5e7eb'
+                            : '1px solid transparent',
                         }}
                       >
-                        Confidence
-                      </div>
-
-                      <div style={{ fontWeight: 600 }}>
-                        {Number(p.confidence).toFixed(2)}%
-                      </div>
-
-                      {(p.matched_main != null || p.matched_stars != null) && (
                         <div
                           style={{
-                            fontSize: '0.75rem',
-                            color: '#6b7280',
-                            marginTop: 2,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: '0.75rem',
+                            marginBottom: '0.4rem',
+                            alignItems: 'baseline',
+                            flexWrap: 'wrap',
                           }}
                         >
-                          Hits: {p.matched_main ?? 0} main /{' '}
-                          {p.matched_stars ?? 0} stars
-                          {p.result_label ? ` • ${p.result_label}` : ''}
-                        </div>
-                      )}
+                          <div>
+                            <div
+                              style={{
+                                fontSize: '0.8rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.06em',
+                                color: '#6b7280',
+                                marginBottom: 2,
+                              }}
+                            >
+                              {p.lottery}
+                            </div>
 
-                      {!draw && (
+                            <div style={{ fontWeight: 600 }}>
+                              {formatModelDisplayName(p.model_name)} — draw{' '}
+                              {predDayKey
+                                ? formatDayLabel(predDayKey)
+                                : p.draw_date}
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: '0.8rem',
+                                padding: '0.2rem 0.6rem',
+                                borderRadius: 999,
+                                background: isPlayed
+                                  ? '#eef2ff'
+                                  : p.status === 'won'
+                                    ? '#ecfdf3'
+                                    : p.status === 'lost'
+                                      ? '#fef2f2'
+                                      : p.status === 'checked'
+                                        ? '#f5f3ff'
+                                        : '#eff6ff',
+                                color: isPlayed
+                                  ? '#3730a3'
+                                  : p.status === 'won'
+                                    ? '#166534'
+                                    : p.status === 'lost'
+                                      ? '#991b1b'
+                                      : p.status === 'checked'
+                                        ? '#6d28d9'
+                                        : '#1d4ed8',
+                              }}
+                            >
+                              {isPlayed ? 'played' : p.status}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(p.id)}
+                              disabled={deletingId === p.id}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#9ca3af',
+                                fontSize: '0.8rem',
+                                cursor:
+                                  deletingId === p.id ? 'default' : 'pointer',
+                                padding: '0.1rem 0.4rem',
+                              }}
+                            >
+                              {deletingId === p.id ? 'Deleting…' : 'Delete'}
+                            </button>
+                          </div>
+                        </div>
+
                         <div
                           style={{
-                            fontSize: '0.75rem',
-                            color: '#9ca3af',
-                            marginTop: 6,
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '0.75rem',
+                            alignItems: 'flex-start',
                           }}
                         >
-                          (No draw data loaded for{' '}
-                          {dayKey ? formatDayLabel(dayKey) : p.draw_date})
-                        </div>
-                      )}
-                    </div>
+                          <div>
+                            <div
+                              style={{
+                                fontSize: '0.75rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.06em',
+                                color: '#6b7280',
+                                marginBottom: 4,
+                              }}
+                            >
+                              Main numbers
+                              {mainHitCount != null
+                                ? ` (hits: ${mainHitCount})`
+                                : ''}
+                            </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleTogglePlayed(p.id)}
-                      disabled={playingId === p.id}
-                      style={{
-                        border: '1px solid rgba(15,23,42,0.12)',
-                        background: isPlayed ? '#eef2ff' : '#ffffff',
-                        borderRadius: 999,
-                        padding: '0.45rem 0.8rem',
-                        fontSize: '0.85rem',
-                        cursor: playingId === p.id ? 'not-allowed' : 'pointer',
-                        fontWeight: 600,
-                        opacity: playingId === p.id ? 0.6 : 1,
-                        color: isPlayed ? '#3730a3' : '#0f172a',
-                      }}
-                      title={
-                        isPlayed
-                          ? 'Click to undo (unmark as played)'
-                          : 'Play this line'
-                      }
-                    >
-                      {playingId === p.id
-                        ? 'Saving…'
-                        : isPlayed
-                          ? 'Played (undo)'
-                          : 'Play this line'}
-                    </button>
-                  </div>
-                </div>
-              </article>
+                            <div>
+                              {p.main_numbers.map((n) => {
+                                const isHit = Boolean(draw?.main.has(n));
+                                return (
+                                  <span
+                                    key={n}
+                                    className="dl-draw-pill dl-draw-pill--main"
+                                    style={hitStyle(isHit)}
+                                    title={isHit ? 'Hit' : undefined}
+                                  >
+                                    {n}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div
+                              style={{
+                                fontSize: '0.75rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.06em',
+                                color: '#6b7280',
+                                marginBottom: 4,
+                              }}
+                            >
+                              Stars
+                              {starHitCount != null
+                                ? ` (hits: ${starHitCount})`
+                                : ''}
+                            </div>
+
+                            <div>
+                              {p.star_numbers.map((n) => {
+                                const isHit = Boolean(draw?.stars.has(n));
+                                return (
+                                  <span
+                                    key={n}
+                                    className="dl-draw-pill dl-draw-pill--star"
+                                    style={hitStyle(isHit)}
+                                    title={isHit ? 'Hit' : undefined}
+                                  >
+                                    {n}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              marginLeft: 'auto',
+                              textAlign: 'right',
+                              minWidth: 170,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 8,
+                              alignItems: 'flex-end',
+                            }}
+                          >
+                            <div style={{ textAlign: 'right' }}>
+                              <div
+                                style={{
+                                  fontSize: '0.75rem',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.06em',
+                                  color: '#6b7280',
+                                }}
+                              >
+                                Confidence
+                              </div>
+
+                              <div style={{ fontWeight: 600 }}>
+                                {Number(p.confidence).toFixed(2)}%
+                              </div>
+
+                              {(p.matched_main != null ||
+                                p.matched_stars != null) && (
+                                <div
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: '#6b7280',
+                                    marginTop: 2,
+                                  }}
+                                >
+                                  Hits: {p.matched_main ?? 0} main /{' '}
+                                  {p.matched_stars ?? 0} stars
+                                  {p.result_label ? ` • ${p.result_label}` : ''}
+                                </div>
+                              )}
+
+                              {!draw && (
+                                <div
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: '#9ca3af',
+                                    marginTop: 6,
+                                  }}
+                                >
+                                  (No draw data loaded for{' '}
+                                  {predDayKey
+                                    ? formatDayLabel(predDayKey)
+                                    : p.draw_date}
+                                  )
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePlayed(p.id)}
+                              disabled={playingId === p.id}
+                              style={{
+                                border: '1px solid rgba(15,23,42,0.12)',
+                                background: isPlayed ? '#eef2ff' : '#ffffff',
+                                borderRadius: 999,
+                                padding: '0.45rem 0.8rem',
+                                fontSize: '0.85rem',
+                                cursor:
+                                  playingId === p.id
+                                    ? 'not-allowed'
+                                    : 'pointer',
+                                fontWeight: 600,
+                                opacity: playingId === p.id ? 0.6 : 1,
+                                color: isPlayed ? '#3730a3' : '#0f172a',
+                              }}
+                              title={
+                                isPlayed
+                                  ? 'Click to undo (unmark as played)'
+                                  : 'Play this line'
+                              }
+                            >
+                              {playingId === p.id
+                                ? 'Saving…'
+                                : isPlayed
+                                  ? 'Played (undo)'
+                                  : 'Play this line'}
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+              </div>
             );
           })}
         </section>
