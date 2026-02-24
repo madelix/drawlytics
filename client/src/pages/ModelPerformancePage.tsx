@@ -80,7 +80,7 @@ function Card({
         borderRadius: 16,
         padding: 14,
         boxShadow: '0 1px 0 rgba(0,0,0,0.02)',
-        minWidth: 220,
+        minWidth: 280,
         flex: '1 1 240px',
       }}
     >
@@ -117,6 +117,9 @@ export default function ModelPerformancePage() {
 
   const [rows, setRows] = useState<ModelPerformanceRow[]>([]);
   const [minChecked, setMinChecked] = useState(5);
+  const [rankDeltaByKey, setRankDeltaByKey] = useState<
+    Record<string, number | null>
+  >({});
 
   async function load() {
     setLoading(true);
@@ -177,6 +180,42 @@ export default function ModelPerformancePage() {
     return chartRows.filter((r) => r.checked >= minChecked);
   }, [chartRows, minChecked]);
 
+  useEffect(() => {
+    const LS_KEY = 'drawlytics_model_ranks_prev';
+
+    // Current ranks (1 = best)
+    const currentRanks: Record<string, number> = {};
+    filtered.forEach((r, i) => {
+      currentRanks[r.model_key] = i + 1;
+    });
+
+    // Previous ranks snapshot
+    let prevRanks: Record<string, number> | null = null;
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      prevRanks = raw ? (JSON.parse(raw) as Record<string, number>) : null;
+    } catch {
+      prevRanks = null;
+    }
+
+    // Delta = prevRank - currentRank (positive means improved)
+    const deltas: Record<string, number | null> = {};
+    for (const r of filtered) {
+      const prev = prevRanks?.[r.model_key];
+      const cur = currentRanks[r.model_key];
+      deltas[r.model_key] = typeof prev === 'number' ? prev - cur : null;
+    }
+
+    setRankDeltaByKey(deltas);
+
+    // Persist snapshot for next time
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(currentRanks));
+    } catch {
+      // ignore
+    }
+  }, [filtered, setRankDeltaByKey]);
+
   const hiddenCount = useMemo(() => {
     return Math.max(0, rows.length - filtered.length);
   }, [rows.length, filtered.length]);
@@ -184,6 +223,20 @@ export default function ModelPerformancePage() {
   const bestModel = useMemo(() => {
     return filtered.length > 0 ? filtered[0] : null;
   }, [filtered]);
+
+  const mostImproved = useMemo(() => {
+    let best: { row: ChartRow; delta: number } | null = null;
+
+    for (const r of filtered) {
+      const d = rankDeltaByKey[r.model_key];
+      if (typeof d !== 'number') continue; // null = new/unknown
+      if (d <= 0) continue; // only improvements
+
+      if (!best || d > best.delta) best = { row: r, delta: d };
+    }
+
+    return best;
+  }, [filtered, rankDeltaByKey]);
 
   // Map by display label for chart tooltip/color, but include stable key inside the value.
   const byLabel = useMemo(() => {
@@ -365,6 +418,39 @@ export default function ModelPerformancePage() {
         />
 
         <Card
+          title="Most improved"
+          value={
+            mostImproved ? mostImproved.row.model_display_name : 'No change yet'
+          }
+          sub={
+            mostImproved ? (
+              <>
+                Rank movement: <strong>↑{mostImproved.delta}</strong> since last
+                view.
+              </>
+            ) : (
+              <>No model has improved since the last snapshot.</>
+            )
+          }
+          right={
+            mostImproved ? (
+              <span
+                aria-hidden
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 999,
+                  background: mostImproved.row.color,
+                  display: 'inline-block',
+                  marginTop: 2,
+                }}
+                title="Model colour"
+              />
+            ) : null
+          }
+        />
+
+        <Card
           title="Checked predictions"
           value={
             <>
@@ -383,7 +469,9 @@ export default function ModelPerformancePage() {
             )
           }
         />
+      </div>
 
+      <div style={{ margin: '0 auto 14px', maxWidth: 980 }}>
         <Card
           title="Models shown"
           value={
@@ -575,7 +663,7 @@ export default function ModelPerformancePage() {
                       whiteSpace: 'nowrap',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 10,
+                      gap: 12,
                     }}
                   >
                     <span
@@ -588,7 +676,69 @@ export default function ModelPerformancePage() {
                         display: 'inline-block',
                       }}
                     />
-                    {r.model_display_name}
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 900,
+                          padding: '3px 8px',
+                          borderRadius: 999,
+                          background:
+                            filtered.findIndex(
+                              (x) => x.model_key === r.model_key,
+                            ) === 0
+                              ? '#f59e0b'
+                              : '#111827',
+                          color:
+                            filtered.findIndex(
+                              (x) => x.model_key === r.model_key,
+                            ) === 0
+                              ? '#111827'
+                              : '#fff',
+                          lineHeight: 1.2,
+                        }}
+                        title="Rank by avg total hits"
+                      >
+                        #
+                        {filtered.findIndex(
+                          (x) => x.model_key === r.model_key,
+                        ) + 1}
+                      </span>
+
+                      <span>{r.model_display_name}</span>
+
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color:
+                            (rankDeltaByKey[r.model_key] ?? 0) > 0
+                              ? '#16a34a'
+                              : (rankDeltaByKey[r.model_key] ?? 0) < 0
+                                ? '#dc2626'
+                                : '#6b7280',
+                        }}
+                        title={
+                          rankDeltaByKey[r.model_key] === null
+                            ? 'New (no previous rank yet)'
+                            : (rankDeltaByKey[r.model_key] ?? 0) > 0
+                              ? `Up ${rankDeltaByKey[r.model_key]}`
+                              : (rankDeltaByKey[r.model_key] ?? 0) < 0
+                                ? `Down ${Math.abs(rankDeltaByKey[r.model_key] ?? 0)}`
+                                : 'No change'
+                        }
+                      >
+                        {rankDeltaByKey[r.model_key] === null
+                          ? 'new'
+                          : (rankDeltaByKey[r.model_key] ?? 0) > 0
+                            ? `↑${rankDeltaByKey[r.model_key]}`
+                            : (rankDeltaByKey[r.model_key] ?? 0) < 0
+                              ? `↓${Math.abs(rankDeltaByKey[r.model_key] ?? 0)}`
+                              : '•'}
+                      </span>
+                    </div>
                   </td>
 
                   <td
