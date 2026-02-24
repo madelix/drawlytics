@@ -661,6 +661,20 @@ export default function MyPredictionsPage() {
 
             const bestLabel = bestLabelForGroup(dayKey, items, drawMap);
 
+            const winning =
+              dayKey !== 'unknown' && drawMap[dayKey]
+                ? (() => {
+                    const d = drawMap[dayKey];
+                    const main = Array.from(d.main)
+                      .sort((a, b) => a - b)
+                      .join(' ');
+                    const stars = Array.from(d.stars)
+                      .sort((a, b) => a - b)
+                      .join(' ');
+                    return `Winning: ${main} ★ ${stars}`;
+                  })()
+                : null;
+
             return (
               <div key={dayKey} style={{ display: 'grid', gap: '0.75rem' }}>
                 <button
@@ -759,10 +773,17 @@ export default function MyPredictionsPage() {
                       marginLeft: 'auto',
                     }}
                   >
-                    <span>
+                    <span
+                      style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                      title={winning ?? undefined}
+                    >
                       {items.length} {items.length === 1 ? 'line' : 'lines'} ·
                       Results {resultsCount}/{items.length} · Played{' '}
                       {playedCount}/{items.length} · Best: {bestLabel}
+                      {winning ? ` · ${winning}` : ''}
                     </span>
                   </span>
                 </button>
