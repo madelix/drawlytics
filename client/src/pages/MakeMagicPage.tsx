@@ -64,8 +64,17 @@ export function MakeMagicPage() {
 
       if (!res.ok) {
         const text = await res.text();
+
+        let msg = text;
+        try {
+          const j = JSON.parse(text);
+          msg = j?.message || j?.error || text;
+        } catch {
+          // not JSON, keep text
+        }
+
         throw new Error(
-          text || 'Something went wrong while generating predictions.',
+          msg || 'Something went wrong while generating predictions.',
         );
       }
 
