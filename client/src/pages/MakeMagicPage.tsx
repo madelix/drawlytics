@@ -214,10 +214,15 @@ export function MakeMagicPage() {
               {status === 'error' && error && (
                 <div
                   style={{
-                    marginTop: 4,
-                    fontSize: '0.75rem',
-                    color: '#b91c1c',
-                    maxWidth: 260,
+                    marginTop: 12,
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    color: '#991b1b',
+                    fontSize: '0.85rem',
+                    maxWidth: 340,
+                    lineHeight: 1.4,
                   }}
                 >
                   {error}
