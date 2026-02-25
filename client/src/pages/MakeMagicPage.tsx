@@ -65,7 +65,7 @@ export function MakeMagicPage() {
       if (!res.ok) {
         const text = await res.text();
         throw new Error(
-          `API error (${res.status}): ${text || 'Failed to generate predictions'}`,
+          text || 'Something went wrong while generating predictions.',
         );
       }
 

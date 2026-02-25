@@ -275,13 +275,6 @@ router.post('/predictions/generate', async (req, res) => {
       });
     }
 
-    if (currentCount + lines > LIMIT_FREE) {
-      return res.status(403).json({
-        ok: false,
-        error: 'prediction_limit_reached',
-        message: `Free plan allows up to ${LIMIT_FREE} saved predictions.`,
-      });
-    }
     for (let i = 0; i < lines; i++) {
       const line = generateOneLine();
       const model_name = `make_magic:${strategy}`;

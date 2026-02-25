@@ -241,15 +241,20 @@ export default function ModelPerformancePage() {
   // Map by display label for chart tooltip/color, but include stable key inside the value.
   const byLabel = useMemo(() => {
     const m = new Map<string, ChartRow>();
-    for (const r of filtered) m.set(r.model_display_name, r);
+    for (const r of filtered) {
+      const rank = filtered.findIndex((x) => x.model_key === r.model_key) + 1;
+      m.set(`#${rank} ${r.model_display_name}`, r);
+    }
     return m;
   }, [filtered]);
 
   const barData = useMemo<NivoBarRow[]>(() => {
-    return filtered.map((r) => ({
-      model: r.model_display_name,
-      avg_total_hits: r.avg_total_hits,
-    }));
+    return [...filtered]
+      .map((r, i) => ({
+        model: `#${i + 1} ${r.model_display_name}`,
+        avg_total_hits: r.avg_total_hits,
+      }))
+      .reverse();
   }, [filtered]);
 
   const checkedCoveragePct = useMemo(() => {
