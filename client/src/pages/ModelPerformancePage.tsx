@@ -619,6 +619,22 @@ export default function ModelPerformancePage() {
         </div>
       </div>
 
+      <div
+        style={{
+          fontSize: 12,
+          color: '#6b7280',
+          margin: '10px 0 6px',
+          textAlign: 'center',
+        }}
+      >
+        Sample reliability:
+        <span style={{ color: '#b91c1c', fontWeight: 600 }}> small</span>{' '}
+        (&lt;10),
+        <span style={{ color: '#b45309', fontWeight: 600 }}> medium</span>{' '}
+        (10–24),
+        <span style={{ color: '#166534', fontWeight: 600 }}> strong</span> (25+)
+      </div>
+
       {/* Table */}
       <div
         style={{
@@ -790,6 +806,21 @@ export default function ModelPerformancePage() {
                     }}
                   >
                     {formatNum(r.avg_total_hits, 2)}
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        opacity: 0.9,
+                        color:
+                          r.checked < 10
+                            ? '#b91c1c'
+                            : r.checked < 25
+                              ? '#b45309'
+                              : '#166534',
+                      }}
+                    >
+                      n={r.checked}
+                    </div>
                   </td>
 
                   <td
