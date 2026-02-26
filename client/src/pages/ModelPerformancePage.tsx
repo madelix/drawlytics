@@ -50,6 +50,7 @@ type ChartRow = {
   avg_main_n: number;
   avg_stars_n: number;
   avg_total_hits: number;
+  confidence: number;
   jackpots: number;
 
   color: string;
@@ -167,6 +168,7 @@ export default function ModelPerformancePage() {
           avg_main_n: avgMain,
           avg_stars_n: avgStars,
           avg_total_hits: avgTotal,
+          confidence: toNum((r as any).confidence, 0),
           jackpots: r.jackpots ?? 0,
 
           // ✅ stable colour by canonical key
@@ -655,6 +657,7 @@ export default function ModelPerformancePage() {
                   'Avg main',
                   'Avg stars',
                   'Avg total',
+                  'Confidence',
                   'Jackpots',
                 ].map((h) => (
                   <th
@@ -676,92 +679,141 @@ export default function ModelPerformancePage() {
             <tbody>
               {filtered.map((r) => (
                 <tr key={r.model_key}>
+                  {/* MODEL */}
                   <td
                     style={{
                       padding: '12px',
                       borderBottom: '1px solid #f1f5f9',
                       fontWeight: 700,
                       whiteSpace: 'nowrap',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
                     }}
                   >
-                    <span
-                      aria-hidden
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 999,
-                        background: r.color,
-                        display: 'inline-block',
-                      }}
-                    />
                     <div
-                      style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                      }}
                     >
+                      {/* Reliability badge */}
                       <span
                         style={{
-                          fontSize: 12,
-                          fontWeight: 900,
-                          padding: '3px 8px',
+                          display: 'inline-block',
+                          padding: '4px 10px',
                           borderRadius: 999,
-                          background:
-                            filtered.findIndex(
-                              (x) => x.model_key === r.model_key,
-                            ) === 0
-                              ? '#f59e0b'
-                              : '#111827',
-                          color:
-                            filtered.findIndex(
-                              (x) => x.model_key === r.model_key,
-                            ) === 0
-                              ? '#111827'
-                              : '#fff',
-                          lineHeight: 1.2,
-                        }}
-                        title="Rank by avg total hits"
-                      >
-                        #
-                        {filtered.findIndex(
-                          (x) => x.model_key === r.model_key,
-                        ) + 1}
-                      </span>
-
-                      <span>{r.model_display_name}</span>
-
-                      <span
-                        style={{
                           fontSize: 12,
                           fontWeight: 800,
+                          background:
+                            r.checked < 10
+                              ? '#fef2f2'
+                              : r.checked < 25
+                                ? '#fffbeb'
+                                : '#f0fdf4',
+                          border:
+                            r.checked < 10
+                              ? '1px solid #fecaca'
+                              : r.checked < 25
+                                ? '1px solid #fde68a'
+                                : '1px solid #bbf7d0',
                           color:
-                            (rankDeltaByKey[r.model_key] ?? 0) > 0
-                              ? '#16a34a'
-                              : (rankDeltaByKey[r.model_key] ?? 0) < 0
-                                ? '#dc2626'
-                                : '#6b7280',
+                            r.checked < 10
+                              ? '#b91c1c'
+                              : r.checked < 25
+                                ? '#b45309'
+                                : '#166534',
                         }}
-                        title={
-                          rankDeltaByKey[r.model_key] === null
-                            ? 'New (no previous rank yet)'
-                            : (rankDeltaByKey[r.model_key] ?? 0) > 0
-                              ? `Up ${rankDeltaByKey[r.model_key]}`
-                              : (rankDeltaByKey[r.model_key] ?? 0) < 0
-                                ? `Down ${Math.abs(rankDeltaByKey[r.model_key] ?? 0)}`
-                                : 'No change'
-                        }
                       >
-                        {rankDeltaByKey[r.model_key] === null
-                          ? 'new'
-                          : (rankDeltaByKey[r.model_key] ?? 0) > 0
-                            ? `↑${rankDeltaByKey[r.model_key]}`
-                            : (rankDeltaByKey[r.model_key] ?? 0) < 0
-                              ? `↓${Math.abs(rankDeltaByKey[r.model_key] ?? 0)}`
-                              : '•'}
+                        {r.checked < 10
+                          ? 'Low'
+                          : r.checked < 25
+                            ? 'Medium'
+                            : 'High'}
                       </span>
+
+                      {/* Model color dot */}
+                      <span
+                        aria-hidden
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 999,
+                          background: r.color,
+                          display: 'inline-block',
+                        }}
+                      />
+
+                      {/* Rank + name */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 900,
+                            padding: '3px 8px',
+                            borderRadius: 999,
+                            background:
+                              filtered.findIndex(
+                                (x) => x.model_key === r.model_key,
+                              ) === 0
+                                ? '#f59e0b'
+                                : '#111827',
+                            color:
+                              filtered.findIndex(
+                                (x) => x.model_key === r.model_key,
+                              ) === 0
+                                ? '#111827'
+                                : '#fff',
+                            lineHeight: 1.2,
+                          }}
+                          title="Rank by avg total hits"
+                        >
+                          #
+                          {filtered.findIndex(
+                            (x) => x.model_key === r.model_key,
+                          ) + 1}
+                        </span>
+
+                        <span>{r.model_display_name}</span>
+
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 800,
+                            color:
+                              (rankDeltaByKey[r.model_key] ?? 0) > 0
+                                ? '#16a34a'
+                                : (rankDeltaByKey[r.model_key] ?? 0) < 0
+                                  ? '#dc2626'
+                                  : '#6b7280',
+                          }}
+                          title={
+                            rankDeltaByKey[r.model_key] === null
+                              ? 'New model'
+                              : (rankDeltaByKey[r.model_key] ?? 0) > 0
+                                ? `Up ${rankDeltaByKey[r.model_key]}`
+                                : (rankDeltaByKey[r.model_key] ?? 0) < 0
+                                  ? `Down ${Math.abs(rankDeltaByKey[r.model_key] ?? 0)}`
+                                  : 'No change'
+                          }
+                        >
+                          {rankDeltaByKey[r.model_key] === null
+                            ? 'new'
+                            : (rankDeltaByKey[r.model_key] ?? 0) > 0
+                              ? `↑${rankDeltaByKey[r.model_key]}`
+                              : (rankDeltaByKey[r.model_key] ?? 0) < 0
+                                ? `↓${Math.abs(rankDeltaByKey[r.model_key] ?? 0)}`
+                                : '•'}
+                        </span>
+                      </div>
                     </div>
                   </td>
 
+                  {/* CHECKED */}
                   <td
                     style={{
                       padding: '12px',
@@ -771,6 +823,7 @@ export default function ModelPerformancePage() {
                     {r.checked}/{r.total}
                   </td>
 
+                  {/* CHECKED % */}
                   <td
                     style={{
                       padding: '12px',
@@ -780,6 +833,7 @@ export default function ModelPerformancePage() {
                     {formatPctFromString(r.checked_rate_pct)}
                   </td>
 
+                  {/* AVG MAIN */}
                   <td
                     style={{
                       padding: '12px',
@@ -789,6 +843,7 @@ export default function ModelPerformancePage() {
                     {formatNum(r.avg_main_n, 2)}
                   </td>
 
+                  {/* AVG STARS */}
                   <td
                     style={{
                       padding: '12px',
@@ -798,6 +853,7 @@ export default function ModelPerformancePage() {
                     {formatNum(r.avg_stars_n, 2)}
                   </td>
 
+                  {/* AVG TOTAL */}
                   <td
                     style={{
                       padding: '12px',
@@ -806,6 +862,7 @@ export default function ModelPerformancePage() {
                     }}
                   >
                     {formatNum(r.avg_total_hits, 2)}
+
                     <div
                       style={{
                         fontSize: 11,
@@ -823,6 +880,51 @@ export default function ModelPerformancePage() {
                     </div>
                   </td>
 
+                  {/* CONFIDENCE */}
+                  <td
+                    style={{
+                      padding: '12px',
+                      borderBottom: '1px solid #f1f5f9',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: '4px 10px',
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 800,
+                        background:
+                          (r.confidence ?? 0) >= 0.66
+                            ? '#ecfdf5'
+                            : (r.confidence ?? 0) >= 0.33
+                              ? '#fffbeb'
+                              : '#fef2f2',
+                        border:
+                          (r.confidence ?? 0) >= 0.66
+                            ? '1px solid #bbf7d0'
+                            : (r.confidence ?? 0) >= 0.33
+                              ? '1px solid #fde68a'
+                              : '1px solid #fecaca',
+                        color:
+                          (r.confidence ?? 0) >= 0.66
+                            ? '#166534'
+                            : (r.confidence ?? 0) >= 0.33
+                              ? '#b45309'
+                              : '#b91c1c',
+                      }}
+                      title={`Confidence score: ${formatNum(r.confidence ?? 0, 2)}`}
+                    >
+                      {(r.confidence ?? 0) >= 0.66
+                        ? 'High'
+                        : (r.confidence ?? 0) >= 0.33
+                          ? 'Medium'
+                          : 'Low'}
+                    </span>
+                  </td>
+
+                  {/* JACKPOTS */}
                   <td
                     style={{
                       padding: '12px',
@@ -833,22 +935,6 @@ export default function ModelPerformancePage() {
                   </td>
                 </tr>
               ))}
-
-              {!loading && filtered.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={7}
-                    style={{
-                      padding: 18,
-                      textAlign: 'center',
-                      color: '#6b7280',
-                    }}
-                  >
-                    No models match the current filter (try lowering “Min
-                    checked”).
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
