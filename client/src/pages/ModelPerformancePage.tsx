@@ -885,43 +885,72 @@ export default function ModelPerformancePage() {
                     style={{
                       padding: '12px',
                       borderBottom: '1px solid #f1f5f9',
-                      whiteSpace: 'nowrap',
+                      minWidth: 140,
                     }}
                   >
-                    <span
+                    <div
                       style={{
-                        display: 'inline-block',
-                        padding: '4px 10px',
-                        borderRadius: 999,
-                        fontSize: 12,
-                        fontWeight: 800,
-                        background:
-                          (r.confidence ?? 0) >= 0.66
-                            ? '#ecfdf5'
-                            : (r.confidence ?? 0) >= 0.33
-                              ? '#fffbeb'
-                              : '#fef2f2',
-                        border:
-                          (r.confidence ?? 0) >= 0.66
-                            ? '1px solid #bbf7d0'
-                            : (r.confidence ?? 0) >= 0.33
-                              ? '1px solid #fde68a'
-                              : '1px solid #fecaca',
-                        color:
-                          (r.confidence ?? 0) >= 0.66
-                            ? '#166534'
-                            : (r.confidence ?? 0) >= 0.33
-                              ? '#b45309'
-                              : '#b91c1c',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
                       }}
-                      title={`Confidence score: ${formatNum(r.confidence ?? 0, 2)}`}
                     >
-                      {(r.confidence ?? 0) >= 0.66
-                        ? 'High'
-                        : (r.confidence ?? 0) >= 0.33
-                          ? 'Medium'
-                          : 'Low'}
-                    </span>
+                      {/* Label */}
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color:
+                            (r.confidence ?? 0) >= 0.66
+                              ? '#166534'
+                              : (r.confidence ?? 0) >= 0.33
+                                ? '#b45309'
+                                : '#b91c1c',
+                        }}
+                      >
+                        {(r.confidence ?? 0) >= 0.66
+                          ? 'High'
+                          : (r.confidence ?? 0) >= 0.33
+                            ? 'Medium'
+                            : 'Low'}
+                      </span>
+
+                      {/* Bar background */}
+                      <div
+                        style={{
+                          height: 6,
+                          borderRadius: 999,
+                          background: '#eef2f7',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {/* Bar fill */}
+                        <div
+                          style={{
+                            width: `${Math.round((r.confidence ?? 0) * 100)}%`,
+                            height: '100%',
+                            borderRadius: 999,
+                            background:
+                              (r.confidence ?? 0) >= 0.66
+                                ? '#22c55e'
+                                : (r.confidence ?? 0) >= 0.33
+                                  ? '#f59e0b'
+                                  : '#ef4444',
+                            transition: 'width 0.4s ease',
+                          }}
+                        />
+                      </div>
+
+                      {/* numeric */}
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: '#6b7280',
+                        }}
+                      >
+                        score {formatNum(r.confidence ?? 0, 2)}
+                      </span>
+                    </div>
                   </td>
 
                   {/* JACKPOTS */}
