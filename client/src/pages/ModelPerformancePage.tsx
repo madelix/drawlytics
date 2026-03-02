@@ -637,6 +637,74 @@ export default function ModelPerformancePage() {
         <span style={{ color: '#166534', fontWeight: 600 }}> strong</span> (25+)
       </div>
 
+      {/* Confidence legend */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+          margin: '10px 0 12px',
+          fontSize: 12,
+          color: '#6b7280',
+          textAlign: 'center',
+        }}
+      >
+        <span style={{ fontWeight: 700, color: '#111827' }}>Confidence:</span>
+
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '4px 10px',
+            borderRadius: 999,
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#b91c1c',
+            fontWeight: 800,
+          }}
+          title="Low confidence (score < 0.33)"
+        >
+          Low <span style={{ fontWeight: 700, opacity: 0.8 }}>(0–0.32)</span>
+        </span>
+
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '4px 10px',
+            borderRadius: 999,
+            background: '#fffbeb',
+            border: '1px solid #fde68a',
+            color: '#b45309',
+            fontWeight: 800,
+          }}
+          title="Medium confidence (0.33–0.65)"
+        >
+          Medium{' '}
+          <span style={{ fontWeight: 700, opacity: 0.8 }}>(0.33–0.65)</span>
+        </span>
+
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '4px 10px',
+            borderRadius: 999,
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            color: '#166534',
+            fontWeight: 800,
+          }}
+          title="High confidence (score ≥ 0.66)"
+        >
+          High <span style={{ fontWeight: 700, opacity: 0.8 }}>(0.66+)</span>
+        </span>
+      </div>
+
       {/* Table */}
       <div
         style={{
