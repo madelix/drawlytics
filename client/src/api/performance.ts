@@ -16,6 +16,7 @@ export type ModelPerformanceRow = {
   avg_stars: string;
 
   jackpots: number;
+  high_hit_predictions: number;
 };
 
 export type ModelsPerformanceResponse = {

@@ -1,5 +1,5 @@
 // client/src/pages/ModelPerformancePage.tsx
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ResponsiveBar } from '@nivo/bar';
 import {
   getModelPerformance,
@@ -50,15 +50,16 @@ type ChartRow = {
   avg_main_n: number;
   avg_stars_n: number;
   avg_total_hits: number;
+
   confidence: number;
   jackpots: number;
+  high_hit_predictions: number;
 
   color: string;
 };
 
 type NivoBarRow = {
-  // indexBy uses this string, so this is what appears on the Y axis
-  model: string;
+  model: string; // label shown on Y axis
   avg_total_hits: number;
 };
 
@@ -69,9 +70,9 @@ function Card({
   right,
 }: {
   title: string;
-  value: React.ReactNode;
-  sub?: React.ReactNode;
-  right?: React.ReactNode;
+  value: ReactNode;
+  sub?: ReactNode;
+  right?: ReactNode;
 }) {
   return (
     <div
@@ -168,10 +169,11 @@ export default function ModelPerformancePage() {
           avg_main_n: avgMain,
           avg_stars_n: avgStars,
           avg_total_hits: avgTotal,
+
           confidence: toNum((r as any).confidence, 0),
           jackpots: r.jackpots ?? 0,
+          high_hit_predictions: r.high_hit_predictions ?? 0,
 
-          // ✅ stable colour by canonical key
           color: modelColor(r.model_key),
         };
       })
@@ -185,13 +187,11 @@ export default function ModelPerformancePage() {
   useEffect(() => {
     const LS_KEY = 'drawlytics_model_ranks_prev';
 
-    // Current ranks (1 = best)
     const currentRanks: Record<string, number> = {};
     filtered.forEach((r, i) => {
       currentRanks[r.model_key] = i + 1;
     });
 
-    // Previous ranks snapshot
     let prevRanks: Record<string, number> | null = null;
     try {
       const raw = localStorage.getItem(LS_KEY);
@@ -200,7 +200,6 @@ export default function ModelPerformancePage() {
       prevRanks = null;
     }
 
-    // Delta = prevRank - currentRank (positive means improved)
     const deltas: Record<string, number | null> = {};
     for (const r of filtered) {
       const prev = prevRanks?.[r.model_key];
@@ -210,13 +209,12 @@ export default function ModelPerformancePage() {
 
     setRankDeltaByKey(deltas);
 
-    // Persist snapshot for next time
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(currentRanks));
     } catch {
       // ignore
     }
-  }, [filtered, setRankDeltaByKey]);
+  }, [filtered]);
 
   const hiddenCount = useMemo(() => {
     return Math.max(0, rows.length - filtered.length);
@@ -231,16 +229,14 @@ export default function ModelPerformancePage() {
 
     for (const r of filtered) {
       const d = rankDeltaByKey[r.model_key];
-      if (typeof d !== 'number') continue; // null = new/unknown
-      if (d <= 0) continue; // only improvements
+      if (typeof d !== 'number') continue;
+      if (d <= 0) continue;
 
       if (!best || d > best.delta) best = { row: r, delta: d };
     }
-
     return best;
   }, [filtered, rankDeltaByKey]);
 
-  // Map by display label for chart tooltip/color, but include stable key inside the value.
   const byLabel = useMemo(() => {
     const m = new Map<string, ChartRow>();
     for (const r of filtered) {
@@ -379,7 +375,6 @@ export default function ModelPerformancePage() {
         {summary.total} · Checked: {summary.checked}
       </div>
 
-      {/* Summary cards */}
       <div
         style={{
           display: 'flex',
@@ -603,19 +598,11 @@ export default function ModelPerformancePage() {
             }}
             theme={{
               axis: {
-                ticks: {
-                  text: { fill: '#6b7280', fontSize: 12 },
-                },
-                legend: {
-                  text: { fill: '#6b7280', fontSize: 12 },
-                },
+                ticks: { text: { fill: '#6b7280', fontSize: 12 } },
+                legend: { text: { fill: '#6b7280', fontSize: 12 } },
               },
-              grid: {
-                line: { stroke: '#eef2f7', strokeWidth: 1 },
-              },
-              labels: {
-                text: { fontSize: 12, fontWeight: 700 },
-              },
+              grid: { line: { stroke: '#eef2f7', strokeWidth: 1 } },
+              labels: { text: { fontSize: 12, fontWeight: 700 } },
             }}
           />
         </div>
@@ -705,6 +692,29 @@ export default function ModelPerformancePage() {
         </span>
       </div>
 
+      <div
+        style={{
+          fontWeight: 900,
+          fontSize: 18,
+          margin: '18px 0 8px',
+          color: '#111827',
+          textAlign: 'center',
+        }}
+      >
+        Model League Table
+      </div>
+
+      <div
+        style={{
+          textAlign: 'center',
+          fontSize: 12,
+          color: '#6b7280',
+          marginBottom: 10,
+        }}
+      >
+        Ranked by average hits per prediction
+      </div>
+
       {/* Table */}
       <div
         style={{
@@ -714,19 +724,23 @@ export default function ModelPerformancePage() {
           overflow: 'hidden',
         }}
       >
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        {/* Scroll container (only scrolls when needed) */}
+        <div className="dl-table-scroll">
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+            }}
+          >
             <thead>
               <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
                 {[
                   'Model',
                   'Checked',
                   'Checked %',
-                  'Avg main',
-                  'Avg stars',
-                  'Avg total',
+                  'Average hits',
                   'Confidence',
-                  'Jackpots',
+                  'Jackpot potential',
                 ].map((h) => (
                   <th
                     key={h}
@@ -745,293 +759,318 @@ export default function ModelPerformancePage() {
             </thead>
 
             <tbody>
-              {filtered.map((r) => (
-                <tr key={r.model_key}>
-                  {/* MODEL */}
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                      fontWeight: 700,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <div
+              {filtered.map((r) => {
+                const rank =
+                  filtered.findIndex((x) => x.model_key === r.model_key) + 1;
+                const delta = rankDeltaByKey[r.model_key];
+
+                const reliabilityBg =
+                  r.checked < 10
+                    ? '#fef2f2'
+                    : r.checked < 25
+                      ? '#fffbeb'
+                      : '#f0fdf4';
+                const reliabilityBorder =
+                  r.checked < 10
+                    ? '1px solid #fecaca'
+                    : r.checked < 25
+                      ? '1px solid #fde68a'
+                      : '1px solid #bbf7d0';
+                const reliabilityColor =
+                  r.checked < 10
+                    ? '#b91c1c'
+                    : r.checked < 25
+                      ? '#b45309'
+                      : '#166534';
+                const reliabilityLabel =
+                  r.checked < 10 ? 'Low' : r.checked < 25 ? 'Medium' : 'High';
+
+                const conf = r.confidence ?? 0;
+                const confLabel =
+                  conf >= 0.66 ? 'High' : conf >= 0.33 ? 'Medium' : 'Low';
+                const confColor =
+                  conf >= 0.66
+                    ? '#166534'
+                    : conf >= 0.33
+                      ? '#b45309'
+                      : '#b91c1c';
+                const confFill =
+                  conf >= 0.66
+                    ? '#22c55e'
+                    : conf >= 0.33
+                      ? '#f59e0b'
+                      : '#ef4444';
+
+                const jackpotRate =
+                  r.checked > 0 ? r.high_hit_predictions / r.checked : 0;
+
+                const jackpotPotBg =
+                  jackpotRate >= 0.18
+                    ? '#ecfdf5'
+                    : jackpotRate >= 0.1
+                      ? '#fffbeb'
+                      : '#fef2f2';
+
+                const jackpotPotBorder =
+                  jackpotRate >= 0.18
+                    ? '1px solid #bbf7d0'
+                    : jackpotRate >= 0.1
+                      ? '1px solid #fde68a'
+                      : '1px solid #fecaca';
+
+                const jackpotPotColor =
+                  jackpotRate >= 0.18
+                    ? '#166534'
+                    : jackpotRate >= 0.1
+                      ? '#b45309'
+                      : '#b91c1c';
+
+                const jackpotPotLabel =
+                  jackpotRate >= 0.18
+                    ? 'High'
+                    : jackpotRate >= 0.1
+                      ? 'Medium'
+                      : 'Low';
+
+                return (
+                  <tr key={r.model_key}>
+                    {/* MODEL */}
+                    <td
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                        fontWeight: 700,
                       }}
                     >
-                      {/* Reliability badge */}
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '4px 10px',
-                          borderRadius: 999,
-                          fontSize: 12,
-                          fontWeight: 800,
-                          background:
-                            r.checked < 10
-                              ? '#fef2f2'
-                              : r.checked < 25
-                                ? '#fffbeb'
-                                : '#f0fdf4',
-                          border:
-                            r.checked < 10
-                              ? '1px solid #fecaca'
-                              : r.checked < 25
-                                ? '1px solid #fde68a'
-                                : '1px solid #bbf7d0',
-                          color:
-                            r.checked < 10
-                              ? '#b91c1c'
-                              : r.checked < 25
-                                ? '#b45309'
-                                : '#166534',
-                        }}
-                      >
-                        {r.checked < 10
-                          ? 'Low'
-                          : r.checked < 25
-                            ? 'Medium'
-                            : 'High'}
-                      </span>
-
-                      {/* Model color dot */}
-                      <span
-                        aria-hidden
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: 999,
-                          background: r.color,
-                          display: 'inline-block',
-                        }}
-                      />
-
-                      {/* Rank + name */}
                       <div
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: 8,
+                          gap: 12,
+                          minWidth: 0,
                         }}
                       >
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '4px 10px',
+                            borderRadius: 999,
+                            fontSize: 12,
+                            fontWeight: 800,
+                            background: reliabilityBg,
+                            border: reliabilityBorder,
+                            color: reliabilityColor,
+                            flex: '0 0 auto',
+                          }}
+                        >
+                          {reliabilityLabel}
+                        </span>
+
+                        <span
+                          aria-hidden
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: 999,
+                            background: r.color,
+                            display: 'inline-block',
+                            flex: '0 0 auto',
+                          }}
+                        />
+
                         <span
                           style={{
                             fontSize: 12,
                             fontWeight: 900,
                             padding: '3px 8px',
                             borderRadius: 999,
-                            background:
-                              filtered.findIndex(
-                                (x) => x.model_key === r.model_key,
-                              ) === 0
-                                ? '#f59e0b'
-                                : '#111827',
-                            color:
-                              filtered.findIndex(
-                                (x) => x.model_key === r.model_key,
-                              ) === 0
-                                ? '#111827'
-                                : '#fff',
+                            background: rank === 1 ? '#f59e0b' : '#111827',
+                            color: rank === 1 ? '#111827' : '#fff',
                             lineHeight: 1.2,
+                            flex: '0 0 auto',
                           }}
                           title="Rank by avg total hits"
                         >
-                          #
-                          {filtered.findIndex(
-                            (x) => x.model_key === r.model_key,
-                          ) + 1}
+                          #{rank}
                         </span>
 
-                        <span>{r.model_display_name}</span>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            minWidth: 0,
+                            flex: 1,
+                          }}
+                        >
+                          <span style={{ color: '#111827' }}>
+                            {r.model_display_name}
+                          </span>
 
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 800,
+                              color:
+                                delta === null
+                                  ? '#6b7280'
+                                  : delta > 0
+                                    ? '#16a34a'
+                                    : delta < 0
+                                      ? '#dc2626'
+                                      : '#6b7280',
+                              flex: '0 0 auto',
+                            }}
+                            title={
+                              delta === null
+                                ? 'New model'
+                                : delta > 0
+                                  ? `Up ${delta}`
+                                  : delta < 0
+                                    ? `Down ${Math.abs(delta)}`
+                                    : 'No change'
+                            }
+                          >
+                            {delta === null
+                              ? 'new'
+                              : delta > 0
+                                ? `↑${delta}`
+                                : delta < 0
+                                  ? `↓${Math.abs(delta)}`
+                                  : '•'}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {r.checked}/{r.total}
+                    </td>
+
+                    {/* CHECKED % */}
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {formatPctFromString(r.checked_rate_pct)}
+                    </td>
+
+                    {/* AVERAGE HITS */}
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {formatNum(r.avg_total_hits, 2)}
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          marginTop: 2,
+                        }}
+                      >
+                        main {formatNum(r.avg_main_n, 2)} • stars{' '}
+                        {formatNum(r.avg_stars_n, 2)}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          opacity: 0.9,
+                          color: reliabilityColor,
+                        }}
+                      >
+                        n={r.checked}
+                      </div>
+                    </td>
+
+                    {/* CONFIDENCE */}
+                    <td
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                        minWidth: 140,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 6,
+                        }}
+                      >
                         <span
                           style={{
                             fontSize: 12,
                             fontWeight: 800,
-                            color:
-                              (rankDeltaByKey[r.model_key] ?? 0) > 0
-                                ? '#16a34a'
-                                : (rankDeltaByKey[r.model_key] ?? 0) < 0
-                                  ? '#dc2626'
-                                  : '#6b7280',
+                            color: confColor,
                           }}
-                          title={
-                            rankDeltaByKey[r.model_key] === null
-                              ? 'New model'
-                              : (rankDeltaByKey[r.model_key] ?? 0) > 0
-                                ? `Up ${rankDeltaByKey[r.model_key]}`
-                                : (rankDeltaByKey[r.model_key] ?? 0) < 0
-                                  ? `Down ${Math.abs(rankDeltaByKey[r.model_key] ?? 0)}`
-                                  : 'No change'
-                          }
                         >
-                          {rankDeltaByKey[r.model_key] === null
-                            ? 'new'
-                            : (rankDeltaByKey[r.model_key] ?? 0) > 0
-                              ? `↑${rankDeltaByKey[r.model_key]}`
-                              : (rankDeltaByKey[r.model_key] ?? 0) < 0
-                                ? `↓${Math.abs(rankDeltaByKey[r.model_key] ?? 0)}`
-                                : '•'}
+                          {confLabel}
+                        </span>
+
+                        <div
+                          style={{
+                            height: 6,
+                            borderRadius: 999,
+                            background: '#eef2f7',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${Math.round(conf * 100)}%`,
+                              height: '100%',
+                              borderRadius: 999,
+                              background: confFill,
+                              transition: 'width 0.4s ease',
+                            }}
+                          />
+                        </div>
+
+                        <span style={{ fontSize: 11, color: '#6b7280' }}>
+                          score {formatNum(conf, 2)}
                         </span>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* CHECKED */}
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {r.checked}/{r.total}
-                  </td>
-
-                  {/* CHECKED % */}
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {formatPctFromString(r.checked_rate_pct)}
-                  </td>
-
-                  {/* AVG MAIN */}
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {formatNum(r.avg_main_n, 2)}
-                  </td>
-
-                  {/* AVG STARS */}
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {formatNum(r.avg_stars_n, 2)}
-                  </td>
-
-                  {/* AVG TOTAL */}
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {formatNum(r.avg_total_hits, 2)}
-
-                    <div
+                    {/* JACKPOT POTENTIAL */}
+                    <td
                       style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        opacity: 0.9,
-                        color:
-                          r.checked < 10
-                            ? '#b91c1c'
-                            : r.checked < 25
-                              ? '#b45309'
-                              : '#166534',
+                        padding: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                        whiteSpace: 'nowrap',
                       }}
                     >
-                      n={r.checked}
-                    </div>
-                  </td>
-
-                  {/* CONFIDENCE */}
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                      minWidth: 140,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                      }}
-                    >
-                      {/* Label */}
                       <span
                         style={{
                           fontSize: 12,
-                          fontWeight: 800,
-                          color:
-                            (r.confidence ?? 0) >= 0.66
-                              ? '#166534'
-                              : (r.confidence ?? 0) >= 0.33
-                                ? '#b45309'
-                                : '#b91c1c',
-                        }}
-                      >
-                        {(r.confidence ?? 0) >= 0.66
-                          ? 'High'
-                          : (r.confidence ?? 0) >= 0.33
-                            ? 'Medium'
-                            : 'Low'}
-                      </span>
-
-                      {/* Bar background */}
-                      <div
-                        style={{
-                          height: 6,
+                          fontWeight: 700,
+                          padding: '4px 10px',
                           borderRadius: 999,
-                          background: '#eef2f7',
-                          overflow: 'hidden',
+                          background: jackpotPotBg,
+                          border: jackpotPotBorder,
+                          color: jackpotPotColor,
                         }}
                       >
-                        {/* Bar fill */}
-                        <div
-                          style={{
-                            width: `${Math.round((r.confidence ?? 0) * 100)}%`,
-                            height: '100%',
-                            borderRadius: 999,
-                            background:
-                              (r.confidence ?? 0) >= 0.66
-                                ? '#22c55e'
-                                : (r.confidence ?? 0) >= 0.33
-                                  ? '#f59e0b'
-                                  : '#ef4444',
-                            transition: 'width 0.4s ease',
-                          }}
-                        />
-                      </div>
-
-                      {/* numeric */}
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: '#6b7280',
-                        }}
-                      >
-                        score {formatNum(r.confidence ?? 0, 2)}
+                        {jackpotPotLabel}
                       </span>
-                    </div>
-                  </td>
-
-                  {/* JACKPOTS */}
-                  <td
-                    style={{
-                      padding: '12px',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}
-                  >
-                    {r.jackpots}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

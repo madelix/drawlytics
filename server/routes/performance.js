@@ -71,20 +71,25 @@ router.get('/performance/models', async (req, res) => {
         model_display_name,
 
         COUNT(*)::int AS total_predictions,
-        COUNT(*) FILTER (WHERE status='checked')::int AS checked_predictions,
+        COUNT(*) FILTER (WHERE status = 'checked')::int AS checked_predictions,
 
         ROUND(
-          100.0 * COUNT(*) FILTER (WHERE status='checked')
-          / NULLIF(COUNT(*),0),
+          100.0 * COUNT(*) FILTER (WHERE status = 'checked')
+          / NULLIF(COUNT(*), 0),
           1
         ) AS checked_rate_pct,
 
         ROUND(AVG(matched_main)::numeric, 2) AS avg_main,
         ROUND(AVG(matched_stars)::numeric, 2) AS avg_stars,
 
+        COUNT(*) FILTER (
+          WHERE status = 'checked'
+            AND COALESCE(matched_main, 0) + COALESCE(matched_stars, 0) >= 3
+        )::int AS high_hit_predictions,
+
         SUM(
           CASE
-            WHEN matched_main=5 AND matched_stars=2
+            WHEN matched_main = 5 AND matched_stars = 2
             THEN 1 ELSE 0
           END
         )::int AS jackpots

@@ -42,3 +42,17 @@ a {
 a:hover {
   text-decoration: none;
 }
+
+/* Drawlytics: hide horizontal scrollbar but keep horizontal scroll */
+.dl-table-scroll {
+  overflow-x: auto;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge/IE */
+}
+
+.dl-table-scroll::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Edge */
+}
