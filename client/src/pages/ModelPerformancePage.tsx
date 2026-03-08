@@ -572,7 +572,7 @@ export default function ModelPerformancePage() {
                     borderRadius: 10,
                     padding: 10,
                     boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
-                    maxWidth: 320,
+                    maxWidth: 220,
                   }}
                 >
                   <div style={{ fontWeight: 800, marginBottom: 6 }}>
@@ -588,14 +588,17 @@ export default function ModelPerformancePage() {
                       {formatNum(meta.avg_stars_n, 2)}
                     </div>
                   </div>
-                  <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
-                    Checked: <strong>{meta.checked}</strong> / {meta.total} ·
-                    Checked %:{' '}
-                    <strong>
-                      {formatPctFromString(meta.checked_rate_pct)}
-                    </strong>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      fontSize: 12,
+                      color: '#6b7280',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    Checked: <strong>{meta.checked}</strong> / {meta.total}
                     <br />
-                    Jackpots: <strong>{meta.jackpots}</strong>
+                    3+ hits: <strong>{meta.high_hit_predictions}</strong>
                     <br />
                     4+ hits: <strong>{meta.four_plus_hits}</strong>
                     <br />
