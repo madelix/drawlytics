@@ -57,6 +57,11 @@ type ChartRow = {
   four_plus_hits: number;
   five_plus_hits: number;
 
+  high_hit_rate: number;
+  four_plus_rate: number;
+  five_plus_rate: number;
+  upside_score: number;
+
   color: string;
 };
 
@@ -121,6 +126,9 @@ export default function ModelPerformancePage() {
 
   const [rows, setRows] = useState<ModelPerformanceRow[]>([]);
   const [minChecked, setMinChecked] = useState(5);
+  const [rankingMode, setRankingMode] = useState<'average' | 'upside'>(
+    'average',
+  );
   const [rankDeltaByKey, setRankDeltaByKey] = useState<
     Record<string, number | null>
   >({});
@@ -159,6 +167,17 @@ export default function ModelPerformancePage() {
         const avgMain = toNum(r.avg_main, 0);
         const avgStars = toNum(r.avg_stars, 0);
         const avgTotal = avgMain + avgStars;
+        const checked = r.checked_predictions ?? 0;
+        const highHitCount = r.high_hit_predictions ?? 0;
+        const fourPlusCount = r.four_plus_hits ?? 0;
+        const fivePlusCount = r.five_plus_hits ?? 0;
+
+        const highHitRate = checked > 0 ? highHitCount / checked : 0;
+        const fourPlusRate = checked > 0 ? fourPlusCount / checked : 0;
+        const fivePlusRate = checked > 0 ? fivePlusCount / checked : 0;
+
+        const upsideScore =
+          highHitRate * 1 + fourPlusRate * 2 + fivePlusRate * 4;
 
         return {
           model_key: r.model_key,
@@ -178,6 +197,11 @@ export default function ModelPerformancePage() {
           four_plus_hits: r.four_plus_hits ?? 0,
           five_plus_hits: r.five_plus_hits ?? 0,
 
+          high_hit_rate: highHitRate,
+          four_plus_rate: fourPlusRate,
+          five_plus_rate: fivePlusRate,
+          upside_score: upsideScore,
+
           color: modelColor(r.model_key),
         };
       })
@@ -185,8 +209,14 @@ export default function ModelPerformancePage() {
   }, [rows]);
 
   const filtered = useMemo(() => {
-    return chartRows.filter((r) => r.checked >= minChecked);
-  }, [chartRows, minChecked]);
+    return chartRows
+      .filter((r) => r.checked >= minChecked)
+      .sort((a, b) =>
+        rankingMode === 'average'
+          ? b.avg_total_hits - a.avg_total_hits
+          : b.upside_score - a.upside_score,
+      );
+  }, [chartRows, minChecked, rankingMode]);
 
   useEffect(() => {
     const LS_KEY = 'drawlytics_model_ranks_prev';
@@ -705,14 +735,40 @@ export default function ModelPerformancePage() {
 
       <div
         style={{
-          fontWeight: 900,
-          fontSize: 18,
-          margin: '18px 0 8px',
-          color: '#111827',
-          textAlign: 'center',
+          display: 'flex',
+          justifyContent: 'center',
+          gap: 8,
+          flexWrap: 'wrap',
+          margin: '18px 0 10px',
         }}
       >
-        Model League Table
+        {[
+          { label: 'Average hits', value: 'average' as const },
+          { label: 'Upside score', value: 'upside' as const },
+        ].map((option) => {
+          const active = rankingMode === option.value;
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setRankingMode(option.value)}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 999,
+                border: '1px solid #e5e7eb',
+                background: active ? '#111827' : '#fff',
+                color: active ? '#fff' : '#111827',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: 12,
+              }}
+              aria-pressed={active}
+            >
+              {option.label}
+            </button>
+          );
+        })}
       </div>
 
       <div
