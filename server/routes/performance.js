@@ -83,9 +83,19 @@ router.get('/performance/models', async (req, res) => {
         ROUND(AVG(matched_stars)::numeric, 2) AS avg_stars,
 
         COUNT(*) FILTER (
-          WHERE status = 'checked'
-            AND COALESCE(matched_main, 0) + COALESCE(matched_stars, 0) >= 3
-        )::int AS high_hit_predictions,
+  WHERE status = 'checked'
+    AND COALESCE(matched_main, 0) + COALESCE(matched_stars, 0) >= 3
+)::int AS high_hit_predictions,
+
+COUNT(*) FILTER (
+  WHERE status = 'checked'
+    AND COALESCE(matched_main, 0) + COALESCE(matched_stars, 0) >= 4
+)::int AS four_plus_hits,
+
+COUNT(*) FILTER (
+  WHERE status = 'checked'
+    AND COALESCE(matched_main, 0) + COALESCE(matched_stars, 0) >= 5
+)::int AS five_plus_hits,
 
         SUM(
           CASE

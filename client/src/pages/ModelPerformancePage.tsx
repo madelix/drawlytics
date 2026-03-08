@@ -54,6 +54,8 @@ type ChartRow = {
   confidence: number;
   jackpots: number;
   high_hit_predictions: number;
+  four_plus_hits: number;
+  five_plus_hits: number;
 
   color: string;
 };
@@ -173,6 +175,8 @@ export default function ModelPerformancePage() {
           confidence: toNum((r as any).confidence, 0),
           jackpots: r.jackpots ?? 0,
           high_hit_predictions: r.high_hit_predictions ?? 0,
+          four_plus_hits: r.four_plus_hits ?? 0,
+          five_plus_hits: r.five_plus_hits ?? 0,
 
           color: modelColor(r.model_key),
         };
@@ -592,6 +596,10 @@ export default function ModelPerformancePage() {
                     </strong>
                     <br />
                     Jackpots: <strong>{meta.jackpots}</strong>
+                    <br />
+                    4+ hits: <strong>{meta.four_plus_hits}</strong>
+                    <br />
+                    5+ hits: <strong>{meta.five_plus_hits}</strong>
                   </div>
                 </div>
               );

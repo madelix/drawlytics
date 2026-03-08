@@ -17,6 +17,8 @@ export type ModelPerformanceRow = {
 
   jackpots: number;
   high_hit_predictions: number;
+  four_plus_hits: number;
+  five_plus_hits: number;
 };
 
 export type ModelsPerformanceResponse = {
