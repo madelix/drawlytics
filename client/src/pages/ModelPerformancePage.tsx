@@ -61,6 +61,7 @@ type ChartRow = {
   four_plus_rate: number;
   five_plus_rate: number;
   upside_score: number;
+  personality: 'stable' | 'aggressive' | 'balanced' | 'experimental';
 
   color: string;
 };
@@ -179,6 +180,18 @@ export default function ModelPerformancePage() {
         const upsideScore =
           highHitRate * 1 + fourPlusRate * 2 + fivePlusRate * 4;
 
+        let personality: ChartRow['personality'];
+
+        if (checked < 5) {
+          personality = 'experimental';
+        } else if (upsideScore >= 0.35 && avgTotal < 1.0) {
+          personality = 'aggressive';
+        } else if (avgTotal >= 1.0 && upsideScore >= 0.15) {
+          personality = 'balanced';
+        } else {
+          personality = 'stable';
+        }
+
         return {
           model_key: r.model_key,
           model_display_name: r.model_display_name,
@@ -201,6 +214,7 @@ export default function ModelPerformancePage() {
           four_plus_rate: fourPlusRate,
           five_plus_rate: fivePlusRate,
           upside_score: upsideScore,
+          personality,
 
           color: modelColor(r.model_key),
         };
@@ -972,6 +986,36 @@ export default function ModelPerformancePage() {
                         >
                           <span style={{ color: '#111827' }}>
                             {r.model_display_name}
+                          </span>
+
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              letterSpacing: '0.04em',
+                              textTransform: 'uppercase',
+                              padding: '3px 8px',
+                              borderRadius: 999,
+                              background:
+                                r.personality === 'stable'
+                                  ? '#eff6ff'
+                                  : r.personality === 'aggressive'
+                                    ? '#fef2f2'
+                                    : r.personality === 'balanced'
+                                      ? '#ecfdf5'
+                                      : '#faf5ff',
+                              color:
+                                r.personality === 'stable'
+                                  ? '#1d4ed8'
+                                  : r.personality === 'aggressive'
+                                    ? '#b91c1c'
+                                    : r.personality === 'balanced'
+                                      ? '#166534'
+                                      : '#7c3aed',
+                              flex: '0 0 auto',
+                            }}
+                          >
+                            {r.personality}
                           </span>
 
                           <span
