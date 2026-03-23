@@ -14,6 +14,7 @@ export type ModelPerformanceRow = {
 
   avg_main: string;
   avg_stars: string;
+  recent_avg_total_hits: string;
 
   jackpots: number;
   high_hit_predictions: number;

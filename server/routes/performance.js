@@ -45,12 +45,13 @@ router.get('/performance/models', async (req, res) => {
               ''
             )
           END AS model_key,
+          draw_date,
           status,
           matched_main,
           matched_stars
         FROM base
       ),
-      named AS (
+        named AS (
         SELECT
           model_key,
           CASE model_key
@@ -61,11 +62,26 @@ router.get('/performance/models', async (req, res) => {
             WHEN 'overdue' THEN 'Overdue'
             ELSE INITCAP(REPLACE(model_key, '_', ' '))
           END AS model_display_name,
+          draw_date,
           status,
           matched_main,
           matched_stars
         FROM normalized
+      ),
+      ranked_checked AS (
+        SELECT
+          model_key,
+          draw_date,
+          matched_main,
+          matched_stars,
+          ROW_NUMBER() OVER (
+            PARTITION BY model_key
+            ORDER BY draw_date DESC
+          ) AS recency_rank
+        FROM named
+        WHERE status = 'checked'
       )
+
       SELECT
         model_key,
         model_display_name,
@@ -81,6 +97,13 @@ router.get('/performance/models', async (req, res) => {
 
         ROUND(AVG(matched_main)::numeric, 2) AS avg_main,
         ROUND(AVG(matched_stars)::numeric, 2) AS avg_stars,
+
+        ROUND((
+  SELECT AVG(rc.matched_main + rc.matched_stars)::numeric
+  FROM ranked_checked rc
+  WHERE rc.model_key = named.model_key
+    AND rc.recency_rank <= 5
+), 2) AS recent_avg_total_hits,
 
         COUNT(*) FILTER (
   WHERE status = 'checked'

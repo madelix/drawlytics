@@ -22,6 +22,14 @@ function formatNum(n: number, decimals = 2) {
   return n.toFixed(decimals);
 }
 
+const MODEL_COLOR_MAP: Record<string, string> = {
+  balanced_hot_cold: '#7C3AED', // purple
+  hot_focused: '#EF4444', // red
+  cold_focused: '#2563EB', // blue
+  overdue: '#F97316', // orange
+  pure_random: '#22C55E', // green
+};
+
 // Stable “hash -> hue” so each model always gets the same colour
 function hashString(str: string) {
   let h = 2166136261;
@@ -130,8 +138,13 @@ export default function ModelPerformancePage() {
   const [rankingMode, setRankingMode] = useState<'average' | 'upside'>(
     'average',
   );
+
   const [rankDeltaByKey, setRankDeltaByKey] = useState<
     Record<string, number | null>
+  >({});
+
+  const [trendByKey, setTrendByKey] = useState<
+    Record<string, 'up' | 'down' | 'flat' | 'new'>
   >({});
 
   async function load() {
@@ -216,7 +229,7 @@ export default function ModelPerformancePage() {
           upside_score: upsideScore,
           personality,
 
-          color: modelColor(r.model_key),
+          color: MODEL_COLOR_MAP[r.model_key] ?? modelColor(r.model_key),
         };
       })
       .sort((a, b) => b.avg_total_hits - a.avg_total_hits);
@@ -235,9 +248,16 @@ export default function ModelPerformancePage() {
   useEffect(() => {
     const LS_KEY = 'drawlytics_model_ranks_prev';
 
+    const LS_KEY_PERF = 'drawlytics_model_perf_prev';
+
     const currentRanks: Record<string, number> = {};
     filtered.forEach((r, i) => {
       currentRanks[r.model_key] = i + 1;
+    });
+
+    const currentPerf: Record<string, number> = {};
+    filtered.forEach((r) => {
+      currentPerf[r.model_key] = r.avg_total_hits;
     });
 
     let prevRanks: Record<string, number> | null = null;
@@ -248,6 +268,16 @@ export default function ModelPerformancePage() {
       prevRanks = null;
     }
 
+    let prevPerf: Record<string, number> | null = null;
+    try {
+      const rawPerf = localStorage.getItem(LS_KEY_PERF);
+      prevPerf = rawPerf
+        ? (JSON.parse(rawPerf) as Record<string, number>)
+        : null;
+    } catch {
+      prevPerf = null;
+    }
+
     const deltas: Record<string, number | null> = {};
     for (const r of filtered) {
       const prev = prevRanks?.[r.model_key];
@@ -255,10 +285,29 @@ export default function ModelPerformancePage() {
       deltas[r.model_key] = typeof prev === 'number' ? prev - cur : null;
     }
 
+    const trends: Record<string, 'up' | 'down' | 'flat' | 'new'> = {};
+
+    for (const r of filtered) {
+      const prev = prevPerf?.[r.model_key];
+      const cur = currentPerf[r.model_key];
+
+      if (typeof prev !== 'number') {
+        trends[r.model_key] = 'new';
+      } else {
+        const diff = cur - prev;
+
+        if (diff > 0.05) trends[r.model_key] = 'up';
+        else if (diff < -0.05) trends[r.model_key] = 'down';
+        else trends[r.model_key] = 'flat';
+      }
+    }
+
     setRankDeltaByKey(deltas);
+    setTrendByKey(trends);
 
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(currentRanks));
+      localStorage.setItem(LS_KEY_PERF, JSON.stringify(currentPerf));
     } catch {
       // ignore
     }
@@ -844,6 +893,7 @@ export default function ModelPerformancePage() {
                 const rank =
                   filtered.findIndex((x) => x.model_key === r.model_key) + 1;
                 const delta = rankDeltaByKey[r.model_key];
+                const trend = trendByKey[r.model_key] ?? 'new';
 
                 const reliabilityBg =
                   r.checked < 10
@@ -933,34 +983,6 @@ export default function ModelPerformancePage() {
                       >
                         <span
                           style={{
-                            display: 'inline-block',
-                            padding: '4px 10px',
-                            borderRadius: 999,
-                            fontSize: 12,
-                            fontWeight: 800,
-                            background: reliabilityBg,
-                            border: reliabilityBorder,
-                            color: reliabilityColor,
-                            flex: '0 0 auto',
-                          }}
-                        >
-                          {reliabilityLabel}
-                        </span>
-
-                        <span
-                          aria-hidden
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: 999,
-                            background: r.color,
-                            display: 'inline-block',
-                            flex: '0 0 auto',
-                          }}
-                        />
-
-                        <span
-                          style={{
                             fontSize: 12,
                             fontWeight: 900,
                             padding: '3px 8px',
@@ -1042,6 +1064,50 @@ export default function ModelPerformancePage() {
                                     : 'No change'
                             }
                           >
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                letterSpacing: '0.04em',
+                                textTransform: 'uppercase',
+                                padding: '3px 8px',
+                                borderRadius: 999,
+                                background:
+                                  trend === 'up'
+                                    ? '#ecfdf5'
+                                    : trend === 'down'
+                                      ? '#fef2f2'
+                                      : trend === 'flat'
+                                        ? '#f8fafc'
+                                        : '#faf5ff',
+                                color:
+                                  trend === 'up'
+                                    ? '#166534'
+                                    : trend === 'down'
+                                      ? '#b91c1c'
+                                      : trend === 'flat'
+                                        ? '#475569'
+                                        : '#7c3aed',
+                                flex: '0 0 auto',
+                              }}
+                              title={
+                                trend === 'up'
+                                  ? 'Recent performance improving'
+                                  : trend === 'down'
+                                    ? 'Recent performance declining'
+                                    : trend === 'flat'
+                                      ? 'Recent performance stable'
+                                      : 'Not enough previous data yet'
+                              }
+                            >
+                              {trend === 'up'
+                                ? '↑ hot'
+                                : trend === 'down'
+                                  ? '↓ cool'
+                                  : trend === 'flat'
+                                    ? '→ stable'
+                                    : 'new'}
+                            </span>
                             {delta === null
                               ? 'new'
                               : delta > 0
@@ -1054,14 +1120,32 @@ export default function ModelPerformancePage() {
                       </div>
                     </td>
 
-                    <td
-                      style={{
-                        padding: '12px',
-                        borderBottom: '1px solid #f1f5f9',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {r.checked}/{r.total}
+                    <td>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <span>
+                          {r.checked}/{r.total}
+                        </span>
+
+                        <span
+                          title={`Sample reliability: ${reliabilityLabel}`}
+                          style={{
+                            fontSize: 12,
+                            opacity: 0.7,
+                          }}
+                        >
+                          {r.checked >= 25
+                            ? '🟢'
+                            : r.checked >= 10
+                              ? '🟡'
+                              : '🔴'}
+                        </span>
+                      </div>
                     </td>
 
                     {/* CHECKED % */}
