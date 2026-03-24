@@ -87,7 +87,9 @@ router.get('/performance/models', async (req, res) => {
         model_display_name,
 
         COUNT(*)::int AS total_predictions,
-        COUNT(*) FILTER (WHERE status = 'checked')::int AS checked_predictions,
+        COUNT(*) FILTER (
+  WHERE LOWER(TRIM(status)) = 'checked'
+)::int AS checked_predictions,
 
         ROUND(
           100.0 * COUNT(*) FILTER (WHERE status = 'checked')

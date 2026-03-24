@@ -58,6 +58,7 @@ type ChartRow = {
   avg_main_n: number;
   avg_stars_n: number;
   avg_total_hits: number;
+  recent_avg_total_hits_n: number;
 
   confidence: number;
   jackpots: number;
@@ -69,6 +70,7 @@ type ChartRow = {
   four_plus_rate: number;
   five_plus_rate: number;
   upside_score: number;
+  trend: 'up' | 'down' | 'flat';
   personality: 'stable' | 'aggressive' | 'balanced' | 'experimental';
 
   color: string;
@@ -134,7 +136,7 @@ export default function ModelPerformancePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [rows, setRows] = useState<ModelPerformanceRow[]>([]);
-  const [minChecked, setMinChecked] = useState(5);
+  const [minChecked, setMinChecked] = useState(0);
   const [rankingMode, setRankingMode] = useState<'average' | 'upside'>(
     'average',
   );
@@ -181,6 +183,7 @@ export default function ModelPerformancePage() {
         const avgMain = toNum(r.avg_main, 0);
         const avgStars = toNum(r.avg_stars, 0);
         const avgTotal = avgMain + avgStars;
+        const recentAvgTotal = toNum(r.recent_avg_total_hits, 0);
         const checked = r.checked_predictions ?? 0;
         const highHitCount = r.high_hit_predictions ?? 0;
         const fourPlusCount = r.four_plus_hits ?? 0;
@@ -192,6 +195,16 @@ export default function ModelPerformancePage() {
 
         const upsideScore =
           highHitRate * 1 + fourPlusRate * 2 + fivePlusRate * 4;
+
+        let trend: 'up' | 'down' | 'flat';
+
+        if (recentAvgTotal > avgTotal + 0.05) {
+          trend = 'up';
+        } else if (recentAvgTotal < avgTotal - 0.05) {
+          trend = 'down';
+        } else {
+          trend = 'flat';
+        }
 
         let personality: ChartRow['personality'];
 
@@ -216,6 +229,7 @@ export default function ModelPerformancePage() {
           avg_main_n: avgMain,
           avg_stars_n: avgStars,
           avg_total_hits: avgTotal,
+          recent_avg_total_hits_n: recentAvgTotal,
 
           confidence: toNum((r as any).confidence, 0),
           jackpots: r.jackpots ?? 0,
@@ -227,6 +241,7 @@ export default function ModelPerformancePage() {
           four_plus_rate: fourPlusRate,
           five_plus_rate: fivePlusRate,
           upside_score: upsideScore,
+          trend,
           personality,
 
           color: MODEL_COLOR_MAP[r.model_key] ?? modelColor(r.model_key),
@@ -321,18 +336,24 @@ export default function ModelPerformancePage() {
     return filtered.length > 0 ? filtered[0] : null;
   }, [filtered]);
 
-  const mostImproved = useMemo(() => {
-    let best: { row: ChartRow; delta: number } | null = null;
+  const biggestMover = useMemo(() => {
+    const movers = filtered.filter((r) => r.trend !== 'flat');
+    if (movers.length === 0) return null;
 
-    for (const r of filtered) {
-      const d = rankDeltaByKey[r.model_key];
-      if (typeof d !== 'number') continue;
-      if (d <= 0) continue;
+    return [...movers].sort((a, b) => {
+      const aDiff = Math.abs(a.recent_avg_total_hits_n - a.avg_total_hits);
+      const bDiff = Math.abs(b.recent_avg_total_hits_n - b.avg_total_hits);
+      return bDiff - aDiff;
+    })[0];
+  }, [filtered]);
 
-      if (!best || d > best.delta) best = { row: r, delta: d };
-    }
-    return best;
-  }, [filtered, rankDeltaByKey]);
+  const heatingUp = useMemo(() => {
+    return filtered.filter((r) => r.trend === 'up');
+  }, [filtered]);
+
+  const coolingDown = useMemo(() => {
+    return filtered.filter((r) => r.trend === 'down');
+  }, [filtered]);
 
   const byLabel = useMemo(() => {
     const m = new Map<string, ChartRow>();
@@ -388,67 +409,6 @@ export default function ModelPerformancePage() {
               background: '#fff',
             }}
           />
-        </label>
-
-        <label style={{ fontSize: 14, color: '#6b7280' }}>
-          Min checked&nbsp;
-          <input
-            type="number"
-            value={minChecked}
-            min={0}
-            max={9999}
-            onChange={(e) =>
-              setMinChecked(Math.max(0, parseInt(e.target.value || '0', 10)))
-            }
-            style={{
-              width: 110,
-              padding: '8px 10px',
-              borderRadius: 10,
-              border: '1px solid #e5e7eb',
-              background: '#fff',
-            }}
-          />
-          <div
-            style={{
-              display: 'flex',
-              gap: 6,
-              marginTop: 6,
-              flexWrap: 'wrap',
-            }}
-          >
-            {[
-              { label: 'All', v: 0 },
-              { label: 'Small', v: 5 },
-              { label: 'Medium', v: 25 },
-              { label: 'Large', v: 100 },
-            ].map((p) => {
-              const active = minChecked === p.v;
-              return (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => setMinChecked(p.v)}
-                  style={{
-                    padding: '6px 10px',
-                    borderRadius: 999,
-                    border: '1px solid #e5e7eb',
-                    background: active ? '#111827' : '#fff',
-                    color: active ? '#fff' : '#111827',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    fontSize: 12,
-                  }}
-                  aria-pressed={active}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ marginTop: 6, fontSize: 12, color: '#9ca3af' }}>
-            Hide models with fewer than <strong>{minChecked}</strong> checked
-            predictions.
-          </div>
         </label>
 
         <button
@@ -519,27 +479,24 @@ export default function ModelPerformancePage() {
         <Card
           title="Most improved"
           value={
-            mostImproved ? mostImproved.row.model_display_name : 'No change yet'
+            biggestMover ? biggestMover.model_display_name : 'No change yet'
           }
           sub={
-            mostImproved ? (
-              <>
-                Rank movement: <strong>↑{mostImproved.delta}</strong> since last
-                view.
-              </>
+            biggestMover ? (
+              <>Recent performance shift based on latest checked draws.</>
             ) : (
-              <>No model has improved since the last snapshot.</>
+              <>No model has moved meaningfully in recent checked draws.</>
             )
           }
           right={
-            mostImproved ? (
+            biggestMover ? (
               <span
                 aria-hidden
                 style={{
                   width: 12,
                   height: 12,
                   borderRadius: 999,
-                  background: mostImproved.row.color,
+                  background: biggestMover.color,
                   display: 'inline-block',
                   marginTop: 2,
                 }}
@@ -550,44 +507,35 @@ export default function ModelPerformancePage() {
         />
 
         <Card
-          title="Checked predictions"
+          title="Heating up"
           value={
-            <>
-              {summary.checked} <span style={{ fontWeight: 700 }}>/</span>{' '}
-              {summary.total}
-            </>
+            heatingUp.length > 0 ? heatingUp[0].model_display_name : 'None yet'
           }
           sub={
-            checkedCoveragePct === null ? (
-              <>No predictions yet.</>
-            ) : (
+            heatingUp.length > 0 ? (
               <>
-                Coverage: <strong>{checkedCoveragePct.toFixed(1)}%</strong> of
-                saved predictions are checked.
-              </>
-            )
-          }
-        />
-      </div>
-
-      <div style={{ margin: '0 auto 14px', maxWidth: 980 }}>
-        <Card
-          title="Models shown"
-          value={
-            <>
-              {filtered.length} <span style={{ fontWeight: 700 }}>/</span>{' '}
-              {rows.length}
-            </>
-          }
-          sub={
-            hiddenCount > 0 ? (
-              <>
-                Hidden by filter: <strong>{hiddenCount}</strong> (need ≥{' '}
-                <strong>{minChecked}</strong> checked)
+                Recent trend: <strong>improving</strong> based on latest
+                performance snapshot.
               </>
             ) : (
-              <>Nothing hidden by the filter.</>
+              <>No models are currently trending up.</>
             )
+          }
+          right={
+            heatingUp.length > 0 ? (
+              <span
+                aria-hidden
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 999,
+                  background: heatingUp[0].color,
+                  display: 'inline-block',
+                  marginTop: 2,
+                }}
+                title="Model colour"
+              />
+            ) : null
           }
         />
       </div>
@@ -842,7 +790,9 @@ export default function ModelPerformancePage() {
           marginBottom: 10,
         }}
       >
-        Ranked by average hits per prediction
+        {rankingMode === 'average'
+          ? 'Ranked by average hits per prediction'
+          : 'Ranked by upside score'}
       </div>
 
       {/* Table */}
@@ -867,7 +817,6 @@ export default function ModelPerformancePage() {
                 {[
                   'Model',
                   'Checked',
-                  'Checked %',
                   'Average hits',
                   'Confidence',
                   'Jackpot potential',
@@ -893,7 +842,7 @@ export default function ModelPerformancePage() {
                 const rank =
                   filtered.findIndex((x) => x.model_key === r.model_key) + 1;
                 const delta = rankDeltaByKey[r.model_key];
-                const trend = trendByKey[r.model_key] ?? 'new';
+                const trend = r.trend;
 
                 const reliabilityBg =
                   r.checked < 10
@@ -1020,24 +969,31 @@ export default function ModelPerformancePage() {
                               borderRadius: 999,
                               background:
                                 r.personality === 'stable'
-                                  ? '#eff6ff'
+                                  ? '#eef2ff' // soft blue
                                   : r.personality === 'aggressive'
-                                    ? '#fef2f2'
+                                    ? '#fff7ed' // orange (upside / risk)
                                     : r.personality === 'balanced'
-                                      ? '#ecfdf5'
-                                      : '#faf5ff',
+                                      ? '#ecfdf5' // green
+                                      : '#faf5ff', // purple (new)
+
                               color:
                                 r.personality === 'stable'
-                                  ? '#1d4ed8'
+                                  ? '#3730a3'
                                   : r.personality === 'aggressive'
-                                    ? '#b91c1c'
+                                    ? '#c2410c'
                                     : r.personality === 'balanced'
                                       ? '#166534'
                                       : '#7c3aed',
                               flex: '0 0 auto',
                             }}
                           >
-                            {r.personality}
+                            {r.personality === 'stable'
+                              ? 'steady'
+                              : r.personality === 'aggressive'
+                                ? 'upside'
+                                : r.personality === 'balanced'
+                                  ? 'balanced'
+                                  : 'new'}
                           </span>
 
                           <span
@@ -1128,7 +1084,7 @@ export default function ModelPerformancePage() {
                           gap: 6,
                         }}
                       >
-                        <span>
+                        <span title="Checked vs total predictions (only checked are evaluated)">
                           {r.checked}/{r.total}
                         </span>
 
@@ -1148,17 +1104,6 @@ export default function ModelPerformancePage() {
                       </div>
                     </td>
 
-                    {/* CHECKED % */}
-                    <td
-                      style={{
-                        padding: '12px',
-                        borderBottom: '1px solid #f1f5f9',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {formatPctFromString(r.checked_rate_pct)}
-                    </td>
-
                     {/* AVERAGE HITS */}
                     <td
                       style={{
@@ -1168,17 +1113,20 @@ export default function ModelPerformancePage() {
                       }}
                     >
                       {formatNum(r.avg_total_hits, 2)}
-                      <div
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: '#6b7280',
-                          marginTop: 2,
-                        }}
-                      >
-                        main {formatNum(r.avg_main_n, 2)} • stars{' '}
-                        {formatNum(r.avg_stars_n, 2)}
-                      </div>
+
+                      {rankingMode === 'upside' && (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            marginTop: 2,
+                          }}
+                        >
+                          upside {formatNum(r.upside_score, 2)}
+                        </div>
+                      )}
+
                       <div
                         style={{
                           fontSize: 11,
@@ -1270,10 +1218,6 @@ export default function ModelPerformancePage() {
           </table>
         </div>
       </div>
-
-      <p style={{ marginTop: 14, textAlign: 'center', color: '#6b7280' }}>
-        Minimum sample size applied: {minChecked} checked predictions.
-      </p>
     </div>
   );
 }
