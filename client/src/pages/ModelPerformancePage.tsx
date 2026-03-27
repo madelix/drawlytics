@@ -71,6 +71,8 @@ type ChartRow = {
   five_plus_rate: number;
   upside_score: number;
   trend: 'up' | 'down' | 'flat';
+  trend_delta: number;
+  consistency_score: number;
   personality: 'stable' | 'aggressive' | 'balanced' | 'experimental';
 
   color: string;
@@ -137,9 +139,9 @@ export default function ModelPerformancePage() {
 
   const [rows, setRows] = useState<ModelPerformanceRow[]>([]);
   const [minChecked, setMinChecked] = useState(0);
-  const [rankingMode, setRankingMode] = useState<'average' | 'upside'>(
-    'average',
-  );
+  const [rankingMode, setRankingMode] = useState<
+    'average' | 'upside' | 'consistency'
+  >('average');
 
   const [rankDeltaByKey, setRankDeltaByKey] = useState<
     Record<string, number | null>
@@ -183,7 +185,10 @@ export default function ModelPerformancePage() {
         const avgMain = toNum(r.avg_main, 0);
         const avgStars = toNum(r.avg_stars, 0);
         const avgTotal = avgMain + avgStars;
-        const recentAvgTotal = toNum(r.recent_avg_total_hits, 0);
+        const recentAvgTotal = toNum(
+          (r as any).recent_avg_total_hits,
+          avgTotal,
+        );
         const checked = r.checked_predictions ?? 0;
         const highHitCount = r.high_hit_predictions ?? 0;
         const fourPlusCount = r.four_plus_hits ?? 0;
@@ -192,15 +197,21 @@ export default function ModelPerformancePage() {
         const highHitRate = checked > 0 ? highHitCount / checked : 0;
         const fourPlusRate = checked > 0 ? fourPlusCount / checked : 0;
         const fivePlusRate = checked > 0 ? fivePlusCount / checked : 0;
+        const sampleFactor = Math.min(1, checked / 20); // scales 0 → 1
+
+        const consistencyScore =
+          (avgTotal * 0.6 + highHitRate * 0.4) * sampleFactor;
 
         const upsideScore =
           highHitRate * 1 + fourPlusRate * 2 + fivePlusRate * 4;
 
         let trend: 'up' | 'down' | 'flat';
 
-        if (recentAvgTotal > avgTotal + 0.05) {
+        const delta = recentAvgTotal - avgTotal;
+
+        if (delta > 0.05) {
           trend = 'up';
-        } else if (recentAvgTotal < avgTotal - 0.05) {
+        } else if (delta < -0.05) {
           trend = 'down';
         } else {
           trend = 'flat';
@@ -230,6 +241,8 @@ export default function ModelPerformancePage() {
           avg_stars_n: avgStars,
           avg_total_hits: avgTotal,
           recent_avg_total_hits_n: recentAvgTotal,
+          trend_delta: delta,
+          consistency_score: consistencyScore,
 
           confidence: toNum((r as any).confidence, 0),
           jackpots: r.jackpots ?? 0,
@@ -256,7 +269,9 @@ export default function ModelPerformancePage() {
       .sort((a, b) =>
         rankingMode === 'average'
           ? b.avg_total_hits - a.avg_total_hits
-          : b.upside_score - a.upside_score,
+          : rankingMode === 'upside'
+            ? b.upside_score - a.upside_score
+            : b.consistency_score - a.consistency_score,
       );
   }, [chartRows, minChecked, rankingMode]);
 
@@ -756,6 +771,7 @@ export default function ModelPerformancePage() {
         {[
           { label: 'Average hits', value: 'average' as const },
           { label: 'Upside score', value: 'upside' as const },
+          { label: 'Consistency', value: 'consistency' as const },
         ].map((option) => {
           const active = rankingMode === option.value;
 
@@ -792,7 +808,9 @@ export default function ModelPerformancePage() {
       >
         {rankingMode === 'average'
           ? 'Ranked by average hits per prediction'
-          : 'Ranked by upside score'}
+          : rankingMode === 'upside'
+            ? 'Ranked by upside score'
+            : 'Ranked by consistency score'}
       </div>
 
       {/* Table */}
@@ -1057,12 +1075,10 @@ export default function ModelPerformancePage() {
                               }
                             >
                               {trend === 'up'
-                                ? '↑ hot'
+                                ? `↑ +${formatNum(r.trend_delta, 2)} hot`
                                 : trend === 'down'
-                                  ? '↓ cool'
-                                  : trend === 'flat'
-                                    ? '→ stable'
-                                    : 'new'}
+                                  ? `↓ ${formatNum(r.trend_delta, 2)} cool`
+                                  : '→ 0.00 stable'}
                             </span>
                             {delta === null
                               ? 'new'
@@ -1124,6 +1140,19 @@ export default function ModelPerformancePage() {
                           }}
                         >
                           upside {formatNum(r.upside_score, 2)}
+                        </div>
+                      )}
+
+                      {rankingMode === 'consistency' && (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            marginTop: 2,
+                          }}
+                        >
+                          consistency {formatNum(r.consistency_score, 2)}
                         </div>
                       )}
 
