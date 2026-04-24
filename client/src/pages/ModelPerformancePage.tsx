@@ -73,6 +73,7 @@ type ChartRow = {
   trend: 'up' | 'down' | 'flat';
   trend_delta: number;
   consistency_score: number;
+  recommendation_score: number;
   personality: 'stable' | 'aggressive' | 'balanced' | 'experimental';
 
   color: string;
@@ -242,6 +243,12 @@ export default function ModelPerformancePage() {
 
         let trend: 'up' | 'down' | 'flat';
 
+        const recommendationScore =
+          avgTotal * 0.35 +
+          upsideScore * 0.25 +
+          consistencyScore * 0.25 +
+          confidenceScore * 0.15;
+
         const delta = recentAvgTotal - avgTotal;
 
         if (delta > 0.05) {
@@ -280,6 +287,7 @@ export default function ModelPerformancePage() {
           recent_avg_total_hits_n: recentAvgTotal,
           trend_delta: delta,
           consistency_score: consistencyScore,
+          recommendation_score: recommendationScore,
 
           confidence: confidenceScore,
           jackpots: r.jackpots ?? 0,
@@ -408,6 +416,14 @@ export default function ModelPerformancePage() {
   const bestModel = useMemo(() => {
     return filtered.length > 0 ? filtered[0] : null;
   }, [filtered]);
+
+  const recommendedModel = useMemo(() => {
+    return (
+      [...chartRows].sort(
+        (a, b) => b.recommendation_score - a.recommendation_score,
+      )[0] ?? null
+    );
+  }, [chartRows]);
 
   const biggestMover = useMemo(() => {
     const movers = filtered.filter((r) => r.trend !== 'flat');
@@ -611,29 +627,27 @@ export default function ModelPerformancePage() {
         />
 
         <Card
-          title="Heating up"
-          value={
-            heatingUp.length > 0 ? heatingUp[0].model_display_name : 'None yet'
-          }
+          title="Recommended"
+          value={recommendedModel ? recommendedModel.model_display_name : '—'}
           sub={
-            heatingUp.length > 0 ? (
+            recommendedModel ? (
               <>
-                Recent trend: <strong>improving</strong> based on latest
-                performance snapshot.
+                Best overall blend of average, upside, consistency and
+                confidence.
               </>
             ) : (
-              <>No models are currently trending up.</>
+              <>No recommendation available yet.</>
             )
           }
           right={
-            heatingUp.length > 0 ? (
+            recommendedModel ? (
               <span
                 aria-hidden
                 style={{
                   width: 12,
                   height: 12,
                   borderRadius: 999,
-                  background: heatingUp[0].color,
+                  background: recommendedModel.color,
                   display: 'inline-block',
                   marginTop: 2,
                 }}
