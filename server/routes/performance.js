@@ -204,11 +204,13 @@ router.get('/performance/model-history', async (req, res) => {
         FROM base
       )
       SELECT
-        draw_date,
-        total_hits::numeric AS avg_total_hits
-      FROM normalized
-      WHERE model_key = $2
-      ORDER BY draw_date ASC;
+  draw_date,
+  model_key,
+  total_hits::numeric AS avg_total_hits
+FROM normalized
+WHERE model_key = $2
+   OR model_key = 'pure_random'
+ORDER BY draw_date ASC;
       `,
       [lottery, modelKey],
     );
@@ -216,7 +218,9 @@ router.get('/performance/model-history', async (req, res) => {
     res.json({
       ok: true,
       model_key: modelKey,
-      history: rows,
+      baseline_model_key: 'pure_random',
+      history: rows.filter((r) => r.model_key === modelKey),
+      baseline_history: rows.filter((r) => r.model_key === 'pure_random'),
     });
   } catch (err) {
     console.error('GET /performance/model-history failed:', err);

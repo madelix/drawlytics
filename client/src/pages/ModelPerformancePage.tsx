@@ -191,6 +191,9 @@ export default function ModelPerformancePage() {
 
   const [rows, setRows] = useState<ModelPerformanceRow[]>([]);
   const [history, setHistory] = useState<ModelHistoryPoint[]>([]);
+  const [baselineHistory, setBaselineHistory] = useState<ModelHistoryPoint[]>(
+    [],
+  );
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [minChecked, setMinChecked] = useState(0);
@@ -235,6 +238,7 @@ export default function ModelPerformancePage() {
       });
 
       setHistory(data.history || []);
+      setBaselineHistory(data.baseline_history || []);
     } catch (e: any) {
       setHistory([]);
       setHistoryError(e?.message ?? 'Failed to load model history');
@@ -488,6 +492,7 @@ export default function ModelPerformancePage() {
   useEffect(() => {
     if (!selectedModelKey) {
       setHistory([]);
+      setBaselineHistory([]);
       return;
     }
 
@@ -564,16 +569,19 @@ export default function ModelPerformancePage() {
   }, [summary.total, summary.checked]);
 
   const historyChartData = useMemo(() => {
+    if (!selectedModel) return [];
+
     return [
       {
-        id: selectedModel?.model_display_name ?? 'Selected model',
+        id: selectedModel.model_display_name,
         data: history.map((point, index) => ({
           x: index + 1,
           y: toNum(point.avg_total_hits, 0),
         })),
+        color: selectedModel.color,
       },
     ];
-  }, [history, selectedModel?.model_display_name]);
+  }, [history, selectedModel]);
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '28px 16px' }}>
@@ -976,13 +984,20 @@ export default function ModelPerformancePage() {
               return (
                 <>
                   {history.length} recent draws · <strong>{trend}</strong>{' '}
-                  performance ({formatNum(diff, 2)})
+                  performance ({formatNum(diff, 2)}) ·{' '}
+                  <span style={{ opacity: 0.7 }}>
+                    {history.length < 10
+                      ? 'low reliability'
+                      : history.length < 25
+                        ? 'moderate reliability'
+                        : 'high reliability'}
+                  </span>
                 </>
               );
             })()}
           </div>
 
-          <div style={{ height: 240 }}>
+          <div style={{ height: 210 }}>
             <svg width="100%" height="100%" viewBox="0 0 400 200">
               {[0, 1, 2, 3, 4, 5].map((v) => {
                 const y = 180 - v * 30;
@@ -1050,7 +1065,72 @@ export default function ModelPerformancePage() {
                   />
                 );
               })}
+
+              {selectedModel?.model_key !== 'pure_random' &&
+                baselineHistory.length > 0 &&
+                baselineHistory.map((point, i) => {
+                  if (i === 0) return null;
+
+                  const prev = baselineHistory[i - 1];
+
+                  const x1 =
+                    ((i - 1) / (baselineHistory.length - 1)) * 380 + 10;
+                  const y1 = 180 - toNum(prev.avg_total_hits, 0) * 30;
+
+                  const x2 = (i / (baselineHistory.length - 1)) * 380 + 10;
+                  const y2 = 180 - toNum(point.avg_total_hits, 0) * 30;
+
+                  return (
+                    <line
+                      key={`baseline-${i}`}
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                      stroke="#9ca3af"
+                      strokeWidth={2}
+                      strokeDasharray="4 4"
+                      opacity={0.7}
+                    />
+                  );
+                })}
             </svg>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: 16,
+                marginTop: 8,
+                fontSize: 12,
+                color: '#6b7280',
+                flexWrap: 'wrap',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span
+                  style={{
+                    width: 14,
+                    height: 2,
+                    background: selectedModel?.color || '#333',
+                    display: 'inline-block',
+                  }}
+                />
+                Selected model
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span
+                  style={{
+                    width: 14,
+                    height: 2,
+                    borderTop: '2px dashed #9ca3af',
+                    display: 'inline-block',
+                  }}
+                />
+                Pure Random baseline
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -49,7 +49,9 @@ export type ModelHistoryPoint = {
 export type ModelHistoryResponse = {
   ok: boolean;
   model_key: string;
+  baseline_model_key: string;
   history: ModelHistoryPoint[];
+  baseline_history: ModelHistoryPoint[];
 };
 
 export async function getModelHistory(params: {
