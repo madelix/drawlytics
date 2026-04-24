@@ -22,6 +22,21 @@ function formatNum(n: number, decimals = 2) {
   return n.toFixed(decimals);
 }
 
+function scoreLabel(
+  score: number,
+  type: 'consistency' | 'confidence' | 'upside',
+) {
+  if (type === 'upside') {
+    if (score >= 0.35) return 'strong upside';
+    if (score >= 0.15) return 'moderate upside';
+    return 'limited upside';
+  }
+
+  if (score >= 0.66) return `strong ${type}`;
+  if (score >= 0.33) return `solid ${type}`;
+  return `low ${type}`;
+}
+
 const MODEL_COLOR_MAP: Record<string, string> = {
   balanced_hot_cold: '#7C3AED', // purple
   hot_focused: '#EF4444', // red
@@ -674,9 +689,10 @@ export default function ModelPerformancePage() {
           sub={
             recommendedModel ? (
               <>
-                {recommendedModel.insight}. Confidence{' '}
-                {formatNum(recommendedModel.confidence, 2)} based on{' '}
-                {recommendedModel.checked} checked predictions.
+                {scoreLabel(recommendedModel.confidence, 'confidence')} and{' '}
+                {scoreLabel(recommendedModel.consistency_score, 'consistency')}{' '}
+                make this a reliable choice, with{' '}
+                {scoreLabel(recommendedModel.upside_score, 'upside')}.
               </>
             ) : (
               <>No recommendation available yet.</>
