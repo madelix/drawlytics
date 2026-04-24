@@ -235,6 +235,8 @@ export default function ModelPerformancePage() {
         const consistencyScore =
           (avgTotal * 0.6 + highHitRate * 0.4) * sampleFactor;
 
+        const confidenceScore = consistencyScore * 0.6 + sampleFactor * 0.4;
+
         const upsideScore =
           highHitRate * 1 + fourPlusRate * 2 + fivePlusRate * 4;
 
@@ -279,7 +281,7 @@ export default function ModelPerformancePage() {
           trend_delta: delta,
           consistency_score: consistencyScore,
 
-          confidence: toNum((r as any).confidence, 0),
+          confidence: confidenceScore,
           jackpots: r.jackpots ?? 0,
           high_hit_predictions: r.high_hit_predictions ?? 0,
           four_plus_hits: r.four_plus_hits ?? 0,
@@ -1221,18 +1223,11 @@ export default function ModelPerformancePage() {
                               }
                             >
                               {trend === 'up'
-                                ? `↑ +${formatNum(r.trend_delta, 2)} hot`
+                                ? `↑ +${formatNum(r.trend_delta, 2)}`
                                 : trend === 'down'
-                                  ? `↓ ${formatNum(r.trend_delta, 2)} cool`
-                                  : '→ 0.00 stable'}
+                                  ? `↓ ${formatNum(Math.abs(r.trend_delta), 2)}`
+                                  : 'Stable'}
                             </span>
-                            {delta === null
-                              ? 'new'
-                              : delta > 0
-                                ? `↑${delta}`
-                                : delta < 0
-                                  ? `↓${Math.abs(delta)}`
-                                  : '•'}
                           </span>
                         </div>
                       </div>
@@ -1359,7 +1354,7 @@ export default function ModelPerformancePage() {
                         </div>
 
                         <span style={{ fontSize: 11, color: '#6b7280' }}>
-                          score {formatNum(conf, 2)}
+                          conf {formatNum(conf, 2)}
                         </span>
                       </div>
                     </td>
