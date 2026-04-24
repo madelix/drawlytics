@@ -181,6 +181,8 @@ export default function ModelPerformancePage() {
     Record<string, number | null>
   >({});
 
+  const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
+
   const [trendByKey, setTrendByKey] = useState<
     Record<string, 'up' | 'down' | 'flat' | 'new'>
   >({});
@@ -417,6 +419,11 @@ export default function ModelPerformancePage() {
     return filtered.length > 0 ? filtered[0] : null;
   }, [filtered]);
 
+  const selectedModel = useMemo(() => {
+    if (!selectedModelKey) return null;
+    return filtered.find((r) => r.model_key === selectedModelKey) ?? null;
+  }, [filtered, selectedModelKey]);
+
   const recommendedModel = useMemo(() => {
     return (
       [...chartRows].sort(
@@ -632,8 +639,8 @@ export default function ModelPerformancePage() {
           sub={
             recommendedModel ? (
               <>
-                Best overall blend of average, upside, consistency and
-                confidence.
+                Score {formatNum(recommendedModel.recommendation_score, 2)} ·
+                strong blend of consistency, upside and confidence.
               </>
             ) : (
               <>No recommendation available yet.</>
@@ -778,54 +785,17 @@ export default function ModelPerformancePage() {
               legendPosition: 'middle',
               legendOffset: 32,
             }}
-            tooltip={({ indexValue, value }) => {
-              const label = String(indexValue);
-              const meta = byLabel.get(label);
-              if (!meta) return null;
+            onClick={(bar) => {
+              const label = String(bar.indexValue);
+              const model = byLabel.get(label);
 
-              return (
-                <div
-                  style={{
-                    background: 'white',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 10,
-                    padding: 10,
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
-                    maxWidth: 220,
-                  }}
-                >
-                  <div style={{ fontWeight: 800, marginBottom: 6 }}>
-                    {meta.model_display_name}
-                  </div>
-                  <div style={{ fontSize: 13, color: '#111827' }}>
-                    Avg total hits:{' '}
-                    <strong>{formatNum(toNum(value, 0), 2)}</strong>
-                    <div
-                      style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}
-                    >
-                      main {formatNum(meta.avg_main_n, 2)} + stars{' '}
-                      {formatNum(meta.avg_stars_n, 2)}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      marginTop: 8,
-                      fontSize: 12,
-                      color: '#6b7280',
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    Checked: <strong>{meta.checked}</strong> / {meta.total}
-                    <br />
-                    3+ hits: <strong>{meta.high_hit_predictions}</strong>
-                    <br />
-                    4+ hits: <strong>{meta.four_plus_hits}</strong>
-                    <br />
-                    5+ hits: <strong>{meta.five_plus_hits}</strong>
-                  </div>
-                </div>
+              if (!model) return;
+
+              setSelectedModelKey((prev) =>
+                prev === model.model_key ? null : model.model_key,
               );
             }}
+            tooltip={() => null}
             theme={{
               axis: {
                 ticks: { text: { fill: '#6b7280', fontSize: 12 } },
@@ -837,6 +807,30 @@ export default function ModelPerformancePage() {
           />
         </div>
       </div>
+
+      {selectedModel && (
+        <div
+          style={{
+            background: '#fff',
+            border: '1px solid #eef2f7',
+            borderRadius: 16,
+            padding: 14,
+            margin: '0 auto 14px',
+            maxWidth: 980,
+          }}
+        >
+          <div style={{ fontWeight: 900, marginBottom: 6 }}>
+            {selectedModel.model_display_name}
+          </div>
+
+          <div style={{ fontSize: 13, color: '#6b7280' }}>
+            Avg hits {formatNum(selectedModel.avg_total_hits, 2)} · Upside{' '}
+            {formatNum(selectedModel.upside_score, 2)} · Consistency{' '}
+            {formatNum(selectedModel.consistency_score, 2)} · Checked{' '}
+            {selectedModel.checked}/{selectedModel.total}
+          </div>
+        </div>
+      )}
 
       <div
         style={{
