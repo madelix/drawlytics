@@ -2,7 +2,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ResponsiveBar } from '@nivo/bar';
 import {
+  getModelHistory,
   getModelPerformance,
+  type ModelHistoryPoint,
   type ModelPerformanceRow,
 } from '../api/performance';
 
@@ -188,6 +190,9 @@ export default function ModelPerformancePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [rows, setRows] = useState<ModelPerformanceRow[]>([]);
+  const [history, setHistory] = useState<ModelHistoryPoint[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [minChecked, setMinChecked] = useState(0);
   const [rankingMode, setRankingMode] = useState<
     'average' | 'upside' | 'consistency'
@@ -217,6 +222,24 @@ export default function ModelPerformancePage() {
       setError(e?.message ?? 'Failed to load model performance');
     } finally {
       setLoading(false);
+    }
+  }
+  async function loadHistory(modelKey: string) {
+    setHistoryLoading(true);
+    setHistoryError(null);
+
+    try {
+      const data = await getModelHistory({
+        model_key: modelKey,
+        lottery,
+      });
+
+      setHistory(data.history || []);
+    } catch (e: any) {
+      setHistory([]);
+      setHistoryError(e?.message ?? 'Failed to load model history');
+    } finally {
+      setHistoryLoading(false);
     }
   }
 
@@ -462,6 +485,15 @@ export default function ModelPerformancePage() {
     return filtered.find((r) => r.model_key === selectedModelKey) ?? null;
   }, [filtered, selectedModelKey]);
 
+  useEffect(() => {
+    if (!selectedModelKey) {
+      setHistory([]);
+      return;
+    }
+
+    loadHistory(selectedModelKey);
+  }, [selectedModelKey, lottery]);
+
   const recommendedModel = useMemo(() => {
     return (
       [...chartRows].sort((a, b) => {
@@ -530,6 +562,18 @@ export default function ModelPerformancePage() {
     if (!summary.total) return null;
     return (100 * summary.checked) / summary.total;
   }, [summary.total, summary.checked]);
+
+  const historyChartData = useMemo(() => {
+    return [
+      {
+        id: selectedModel?.model_display_name ?? 'Selected model',
+        data: history.map((point, index) => ({
+          x: index + 1,
+          y: toNum(point.avg_total_hits, 0),
+        })),
+      },
+    ];
+  }, [history, selectedModel?.model_display_name]);
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '28px 16px' }}>
@@ -887,6 +931,98 @@ export default function ModelPerformancePage() {
             <strong>{selectedModel.four_plus_hits}</strong> · 5+ hits{' '}
             <strong>{selectedModel.five_plus_hits}</strong> · checked{' '}
             <strong>{selectedModel.checked}</strong>/{selectedModel.total}
+          </div>
+        </div>
+      )}
+
+      {selectedModel && history.length > 0 && (
+        <div
+          style={{
+            background: '#fff',
+            border: '1px solid #eef2f7',
+            borderRadius: 16,
+            padding: 14,
+            margin: '0 auto 14px',
+            maxWidth: 980,
+          }}
+        >
+          <div style={{ fontWeight: 900, marginBottom: 10 }}>
+            Performance over time
+          </div>
+
+          <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 10 }}>
+            {(() => {
+              if (history.length < 2) {
+                return 'Not enough data to assess trend.';
+              }
+
+              const mid = Math.floor(history.length / 2);
+              const firstHalf = history.slice(0, mid);
+              const secondHalf = history.slice(mid);
+
+              const avg = (arr: typeof history) =>
+                arr.reduce((sum, p) => sum + toNum(p.avg_total_hits, 0), 0) /
+                arr.length;
+
+              const diff = avg(secondHalf) - avg(firstHalf);
+
+              const trend =
+                diff > 0.05
+                  ? 'improving'
+                  : diff < -0.05
+                    ? 'declining'
+                    : 'stable';
+
+              return (
+                <>
+                  {history.length} recent draws · <strong>{trend}</strong>{' '}
+                  performance ({formatNum(diff, 2)})
+                </>
+              );
+            })()}
+          </div>
+
+          <div style={{ height: 240 }}>
+            <svg width="100%" height="100%" viewBox="0 0 400 200">
+              {history.map((point, i) => {
+                const x = (i / (history.length - 1)) * 380 + 10;
+                const y = 180 - toNum(point.avg_total_hits, 0) * 30; // scale visually
+
+                return (
+                  <circle
+                    key={i}
+                    cx={x}
+                    cy={y}
+                    r={3}
+                    fill={selectedModel?.color ?? '#804198'}
+                  />
+                );
+              })}
+
+              {history.map((point, i) => {
+                if (i === 0) return null;
+
+                const prev = history[i - 1];
+
+                const x1 = ((i - 1) / (history.length - 1)) * 380 + 10;
+                const y1 = 180 - toNum(prev.avg_total_hits, 0) * 30;
+
+                const x2 = (i / (history.length - 1)) * 380 + 10;
+                const y2 = 180 - toNum(point.avg_total_hits, 0) * 30;
+
+                return (
+                  <line
+                    key={`line-${i}`}
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke={selectedModel?.color ?? '#804198'}
+                    strokeWidth={2}
+                  />
+                );
+              })}
+            </svg>
           </div>
         </div>
       )}

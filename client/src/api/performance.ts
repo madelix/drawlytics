@@ -40,3 +40,29 @@ export async function getModelPerformance(params?: {
     `/api/performance/models?${qs.toString()}`,
   );
 }
+
+export type ModelHistoryPoint = {
+  draw_date: string;
+  avg_total_hits: number;
+};
+
+export type ModelHistoryResponse = {
+  ok: boolean;
+  model_key: string;
+  history: ModelHistoryPoint[];
+};
+
+export async function getModelHistory(params: {
+  model_key: string;
+  lottery?: string;
+}): Promise<ModelHistoryResponse> {
+  const lottery = params.lottery ?? 'euromillions';
+
+  const qs = new URLSearchParams();
+  qs.set('model_key', params.model_key);
+  qs.set('lottery', lottery);
+
+  return apiGetJson<ModelHistoryResponse>(
+    `/api/performance/model-history?${qs.toString()}`,
+  );
+}

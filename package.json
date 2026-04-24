@@ -11,5 +11,8 @@
   "devDependencies": {
     "concurrently": "^9.0.0",
     "prettier": "^3.6.2"
+  },
+  "dependencies": {
+    "@nivo/line": "^0.99.0"
   }
 }

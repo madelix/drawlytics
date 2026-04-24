@@ -149,4 +149,79 @@ COUNT(*) FILTER (
   }
 });
 
+/**
+ * GET /api/performance/model-history?lottery=euromillions&model_key=overdue
+ */
+router.get('/performance/model-history', async (req, res) => {
+  try {
+    const lottery = String(req.query.lottery || 'euromillions');
+    const modelKey = String(req.query.model_key || '');
+
+    if (!modelKey) {
+      return res.status(400).json({
+        ok: false,
+        error: 'missing_model_key',
+      });
+    }
+
+    const { rows } = await pool.query(
+      `
+      WITH base AS (
+        SELECT
+          *,
+          LOWER(model_name) AS model_name_lc
+        FROM predictions
+        WHERE LOWER(lottery) = LOWER($1)
+          AND LOWER(TRIM(status)) = 'checked'
+      ),
+      normalized AS (
+        SELECT
+          CASE
+            WHEN model_name_lc LIKE 'make_magic:cold_focused%' THEN 'cold_focused'
+            WHEN model_name_lc LIKE 'make_magic:hot_focused%' THEN 'hot_focused'
+            WHEN model_name_lc LIKE 'make_magic:balanced_hot_cold%' THEN 'balanced_hot_cold'
+            WHEN model_name_lc LIKE 'make_magic:pure_random%' THEN 'pure_random'
+            WHEN model_name_lc LIKE 'make_magic:overdue%' THEN 'overdue'
+
+            WHEN model_name_lc LIKE '%cold-focused generator%' THEN 'cold_focused'
+            WHEN model_name_lc LIKE '%hot-focused generator%' THEN 'hot_focused'
+            WHEN model_name_lc LIKE '%balanced hot/cold generator%' THEN 'balanced_hot_cold'
+            WHEN model_name_lc LIKE '%pure random generator%' THEN 'pure_random'
+            WHEN model_name_lc LIKE '%overdue-focused generator%' THEN 'overdue'
+
+            ELSE REPLACE(
+              REPLACE(
+                REPLACE(model_name_lc, 'make_magic:', ''),
+                ' generator',
+                ''
+              ),
+              '-focused',
+              ''
+            )
+          END AS model_key,
+          draw_date,
+          COALESCE(matched_main, 0) + COALESCE(matched_stars, 0) AS total_hits
+        FROM base
+      )
+      SELECT
+        draw_date,
+        total_hits::numeric AS avg_total_hits
+      FROM normalized
+      WHERE model_key = $2
+      ORDER BY draw_date ASC;
+      `,
+      [lottery, modelKey],
+    );
+
+    res.json({
+      ok: true,
+      model_key: modelKey,
+      history: rows,
+    });
+  } catch (err) {
+    console.error('GET /performance/model-history failed:', err);
+    res.status(500).json({ ok: false, error: 'model_history_failed' });
+  }
+});
+
 export default router;
