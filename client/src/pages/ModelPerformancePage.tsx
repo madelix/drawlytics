@@ -984,6 +984,33 @@ export default function ModelPerformancePage() {
 
           <div style={{ height: 240 }}>
             <svg width="100%" height="100%" viewBox="0 0 400 200">
+              {[0, 1, 2, 3, 4, 5].map((v) => {
+                const y = 180 - v * 30;
+
+                return (
+                  <g key={v}>
+                    <line
+                      x1={10}
+                      y1={y}
+                      x2={390}
+                      y2={y}
+                      stroke="#eef2f7"
+                      strokeWidth={1}
+                    />
+                    <text x={0} y={y + 4} fontSize={10} fill="#9ca3af">
+                      {v}
+                    </text>
+                  </g>
+                );
+              })}
+              <line
+                x1={10}
+                y1={180}
+                x2={390}
+                y2={180}
+                stroke="#e5e7eb"
+                strokeWidth={1}
+              />
               {history.map((point, i) => {
                 const x = (i / (history.length - 1)) * 380 + 10;
                 const y = 180 - toNum(point.avg_total_hits, 0) * 30; // scale visually
@@ -993,7 +1020,7 @@ export default function ModelPerformancePage() {
                     key={i}
                     cx={x}
                     cy={y}
-                    r={3}
+                    r={4}
                     fill={selectedModel?.color ?? '#804198'}
                   />
                 );
@@ -1018,7 +1045,8 @@ export default function ModelPerformancePage() {
                     x2={x2}
                     y2={y2}
                     stroke={selectedModel?.color ?? '#804198'}
-                    strokeWidth={2}
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
                   />
                 );
               })}
