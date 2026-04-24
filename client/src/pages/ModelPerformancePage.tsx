@@ -457,7 +457,13 @@ export default function ModelPerformancePage() {
         }}
       >
         <Card
-          title="Top model (avg hits)"
+          title={
+            rankingMode === 'average'
+              ? 'Top model (avg hits)'
+              : rankingMode === 'upside'
+                ? 'Top model (upside)'
+                : 'Top model (consistency)'
+          }
           value={bestModel ? bestModel.model_display_name : '—'}
           sub={
             bestModel ? (
