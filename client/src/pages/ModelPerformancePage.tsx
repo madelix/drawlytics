@@ -74,6 +74,7 @@ type ChartRow = {
   trend_delta: number;
   consistency_score: number;
   recommendation_score: number;
+  insight: string;
   personality: 'stable' | 'aggressive' | 'balanced' | 'experimental';
 
   color: string;
@@ -261,9 +262,27 @@ export default function ModelPerformancePage() {
           trend = 'flat';
         }
 
+        let insight: string;
+
+        if (checked < 10) {
+          insight = 'Low sample, results not yet reliable';
+        } else if (consistencyScore >= 0.6 && upsideScore >= 0.2) {
+          insight = 'Strong and reliable with good upside';
+        } else if (consistencyScore >= 0.6) {
+          insight = 'Reliable performance, lower volatility';
+        } else if (upsideScore >= 0.25) {
+          insight = 'High upside but volatile results';
+        } else if (trend === 'up') {
+          insight = 'Improving recent performance';
+        } else if (trend === 'down') {
+          insight = 'Recent performance declining';
+        } else {
+          insight = 'Stable but unremarkable performance';
+        }
+
         let personality: ChartRow['personality'];
 
-        if (checked < 8) {
+        if (checked < 10) {
           personality = 'experimental'; // emerging / low sample
         } else if (consistencyScore >= 0.5) {
           personality = 'stable'; // reliable performer
@@ -289,6 +308,7 @@ export default function ModelPerformancePage() {
           recent_avg_total_hits_n: recentAvgTotal,
           trend_delta: delta,
           consistency_score: consistencyScore,
+          insight,
           recommendation_score: recommendationScore,
 
           confidence: confidenceScore,
@@ -823,11 +843,18 @@ export default function ModelPerformancePage() {
             {selectedModel.model_display_name}
           </div>
 
-          <div style={{ fontSize: 13, color: '#6b7280' }}>
-            Avg hits {formatNum(selectedModel.avg_total_hits, 2)} · Upside{' '}
-            {formatNum(selectedModel.upside_score, 2)} · Consistency{' '}
-            {formatNum(selectedModel.consistency_score, 2)} · Checked{' '}
-            {selectedModel.checked}/{selectedModel.total}
+          <div style={{ fontSize: 13, color: '#111827', marginBottom: 6 }}>
+            {selectedModel.insight}
+          </div>
+
+          <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
+            Avg <strong>{formatNum(selectedModel.avg_total_hits, 2)}</strong> ·
+            main {formatNum(selectedModel.avg_main_n, 2)} · stars{' '}
+            {formatNum(selectedModel.avg_stars_n, 2)} · 3+ hits{' '}
+            <strong>{selectedModel.high_hit_predictions}</strong> · 4+ hits{' '}
+            <strong>{selectedModel.four_plus_hits}</strong> · 5+ hits{' '}
+            <strong>{selectedModel.five_plus_hits}</strong> · checked{' '}
+            <strong>{selectedModel.checked}</strong>/{selectedModel.total}
           </div>
         </div>
       )}
@@ -918,11 +945,23 @@ export default function ModelPerformancePage() {
 
       <div
         style={{
+          fontWeight: 900,
+          fontSize: 18,
+          margin: '18px 0 8px',
+          color: '#111827',
+          textAlign: 'center',
+        }}
+      >
+        Model League Table
+      </div>
+
+      <div
+        style={{
           display: 'flex',
           justifyContent: 'center',
           gap: 8,
           flexWrap: 'wrap',
-          margin: '18px 0 10px',
+          margin: '0 0 10px',
         }}
       >
         {[
