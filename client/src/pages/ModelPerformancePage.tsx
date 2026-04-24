@@ -252,12 +252,14 @@ export default function ModelPerformancePage() {
 
         let personality: ChartRow['personality'];
 
-        if (checked < 5) {
-          personality = 'experimental';
-        } else if (upsideScore >= 0.35 && avgTotal < 1.0) {
-          personality = 'aggressive';
-        } else if (avgTotal >= 1.0 && upsideScore >= 0.15) {
-          personality = 'balanced';
+        if (checked < 8) {
+          personality = 'experimental'; // emerging / low sample
+        } else if (consistencyScore >= 0.5) {
+          personality = 'stable'; // reliable performer
+        } else if (upsideScore >= 0.25 && consistencyScore < 0.3) {
+          personality = 'aggressive'; // high risk / high reward
+        } else if (avgTotal >= 0.9 && upsideScore >= 0.1) {
+          personality = 'balanced'; // good mix
         } else {
           personality = 'stable';
         }
@@ -295,6 +297,27 @@ export default function ModelPerformancePage() {
       })
       .sort((a, b) => b.avg_total_hits - a.avg_total_hits);
   }, [rows]);
+
+  const topAverageModel = useMemo(() => {
+    return (
+      [...chartRows].sort((a, b) => b.avg_total_hits - a.avg_total_hits)[0] ??
+      null
+    );
+  }, [chartRows]);
+
+  const topUpsideModel = useMemo(() => {
+    return (
+      [...chartRows].sort((a, b) => b.upside_score - a.upside_score)[0] ?? null
+    );
+  }, [chartRows]);
+
+  const topConsistencyModel = useMemo(() => {
+    return (
+      [...chartRows].sort(
+        (a, b) => b.consistency_score - a.consistency_score,
+      )[0] ?? null
+    );
+  }, [chartRows]);
 
   const filtered = useMemo(() => {
     return chartRows
@@ -383,27 +406,6 @@ export default function ModelPerformancePage() {
   const bestModel = useMemo(() => {
     return filtered.length > 0 ? filtered[0] : null;
   }, [filtered]);
-
-  const topAverageModel = useMemo(() => {
-    return (
-      [...chartRows].sort((a, b) => b.avg_total_hits - a.avg_total_hits)[0] ??
-      null
-    );
-  }, [chartRows]);
-
-  const topUpsideModel = useMemo(() => {
-    return (
-      [...chartRows].sort((a, b) => b.upside_score - a.upside_score)[0] ?? null
-    );
-  }, [chartRows]);
-
-  const topConsistencyModel = useMemo(() => {
-    return (
-      [...chartRows].sort(
-        (a, b) => b.consistency_score - a.consistency_score,
-      )[0] ?? null
-    );
-  }, [chartRows]);
 
   const biggestMover = useMemo(() => {
     const movers = filtered.filter((r) => r.trend !== 'flat');
@@ -1149,13 +1151,13 @@ export default function ModelPerformancePage() {
                               flex: '0 0 auto',
                             }}
                           >
-                            {r.personality === 'stable'
-                              ? 'steady'
-                              : r.personality === 'aggressive'
-                                ? 'upside'
-                                : r.personality === 'balanced'
-                                  ? 'balanced'
-                                  : 'new'}
+                            {r.personality === 'experimental'
+                              ? 'Emerging'
+                              : r.personality === 'stable'
+                                ? 'Reliable'
+                                : r.personality === 'aggressive'
+                                  ? 'High risk'
+                                  : 'Balanced'}
                           </span>
 
                           <span
