@@ -468,15 +468,33 @@ export default function ModelPerformancePage() {
           sub={
             bestModel ? (
               <>
-                Avg hits{' '}
-                <strong>{formatNum(bestModel.avg_total_hits, 2)}</strong>{' '}
-                <span style={{ fontSize: 12 }}>
-                  (main {formatNum(bestModel.avg_main_n, 2)} + stars{' '}
-                  {formatNum(bestModel.avg_stars_n, 2)})
-                </span>
+                {rankingMode === 'average' && (
+                  <>
+                    Avg hits{' '}
+                    <strong>{formatNum(bestModel.avg_total_hits, 2)}</strong>{' '}
+                    <span style={{ fontSize: 12 }}>
+                      (main {formatNum(bestModel.avg_main_n, 2)} + stars{' '}
+                      {formatNum(bestModel.avg_stars_n, 2)})
+                    </span>
+                  </>
+                )}
+
+                {rankingMode === 'upside' && (
+                  <>
+                    Upside score{' '}
+                    <strong>{formatNum(bestModel.upside_score, 2)}</strong>
+                  </>
+                )}
+
+                {rankingMode === 'consistency' && (
+                  <>
+                    Consistency{' '}
+                    <strong>{formatNum(bestModel.consistency_score, 2)}</strong>
+                  </>
+                )}
               </>
             ) : (
-              <>No models meet “Min checked”.</>
+              <>No models available.</>
             )
           }
           right={
