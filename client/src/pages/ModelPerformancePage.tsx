@@ -383,10 +383,15 @@ export default function ModelPerformancePage() {
     return [...filtered]
       .map((r, i) => ({
         model: `#${i + 1} ${r.model_display_name}`,
-        avg_total_hits: r.avg_total_hits,
+        avg_total_hits:
+          rankingMode === 'average'
+            ? r.avg_total_hits
+            : rankingMode === 'upside'
+              ? r.upside_score
+              : r.consistency_score,
       }))
       .reverse();
-  }, [filtered]);
+  }, [filtered, rankingMode]);
 
   const checkedCoveragePct = useMemo(() => {
     if (!summary.total) return null;
@@ -596,9 +601,19 @@ export default function ModelPerformancePage() {
         <div
           style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f7' }}
         >
-          <div style={{ fontWeight: 800 }}>Average hits per prediction</div>
+          <div style={{ fontWeight: 800 }}>
+            {rankingMode === 'average'
+              ? 'Average hits per prediction'
+              : rankingMode === 'upside'
+                ? 'Upside score by model'
+                : 'Consistency score by model'}
+          </div>
           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-            Bars = avg(main + stars). Hover for details.
+            {rankingMode === 'average'
+              ? 'Bars = avg(main + stars). Hover for details.'
+              : rankingMode === 'upside'
+                ? 'Bars = upside score (high-hit potential).'
+                : 'Bars = consistency score (stability + sample size).'}
           </div>
         </div>
 
