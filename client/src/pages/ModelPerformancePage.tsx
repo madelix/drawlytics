@@ -938,34 +938,33 @@ export default function ModelPerformancePage() {
                       ? '#f59e0b'
                       : '#ef4444';
 
-                const jackpotRate =
-                  r.checked > 0 ? r.high_hit_predictions / r.checked : 0;
+                const jackpotScore = r.upside_score;
 
                 const jackpotPotBg =
-                  jackpotRate >= 0.18
+                  jackpotScore >= 0.35
                     ? '#ecfdf5'
-                    : jackpotRate >= 0.1
+                    : jackpotScore >= 0.15
                       ? '#fffbeb'
                       : '#fef2f2';
 
                 const jackpotPotBorder =
-                  jackpotRate >= 0.18
+                  jackpotScore >= 0.35
                     ? '1px solid #bbf7d0'
-                    : jackpotRate >= 0.1
+                    : jackpotScore >= 0.15
                       ? '1px solid #fde68a'
                       : '1px solid #fecaca';
 
                 const jackpotPotColor =
-                  jackpotRate >= 0.18
+                  jackpotScore >= 0.35
                     ? '#166534'
-                    : jackpotRate >= 0.1
+                    : jackpotScore >= 0.15
                       ? '#b45309'
                       : '#b91c1c';
 
                 const jackpotPotLabel =
-                  jackpotRate >= 0.18
+                  jackpotScore >= 0.35
                     ? 'High'
-                    : jackpotRate >= 0.1
+                    : jackpotScore >= 0.15
                       ? 'Medium'
                       : 'Low';
 
@@ -1276,7 +1275,7 @@ export default function ModelPerformancePage() {
                           color: jackpotPotColor,
                         }}
                       >
-                        {jackpotPotLabel}
+                        {jackpotPotLabel} · {formatNum(jackpotScore, 2)}
                       </span>
                     </td>
                   </tr>
