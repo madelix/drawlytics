@@ -132,6 +132,39 @@ function Card({
   );
 }
 
+function TopPick({
+  label,
+  model,
+  metric,
+}: {
+  label: string;
+  model: ChartRow | null;
+  metric: ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: '1px solid #eef2f7',
+        borderRadius: 14,
+        padding: '10px 12px',
+        minWidth: 180,
+        flex: '1 1 180px',
+      }}
+    >
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontWeight: 900, color: '#111827' }}>
+        {model ? model.model_display_name : '—'}
+      </div>
+      <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
+        {metric}
+      </div>
+    </div>
+  );
+}
+
 export default function ModelPerformancePage() {
   const [lottery, setLottery] = useState('euromillions');
   const [loading, setLoading] = useState(false);
@@ -350,6 +383,27 @@ export default function ModelPerformancePage() {
   const bestModel = useMemo(() => {
     return filtered.length > 0 ? filtered[0] : null;
   }, [filtered]);
+
+  const topAverageModel = useMemo(() => {
+    return (
+      [...chartRows].sort((a, b) => b.avg_total_hits - a.avg_total_hits)[0] ??
+      null
+    );
+  }, [chartRows]);
+
+  const topUpsideModel = useMemo(() => {
+    return (
+      [...chartRows].sort((a, b) => b.upside_score - a.upside_score)[0] ?? null
+    );
+  }, [chartRows]);
+
+  const topConsistencyModel = useMemo(() => {
+    return (
+      [...chartRows].sort(
+        (a, b) => b.consistency_score - a.consistency_score,
+      )[0] ?? null
+    );
+  }, [chartRows]);
 
   const biggestMover = useMemo(() => {
     const movers = filtered.filter((r) => r.trend !== 'flat');
@@ -587,6 +641,56 @@ export default function ModelPerformancePage() {
       {error && (
         <p style={{ color: '#b91c1c', textAlign: 'center' }}>{error}</p>
       )}
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 10,
+          flexWrap: 'wrap',
+          margin: '0 auto 14px',
+          maxWidth: 980,
+        }}
+      >
+        <TopPick
+          label="Best average"
+          model={topAverageModel}
+          metric={
+            topAverageModel
+              ? `Avg ${formatNum(topAverageModel.avg_total_hits, 2)}`
+              : 'No data'
+          }
+        />
+
+        <TopPick
+          label="Highest upside"
+          model={topUpsideModel}
+          metric={
+            topUpsideModel
+              ? `Upside ${formatNum(topUpsideModel.upside_score, 2)}`
+              : 'No data'
+          }
+        />
+
+        <TopPick
+          label="Most consistent"
+          model={topConsistencyModel}
+          metric={
+            topConsistencyModel
+              ? `Consistency ${formatNum(topConsistencyModel.consistency_score, 2)}`
+              : 'No data'
+          }
+        />
+
+        <TopPick
+          label="Trending up"
+          model={heatingUp[0] ?? null}
+          metric={
+            heatingUp[0]
+              ? `Trend +${formatNum(heatingUp[0].trend_delta, 2)}`
+              : 'No active trend'
+          }
+        />
+      </div>
 
       {/* Chart */}
       <div
