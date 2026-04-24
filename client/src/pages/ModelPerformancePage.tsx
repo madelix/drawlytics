@@ -177,6 +177,9 @@ export default function ModelPerformancePage() {
   const [rankingMode, setRankingMode] = useState<
     'average' | 'upside' | 'consistency'
   >('average');
+  const [strategyMode, setStrategyMode] = useState<
+    'safe' | 'balanced' | 'aggressive'
+  >('balanced');
 
   const [rankDeltaByKey, setRankDeltaByKey] = useState<
     Record<string, number | null>
@@ -446,11 +449,23 @@ export default function ModelPerformancePage() {
 
   const recommendedModel = useMemo(() => {
     return (
-      [...chartRows].sort(
-        (a, b) => b.recommendation_score - a.recommendation_score,
-      )[0] ?? null
+      [...chartRows].sort((a, b) => {
+        const getScore = (row: ChartRow) => {
+          if (strategyMode === 'safe') {
+            return row.consistency_score * 0.6 + row.confidence * 0.4;
+          }
+
+          if (strategyMode === 'aggressive') {
+            return row.upside_score * 0.7 + row.avg_total_hits * 0.3;
+          }
+
+          return row.recommendation_score;
+        };
+
+        return getScore(b) - getScore(a);
+      })[0] ?? null
     );
-  }, [chartRows]);
+  }, [chartRows, strategyMode]);
 
   const biggestMover = useMemo(() => {
     const movers = filtered.filter((r) => r.trend !== 'flat');
@@ -659,8 +674,9 @@ export default function ModelPerformancePage() {
           sub={
             recommendedModel ? (
               <>
-                Score {formatNum(recommendedModel.recommendation_score, 2)} ·
-                strong blend of consistency, upside and confidence.
+                {recommendedModel.insight}. Confidence{' '}
+                {formatNum(recommendedModel.confidence, 2)} based on{' '}
+                {recommendedModel.checked} checked predictions.
               </>
             ) : (
               <>No recommendation available yet.</>
@@ -1172,6 +1188,25 @@ export default function ModelPerformancePage() {
                             {r.model_display_name}
                           </span>
 
+                          {r.model_key === 'pure_random' && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                letterSpacing: '0.04em',
+                                textTransform: 'uppercase',
+                                padding: '3px 8px',
+                                borderRadius: 999,
+                                background: '#f8fafc',
+                                border: '1px dashed #cbd5f5',
+                                color: '#475569',
+                                marginLeft: 6,
+                              }}
+                            >
+                              Baseline
+                            </span>
+                          )}
+
                           <span
                             style={{
                               fontSize: 10,
@@ -1316,7 +1351,43 @@ export default function ModelPerformancePage() {
                         fontWeight: 700,
                       }}
                     >
-                      {formatNum(r.avg_total_hits, 2)}
+                      <div>{formatNum(r.avg_total_hits, 2)}</div>
+
+                      {(() => {
+                        const baseline = chartRows.find(
+                          (x) => x.model_key === 'pure_random',
+                        );
+                        if (!baseline || r.model_key === 'pure_random')
+                          return null;
+
+                        const diff = r.avg_total_hits - baseline.avg_total_hits;
+
+                        // hide tiny differences (noise)
+                        if (Math.abs(diff) < 0.05) return null;
+
+                        return (
+                          <div
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color:
+                                diff > 0
+                                  ? '#16a34a'
+                                  : diff < 0
+                                    ? '#dc2626'
+                                    : '#6b7280',
+                              marginTop: 2,
+                            }}
+                            title="Difference from Pure Random baseline"
+                          >
+                            {diff > 0
+                              ? `+${formatNum(diff, 2)} over baseline`
+                              : diff < 0
+                                ? `${formatNum(diff, 2)} below baseline`
+                                : '≈ random'}
+                          </div>
+                        );
+                      })()}
 
                       {rankingMode === 'upside' && (
                         <div
