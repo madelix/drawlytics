@@ -417,7 +417,9 @@ export default function ModelPerformancePage() {
   }, [filtered]);
 
   const heatingUp = useMemo(() => {
-    return filtered.filter((r) => r.trend === 'up');
+    return [...filtered]
+      .filter((r) => r.trend === 'up')
+      .sort((a, b) => b.trend_delta - a.trend_delta);
   }, [filtered]);
 
   const coolingDown = useMemo(() => {
