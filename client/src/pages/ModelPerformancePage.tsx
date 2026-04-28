@@ -39,6 +39,12 @@ function scoreLabel(
   return `low ${type}`;
 }
 
+function strategyLabel(strategy: 'safe' | 'balanced' | 'aggressive') {
+  if (strategy === 'safe') return 'Safe';
+  if (strategy === 'aggressive') return 'Aggressive';
+  return 'Balanced';
+}
+
 const MODEL_COLOR_MAP: Record<string, string> = {
   balanced_hot_cold: '#7C3AED', // purple
   hot_focused: '#EF4444', // red
@@ -736,15 +742,52 @@ export default function ModelPerformancePage() {
         />
 
         <Card
-          title="Recommended"
+          title={`Recommended · ${strategyLabel(strategyMode)}`}
           value={recommendedModel ? recommendedModel.model_display_name : '—'}
           sub={
             recommendedModel ? (
               <>
-                {scoreLabel(recommendedModel.confidence, 'confidence')} and{' '}
-                {scoreLabel(recommendedModel.consistency_score, 'consistency')}{' '}
-                make this a reliable choice, with{' '}
-                {scoreLabel(recommendedModel.upside_score, 'upside')}.
+                <div style={{ marginBottom: 8 }}>
+                  {scoreLabel(recommendedModel.confidence, 'confidence')} and{' '}
+                  {scoreLabel(
+                    recommendedModel.consistency_score,
+                    'consistency',
+                  )}{' '}
+                  make this a reliable choice, with{' '}
+                  {scoreLabel(recommendedModel.upside_score, 'upside')}.
+                </div>
+
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Safe', value: 'safe' as const },
+                    { label: 'Balanced', value: 'balanced' as const },
+                    { label: 'Aggressive', value: 'aggressive' as const },
+                  ].map((option) => {
+                    const active = strategyMode === option.value;
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setStrategyMode(option.value)}
+                        style={{
+                          padding: '4px 8px',
+                          borderRadius: 999,
+                          background: active ? '#111827' : '#f8fafc',
+                          color: active ? '#fff' : '#374151',
+                          border: active
+                            ? '1px solid #111827'
+                            : '1px solid #e5e7eb',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </>
             ) : (
               <>No recommendation available yet.</>
