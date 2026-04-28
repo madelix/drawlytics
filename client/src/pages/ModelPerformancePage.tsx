@@ -97,6 +97,9 @@ type ChartRow = {
   trend_delta: number;
   consistency_score: number;
   recommendation_score: number;
+  baseline_win_rate_global: number;
+  baseline_wins: number;
+  baseline_compared: number;
   insight: string;
   personality: 'stable' | 'aggressive' | 'balanced' | 'experimental';
 
@@ -310,6 +313,12 @@ export default function ModelPerformancePage() {
 
         let trend: 'up' | 'down' | 'flat';
 
+        const baselineWins = r.baseline_wins ?? 0;
+        const baselineCompared = r.baseline_compared_draws ?? 0;
+
+        const baselineWinRateGlobal =
+          baselineCompared > 0 ? baselineWins / baselineCompared : 0;
+
         const recommendationScore =
           avgTotal * 0.35 +
           upsideScore * 0.25 +
@@ -385,6 +394,9 @@ export default function ModelPerformancePage() {
           four_plus_rate: fourPlusRate,
           five_plus_rate: fivePlusRate,
           upside_score: upsideScore,
+          baseline_win_rate_global: baselineWinRateGlobal,
+          baseline_wins: baselineWins,
+          baseline_compared: baselineCompared,
           trend,
           personality,
 
@@ -629,6 +641,18 @@ export default function ModelPerformancePage() {
       percentage: (wins / comparedDraws) * 100,
     };
   }, [history, baselineHistory]);
+
+  const baselineVerdict = useMemo(() => {
+    if (!baselineWinRate) return null;
+
+    const pct = baselineWinRate.percentage;
+
+    if (pct >= 60) return { label: 'Outperforming baseline', color: '#166534' };
+    if (pct >= 40)
+      return { label: 'Competitive with baseline', color: '#b45309' };
+
+    return { label: 'Below baseline', color: '#b91c1c' };
+  }, [baselineWinRate]);
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '28px 16px' }}>
@@ -1108,28 +1132,43 @@ export default function ModelPerformancePage() {
                     ? 'declining'
                     : 'stable';
 
+              const reliability =
+                history.length < 10
+                  ? 'low reliability'
+                  : history.length < 25
+                    ? 'moderate reliability'
+                    : 'high reliability';
+
               return (
                 <>
                   {history.length} recent draws · <strong>{trend}</strong>{' '}
                   performance ({formatNum(diff, 2)}) ·{' '}
-                  <span style={{ opacity: 0.7 }}>
-                    {history.length < 10
-                      ? 'low reliability'
-                      : history.length < 25
-                        ? 'moderate reliability'
-                        : 'high reliability'}
-                  </span>
+                  <span style={{ opacity: 0.7 }}>{reliability}</span>
                   {baselineWinRate &&
                     selectedModel?.model_key !== 'pure_random' && (
-                      <span>
+                      <>
                         {' '}
                         · beats baseline in{' '}
                         <strong>
                           {baselineWinRate.wins}/{baselineWinRate.comparedDraws}
                         </strong>{' '}
                         draws ({formatNum(baselineWinRate.percentage, 0)}%)
-                      </span>
+                      </>
                     )}
+                  {baselineVerdict && (
+                    <>
+                      {' '}
+                      ·{' '}
+                      <span
+                        style={{
+                          color: baselineVerdict.color,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {baselineVerdict.label}
+                      </span>
+                    </>
+                  )}
                 </>
               );
             })()}
@@ -1951,6 +1990,27 @@ export default function ModelPerformancePage() {
                       }}
                     >
                       <div>{formatNum(r.avg_total_hits, 2)}</div>
+
+                      {r.model_key !== 'pure_random' && (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color:
+                              r.baseline_win_rate_global >= 0.55
+                                ? '#16a34a'
+                                : r.baseline_win_rate_global >= 0.45
+                                  ? '#b45309'
+                                  : '#dc2626',
+                            marginTop: 2,
+                          }}
+                          title="Percentage of comparable draws where this model beat Pure Random"
+                        >
+                          beats random{' '}
+                          {Math.round(r.baseline_win_rate_global * 100)}% ( n=
+                          {r.baseline_compared})
+                        </div>
+                      )}
 
                       {(() => {
                         const baseline = chartRows.find(

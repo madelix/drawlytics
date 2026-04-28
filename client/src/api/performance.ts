@@ -20,6 +20,8 @@ export type ModelPerformanceRow = {
   high_hit_predictions: number;
   four_plus_hits: number;
   five_plus_hits: number;
+  baseline_wins: number;
+  baseline_compared_draws: number;
 };
 
 export type ModelsPerformanceResponse = {

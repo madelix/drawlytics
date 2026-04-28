@@ -69,22 +69,39 @@ router.get('/performance/models', async (req, res) => {
         FROM normalized
       ),
       ranked_checked AS (
-        SELECT
-          model_key,
-          draw_date,
-          matched_main,
-          matched_stars,
-          ROW_NUMBER() OVER (
-            PARTITION BY model_key
-            ORDER BY draw_date DESC
-          ) AS recency_rank
-        FROM named
-        WHERE status = 'checked'
-      )
+  SELECT
+    model_key,
+    draw_date,
+    matched_main,
+    matched_stars,
+    ROW_NUMBER() OVER (
+      PARTITION BY model_key
+      ORDER BY draw_date DESC
+    ) AS recency_rank
+  FROM named
+  WHERE status = 'checked'
+),
+baseline_compare AS (
+  SELECT
+    m.model_key,
+    COUNT(*)::int AS baseline_compared_draws,
+    COUNT(*) FILTER (
+      WHERE COALESCE(m.matched_main, 0) + COALESCE(m.matched_stars, 0)
+          > COALESCE(b.matched_main, 0) + COALESCE(b.matched_stars, 0)
+    )::int AS baseline_wins
+  FROM named m
+  JOIN named b
+    ON b.draw_date = m.draw_date
+   AND b.model_key = 'pure_random'
+   AND b.status = 'checked'
+  WHERE m.status = 'checked'
+    AND m.model_key <> 'pure_random'
+  GROUP BY m.model_key
+)
 
-      SELECT
-        model_key,
-        model_display_name,
+            SELECT
+        named.model_key,
+        named.model_display_name,
 
         COUNT(*)::int AS total_predictions,
         COUNT(*) FILTER (
@@ -123,17 +140,22 @@ COUNT(*) FILTER (
 )::int AS five_plus_hits,
 
         SUM(
-          CASE
-            WHEN matched_main = 5 AND matched_stars = 2
-            THEN 1 ELSE 0
-          END
-        )::int AS jackpots
+  CASE
+    WHEN matched_main = 5 AND matched_stars = 2
+    THEN 1 ELSE 0
+  END
+)::int AS jackpots,
+
+COALESCE(MAX(bc.baseline_wins), 0)::int AS baseline_wins,
+COALESCE(MAX(bc.baseline_compared_draws), 0)::int AS baseline_compared_draws
 
       FROM named
-      GROUP BY model_key, model_display_name
+LEFT JOIN baseline_compare bc
+  ON bc.model_key = named.model_key
+GROUP BY named.model_key, named.model_display_name
       ORDER BY
-        (AVG(matched_main) + AVG(matched_stars)) DESC NULLS LAST,
-        COUNT(*) DESC;
+  (AVG(named.matched_main) + AVG(named.matched_stars)) DESC NULLS LAST,
+  COUNT(*) DESC;
       `,
       [lottery],
     );
