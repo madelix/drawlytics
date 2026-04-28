@@ -605,6 +605,31 @@ export default function ModelPerformancePage() {
     ];
   }, [history, selectedModel]);
 
+  const baselineWinRate = useMemo(() => {
+    if (!history.length || !baselineHistory.length) return null;
+
+    const comparedDraws = Math.min(history.length, baselineHistory.length);
+
+    if (comparedDraws === 0) return null;
+
+    let wins = 0;
+
+    for (let i = 0; i < comparedDraws; i++) {
+      const modelHits = toNum(history[i].avg_total_hits, 0);
+      const baselineHits = toNum(baselineHistory[i].avg_total_hits, 0);
+
+      if (modelHits > baselineHits) {
+        wins += 1;
+      }
+    }
+
+    return {
+      wins,
+      comparedDraws,
+      percentage: (wins / comparedDraws) * 100,
+    };
+  }, [history, baselineHistory]);
+
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '28px 16px' }}>
       <header style={{ textAlign: 'center', marginBottom: 18 }}>
@@ -1094,6 +1119,17 @@ export default function ModelPerformancePage() {
                         ? 'moderate reliability'
                         : 'high reliability'}
                   </span>
+                  {baselineWinRate &&
+                    selectedModel?.model_key !== 'pure_random' && (
+                      <span>
+                        {' '}
+                        · beats baseline in{' '}
+                        <strong>
+                          {baselineWinRate.wins}/{baselineWinRate.comparedDraws}
+                        </strong>{' '}
+                        draws ({formatNum(baselineWinRate.percentage, 0)}%)
+                      </span>
+                    )}
                 </>
               );
             })()}
