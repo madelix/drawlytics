@@ -100,6 +100,9 @@ type ChartRow = {
   baseline_win_rate_global: number;
   baseline_wins: number;
   baseline_compared: number;
+  baseline_weighted_score: number;
+  strategy_score: number;
+  strategy_insight: string;
   insight: string;
   personality: 'stable' | 'aggressive' | 'balanced' | 'experimental';
 
@@ -216,7 +219,7 @@ export default function ModelPerformancePage() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [minChecked, setMinChecked] = useState(0);
   const [rankingMode, setRankingMode] = useState<
-    'average' | 'upside' | 'consistency'
+    'average' | 'upside' | 'consistency' | 'baseline'
   >('average');
   const [strategyMode, setStrategyMode] = useState<
     'safe' | 'balanced' | 'aggressive'
@@ -319,6 +322,11 @@ export default function ModelPerformancePage() {
         const baselineWinRateGlobal =
           baselineCompared > 0 ? baselineWins / baselineCompared : 0;
 
+        const baselineSampleFactor = Math.min(1, baselineCompared / 20);
+
+        const baselineWeightedScore =
+          baselineWinRateGlobal * baselineSampleFactor;
+
         const recommendationScore =
           avgTotal * 0.35 +
           upsideScore * 0.25 +
@@ -326,6 +334,40 @@ export default function ModelPerformancePage() {
           confidenceScore * 0.15;
 
         const delta = recentAvgTotal - avgTotal;
+
+        const strategyScore =
+          consistencyScore * 0.4 +
+          baselineWeightedScore * 0.4 +
+          Math.max(0, delta) * 0.2;
+
+        let strategyInsight: string;
+
+        if (baselineWeightedScore >= 0.5 && consistencyScore >= 0.5) {
+          strategyInsight =
+            baselineCompared >= 20
+              ? 'Strong and proven, consistently beats random'
+              : 'Strong performance, but still building sample';
+        } else if (baselineWeightedScore >= 0.5) {
+          strategyInsight =
+            baselineCompared >= 20
+              ? 'Beating random reliably, moderate consistency'
+              : 'Beating random, but sample is still limited';
+        } else if (consistencyScore >= 0.5) {
+          strategyInsight =
+            baselineCompared >= 20
+              ? 'Realiable and consistent, outperforming random with moderate edge'
+              : 'Consistent so far, but not yet proven vs random';
+        } else if (delta > 0.05) {
+          strategyInsight =
+            baselineCompared >= 10
+              ? 'Improving recently, showing emerging potential'
+              : 'Early signs of improvement, but very limited data';
+        } else {
+          strategyInsight =
+            baselineCompared >= 10
+              ? 'Unproven or below baseline performance'
+              : 'Too little data to assess reliably';
+        }
 
         if (delta > 0.05) {
           trend = 'up';
@@ -397,6 +439,9 @@ export default function ModelPerformancePage() {
           baseline_win_rate_global: baselineWinRateGlobal,
           baseline_wins: baselineWins,
           baseline_compared: baselineCompared,
+          baseline_weighted_score: baselineWeightedScore,
+          strategy_score: strategyScore,
+          strategy_insight: strategyInsight,
           trend,
           personality,
 
@@ -435,7 +480,9 @@ export default function ModelPerformancePage() {
           ? b.avg_total_hits - a.avg_total_hits
           : rankingMode === 'upside'
             ? b.upside_score - a.upside_score
-            : b.consistency_score - a.consistency_score,
+            : rankingMode === 'consistency'
+              ? b.consistency_score - a.consistency_score
+              : b.baseline_weighted_score - a.baseline_weighted_score,
       );
   }, [chartRows, minChecked, rankingMode]);
 
@@ -511,9 +558,19 @@ export default function ModelPerformancePage() {
     return Math.max(0, rows.length - filtered.length);
   }, [rows.length, filtered.length]);
 
-  const bestModel = useMemo(() => {
-    return filtered.length > 0 ? filtered[0] : null;
-  }, [filtered]);
+  const bestStrategyModel = useMemo(() => {
+    return (
+      [...chartRows].sort((a, b) => b.strategy_score - a.strategy_score)[0] ??
+      null
+    );
+  }, [chartRows]);
+
+  const strategyPortfolio = useMemo(() => {
+    return [...chartRows]
+      .filter((model) => model.model_key !== 'pure_random')
+      .sort((a, b) => b.strategy_score - a.strategy_score)
+      .slice(0, 3);
+  }, [chartRows]);
 
   const selectedModel = useMemo(() => {
     if (!selectedModelKey) return null;
@@ -718,48 +775,17 @@ export default function ModelPerformancePage() {
         }}
       >
         <Card
-          title={
-            rankingMode === 'average'
-              ? 'Top model (avg hits)'
-              : rankingMode === 'upside'
-                ? 'Top model (upside)'
-                : 'Top model (consistency)'
-          }
-          value={bestModel ? bestModel.model_display_name : '—'}
+          title="Best model right now"
+          value={bestStrategyModel ? bestStrategyModel.model_display_name : '—'}
           sub={
-            bestModel ? (
-              <>
-                {rankingMode === 'average' && (
-                  <>
-                    Avg hits{' '}
-                    <strong>{formatNum(bestModel.avg_total_hits, 2)}</strong>{' '}
-                    <span style={{ fontSize: 12 }}>
-                      (main {formatNum(bestModel.avg_main_n, 2)} + stars{' '}
-                      {formatNum(bestModel.avg_stars_n, 2)})
-                    </span>
-                  </>
-                )}
-
-                {rankingMode === 'upside' && (
-                  <>
-                    Upside score{' '}
-                    <strong>{formatNum(bestModel.upside_score, 2)}</strong>
-                  </>
-                )}
-
-                {rankingMode === 'consistency' && (
-                  <>
-                    Consistency{' '}
-                    <strong>{formatNum(bestModel.consistency_score, 2)}</strong>
-                  </>
-                )}
-              </>
+            bestStrategyModel ? (
+              <>{bestStrategyModel.strategy_insight}</>
             ) : (
               <>No models available.</>
             )
           }
           right={
-            bestModel ? (
+            bestStrategyModel ? (
               <span
                 aria-hidden
                 title="Model colour"
@@ -767,7 +793,7 @@ export default function ModelPerformancePage() {
                   width: 12,
                   height: 12,
                   borderRadius: 999,
-                  background: bestModel.color,
+                  background: bestStrategyModel.color,
                   display: 'inline-block',
                   marginTop: 2,
                 }}
@@ -777,32 +803,22 @@ export default function ModelPerformancePage() {
         />
 
         <Card
-          title="Most improved"
+          title="Suggested mix"
           value={
-            biggestMover ? biggestMover.model_display_name : 'No change yet'
+            strategyPortfolio.length > 0
+              ? strategyPortfolio
+                  .map((model) => model.model_display_name)
+                  .join(' + ')
+              : '—'
           }
           sub={
-            biggestMover ? (
-              <>Recent performance shift based on latest checked draws.</>
+            strategyPortfolio.length > 0 ? (
+              <span style={{ opacity: 0.7 }}>
+                Diversifies across top-performing models.
+              </span>
             ) : (
-              <>No model has moved meaningfully in recent checked draws.</>
+              <>No mix available yet.</>
             )
-          }
-          right={
-            biggestMover ? (
-              <span
-                aria-hidden
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: 999,
-                  background: biggestMover.color,
-                  display: 'inline-block',
-                  marginTop: 2,
-                }}
-                title="Model colour"
-              />
-            ) : null
           }
         />
 
@@ -953,7 +969,7 @@ export default function ModelPerformancePage() {
           </div>
           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
             {rankingMode === 'average'
-              ? 'Bars = avg(main + stars). Hover for details.'
+              ? 'Bars = avg(main + stars). Click a bar to inspect model history.'
               : rankingMode === 'upside'
                 ? 'Bars = upside score (high-hit potential).'
                 : 'Bars = consistency score (stability + sample size).'}
@@ -1622,6 +1638,7 @@ export default function ModelPerformancePage() {
           { label: 'Average hits', value: 'average' as const },
           { label: 'Upside score', value: 'upside' as const },
           { label: 'Consistency', value: 'consistency' as const },
+          { label: 'Baseline edge', value: 'baseline' as const },
         ].map((option) => {
           const active = rankingMode === option.value;
 
@@ -1660,7 +1677,9 @@ export default function ModelPerformancePage() {
           ? 'Ranked by average hits per prediction'
           : rankingMode === 'upside'
             ? 'Ranked by upside score'
-            : 'Ranked by consistency score'}
+            : rankingMode === 'consistency'
+              ? 'Ranked by consistency score'
+              : 'Ranked by how often the model beats Pure Random'}
       </div>
 
       {/* Table */}
