@@ -566,10 +566,17 @@ export default function ModelPerformancePage() {
   }, [chartRows]);
 
   const strategyPortfolio = useMemo(() => {
-    return [...chartRows]
+    const top = [...chartRows]
       .filter((model) => model.model_key !== 'pure_random')
       .sort((a, b) => b.strategy_score - a.strategy_score)
       .slice(0, 3);
+
+    const totalScore = top.reduce((sum, m) => sum + m.strategy_score, 0);
+
+    return top.map((m) => ({
+      ...m,
+      weight: totalScore > 0 ? m.strategy_score / totalScore : 0,
+    }));
   }, [chartRows]);
 
   const selectedModel = useMemo(() => {
@@ -807,15 +814,32 @@ export default function ModelPerformancePage() {
           value={
             strategyPortfolio.length > 0
               ? strategyPortfolio
-                  .map((model) => model.model_display_name)
+                  .map((model) =>
+                    model.model_display_name
+                      .replace('Balanced Hot/Cold', 'Balanced')
+                      .replace('Cold Focused', 'Cold')
+                      .replace('Hot Focused', 'Hot')
+                      .replace('Pure Random', 'Random'),
+                  )
                   .join(' + ')
               : '—'
           }
           sub={
             strategyPortfolio.length > 0 ? (
-              <span style={{ opacity: 0.7 }}>
-                Diversifies across top-performing models.
-              </span>
+              <>
+                Suggested split:{' '}
+                {strategyPortfolio
+                  .map((model) => {
+                    const shortName = model.model_display_name
+                      .replace('Balanced Hot/Cold', 'Balanced')
+                      .replace('Cold Focused', 'Cold')
+                      .replace('Hot Focused', 'Hot')
+                      .replace('Pure Random', 'Random');
+
+                    return `${shortName} ${Math.round(model.weight * 100)}%`;
+                  })
+                  .join(' · ')}
+              </>
             ) : (
               <>No mix available yet.</>
             )
