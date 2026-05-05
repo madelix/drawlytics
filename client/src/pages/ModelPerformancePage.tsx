@@ -335,10 +335,26 @@ export default function ModelPerformancePage() {
 
         const delta = recentAvgTotal - avgTotal;
 
-        const strategyScore =
-          consistencyScore * 0.4 +
-          baselineWeightedScore * 0.4 +
-          Math.max(0, delta) * 0.2;
+        let strategyScore: number;
+
+        if (strategyMode === 'safe') {
+          strategyScore =
+            consistencyScore * 0.5 +
+            baselineWeightedScore * 0.4 +
+            Math.max(0, delta) * 0.1;
+        } else if (strategyMode === 'aggressive') {
+          strategyScore =
+            consistencyScore * 0.2 +
+            baselineWeightedScore * 0.3 +
+            Math.max(0, delta) * 0.5 +
+            upsideScore * 0.3;
+        } else {
+          // balanced (default)
+          strategyScore =
+            consistencyScore * 0.4 +
+            baselineWeightedScore * 0.4 +
+            Math.max(0, delta) * 0.2;
+        }
 
         let strategyInsight: string;
 
