@@ -99,7 +99,7 @@ function AppHeader() {
               `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
             }
           >
-            Make magic
+            Strategy
           </NavLink>
 
           <NavLink
@@ -175,7 +175,7 @@ function AppHeader() {
               }`
             }
           >
-            Make magic
+            Strategy
           </NavLink>
 
           <NavLink

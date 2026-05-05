@@ -77,6 +77,7 @@ type ChartRow = {
   checked: number;
   total: number;
   checked_rate_pct: string;
+  strategy_mix_predictions: number;
 
   avg_main_n: number;
   avg_stars_n: number;
@@ -103,6 +104,7 @@ type ChartRow = {
   baseline_weighted_score: number;
   strategy_score: number;
   strategy_insight: string;
+  strategy_reasons: string[];
   insight: string;
   personality: 'stable' | 'aggressive' | 'balanced' | 'experimental';
 
@@ -385,6 +387,28 @@ export default function ModelPerformancePage() {
               : 'Too little data to assess reliably';
         }
 
+        const strategyReasons: string[] = [];
+
+        if (consistencyScore >= 0.5) {
+          strategyReasons.push('consistent results');
+        }
+
+        if (baselineWinRateGlobal >= 0.45 && baselineCompared >= 10) {
+          strategyReasons.push('competitive vs random');
+        }
+
+        if (delta > 0.05) {
+          strategyReasons.push('recently improving');
+        }
+
+        if (upsideScore >= 0.15) {
+          strategyReasons.push('some upside potential');
+        }
+
+        if (strategyReasons.length === 0) {
+          strategyReasons.push('best available balance for now');
+        }
+
         if (delta > 0.05) {
           trend = 'up';
         } else if (delta < -0.05) {
@@ -458,6 +482,7 @@ export default function ModelPerformancePage() {
           baseline_weighted_score: baselineWeightedScore,
           strategy_score: strategyScore,
           strategy_insight: strategyInsight,
+          strategy_reasons: strategyReasons,
           trend,
           personality,
 
@@ -594,6 +619,22 @@ export default function ModelPerformancePage() {
       weight: totalScore > 0 ? m.strategy_score / totalScore : 0,
     }));
   }, [chartRows]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'drawlytics_suggested_strategy_mix',
+        JSON.stringify(
+          strategyPortfolio.map((model) => ({
+            model_key: model.model_key,
+            weight: model.weight,
+          })),
+        ),
+      );
+    } catch {
+      // ignore localStorage errors
+    }
+  }, [strategyPortfolio]);
 
   const selectedModel = useMemo(() => {
     if (!selectedModelKey) return null;
@@ -802,7 +843,9 @@ export default function ModelPerformancePage() {
           value={bestStrategyModel ? bestStrategyModel.model_display_name : '—'}
           sub={
             bestStrategyModel ? (
-              <>{bestStrategyModel.strategy_insight}</>
+              <>
+                <div>{bestStrategyModel.strategy_insight}</div>
+              </>
             ) : (
               <>No models available.</>
             )
@@ -828,8 +871,36 @@ export default function ModelPerformancePage() {
         <Card
           title="Suggested mix"
           value={
-            strategyPortfolio.length > 0
-              ? strategyPortfolio
+            strategyPortfolio.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const mix = strategyPortfolio.map((model) => ({
+                    key: model.model_key,
+                    weight: model.weight,
+                  }));
+
+                  localStorage.setItem(
+                    'drawlytics_suggested_strategy_mix',
+                    JSON.stringify(mix),
+                  );
+
+                  window.location.href = '/make-magic';
+                }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: 0,
+                  margin: 0,
+                  font: 'inherit',
+                  fontWeight: 900,
+                  color: '#111827',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+                title="Open Strategy Builder"
+              >
+                {strategyPortfolio
                   .map((model) =>
                     model.model_display_name
                       .replace('Balanced Hot/Cold', 'Balanced')
@@ -837,8 +908,11 @@ export default function ModelPerformancePage() {
                       .replace('Hot Focused', 'Hot')
                       .replace('Pure Random', 'Random'),
                   )
-                  .join(' + ')
-              : '—'
+                  .join(' + ')}
+              </button>
+            ) : (
+              '—'
+            )
           }
           sub={
             strategyPortfolio.length > 0 ? (
@@ -2065,8 +2139,8 @@ export default function ModelPerformancePage() {
                           }}
                           title="Percentage of comparable draws where this model beat Pure Random"
                         >
-                          beats random{' '}
-                          {Math.round(r.baseline_win_rate_global * 100)}% ( n=
+                          baseline win rate{' '}
+                          {Math.round(r.baseline_win_rate_global * 100)}% (n=
                           {r.baseline_compared})
                         </div>
                       )}
@@ -2087,14 +2161,8 @@ export default function ModelPerformancePage() {
                           <div
                             style={{
                               fontSize: 11,
-                              fontWeight: 700,
-                              color:
-                                diff > 0
-                                  ? '#16a34a'
-                                  : diff < 0
-                                    ? '#dc2626'
-                                    : '#6b7280',
-                              marginTop: 2,
+                              opacity: 0.7,
+                              color: '#6b7280',
                             }}
                             title="Difference from Pure Random baseline"
                           >
@@ -2136,12 +2204,11 @@ export default function ModelPerformancePage() {
                       <div
                         style={{
                           fontSize: 11,
-                          fontWeight: 600,
-                          opacity: 0.9,
-                          color: reliabilityColor,
+                          opacity: 0.7,
+                          color: '#6b7280',
                         }}
                       >
-                        n={r.checked}
+                        sample {r.checked}
                       </div>
                     </td>
 

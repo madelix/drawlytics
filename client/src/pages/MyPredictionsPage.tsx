@@ -5,6 +5,7 @@ type PredictionRow = {
   id: number;
   lottery: string;
   model_name: string;
+  source?: string | null;
   draw_date: string; // "YYYY-MM-DD" or ISO
   main_numbers: number[];
   star_numbers: number[];
@@ -918,7 +919,12 @@ export default function MyPredictionsPage() {
                       <article
                         key={p.id}
                         style={{
-                          background: isPlayed ? '#f8fafc' : '#ffffff',
+                          background:
+                            p.source === 'strategy_mix'
+                              ? '#faf7ff'
+                              : isPlayed
+                                ? '#f8fafc'
+                                : '#ffffff',
                           borderRadius: '18px',
                           padding: '1rem 1.25rem',
                           boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
@@ -948,6 +954,22 @@ export default function MyPredictionsPage() {
                               }}
                             >
                               {p.lottery}
+                              {p.source === 'strategy_mix' && (
+                                <span
+                                  style={{
+                                    marginLeft: 8,
+                                    fontSize: '0.68rem',
+                                    fontWeight: 800,
+                                    padding: '2px 7px',
+                                    borderRadius: 999,
+                                    background: '#f5f3ff',
+                                    color: '#6d28d9',
+                                    letterSpacing: '0.04em',
+                                  }}
+                                >
+                                  Strategy mix
+                                </span>
+                              )}
                             </div>
 
                             <div style={{ fontWeight: 600 }}>

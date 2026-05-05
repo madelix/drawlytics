@@ -51,6 +51,33 @@ router.post('/predictions/debug-migrate-user', async (_req, res) => {
 });
 
 /**
+ * TEMP: POST /api/predictions/debug-migrate-source
+ * Adds source to predictions so strategy-mix lines can be labelled.
+ */
+router.post('/predictions/debug-migrate-source', async (_req, res) => {
+  try {
+    await pool.query(
+      `ALTER TABLE predictions ADD COLUMN IF NOT EXISTS source text;`,
+    );
+
+    await pool.query(
+      `UPDATE predictions SET source = 'manual' WHERE source IS NULL;`,
+    );
+
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_predictions_source ON predictions(source);`,
+    );
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('debug-migrate-source error:', err);
+    return res
+      .status(500)
+      .json({ ok: false, error: 'debug_migrate_source_failed' });
+  }
+});
+
+/**
  * Resolve EuroMillions draw date:
  * - If client provides draw_date: validate and use it (date-only UTC midnight)
  * - If not provided:
@@ -152,18 +179,19 @@ router.get('/predictions', async (_req, res) => {
     const { rows } = await pool.query(
       `
       SELECT
-        id,
-        lottery,
-        draw_date,
-        model_name,
-        main_numbers,
-        star_numbers,
-        confidence,
-        status,
-        created_at,
-        matched_main,
-        matched_stars,
-        result_label
+  id,
+  lottery,
+  draw_date,
+  model_name,
+  main_numbers,
+  star_numbers,
+  confidence,
+  status,
+  created_at,
+  matched_main,
+  matched_stars,
+  result_label,
+  source
       FROM predictions
 WHERE user_id = 1
 ORDER BY created_at DESC
@@ -214,6 +242,7 @@ router.post('/predictions/generate', async (req, res) => {
   try {
     const lotteryRaw = String(req.body?.lottery ?? '').trim();
     const strategy = String(req.body?.strategy ?? 'pure_random').trim();
+    const source = String(req.body?.source ?? 'manual').trim();
     const linesRaw = Number(req.body?.lines ?? 1);
     const drawDateRaw = req.body?.draw_date ? String(req.body.draw_date) : null;
 
@@ -293,7 +322,8 @@ router.post('/predictions/generate', async (req, res) => {
   matched_stars,
   result_label,
   status,
-  user_id
+user_id,
+source
 )
         VALUES (
   $1,
@@ -307,7 +337,8 @@ router.post('/predictions/generate', async (req, res) => {
   NULL,
   NULL,
   'pending',
-  1
+1,
+$7
 )
         RETURNING
           id,
@@ -323,7 +354,15 @@ router.post('/predictions/generate', async (req, res) => {
           matched_stars,
           result_label
         `,
-        ['EuroMillions', draw_date, model_name, line.main, line.stars, 0],
+        [
+          'EuroMillions',
+          draw_date,
+          model_name,
+          line.main,
+          line.stars,
+          0,
+          source,
+        ],
       );
 
       saved.push(rows[0]);

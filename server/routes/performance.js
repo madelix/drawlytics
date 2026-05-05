@@ -49,6 +49,7 @@ router.get('/performance/models', async (req, res) => {
           status,
           matched_main,
           matched_stars
+          source
         FROM base
       ),
         named AS (
@@ -66,6 +67,7 @@ router.get('/performance/models', async (req, res) => {
           status,
           matched_main,
           matched_stars
+          source
         FROM normalized
       ),
       ranked_checked AS (
@@ -104,6 +106,9 @@ baseline_compare AS (
         named.model_display_name,
 
         COUNT(*)::int AS total_predictions,
+        COUNT(*) FILTER (
+  WHERE source = 'strategy_mix'
+)::int AS strategy_mix_predictions,
         COUNT(*) FILTER (
   WHERE LOWER(TRIM(status)) = 'checked'
 )::int AS checked_predictions,

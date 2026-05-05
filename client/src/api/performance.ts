@@ -8,6 +8,7 @@ export type ModelPerformanceRow = {
 
   total_predictions: number;
   checked_predictions: number;
+  strategy_mix_predictions: number;
 
   // returned from Postgres as numeric -> often string in node-postgres
   checked_rate_pct: string;
