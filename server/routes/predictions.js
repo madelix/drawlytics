@@ -268,6 +268,14 @@ router.post('/predictions/generate', async (req, res) => {
       return res.status(400).json({ ok: false, error: resolved.error });
     }
     const draw_date = resolved.draw_date;
+    const { rows: historyRows } = await pool.query(
+      `
+  SELECT n1, n2, n3, n4, n5, s1, s2
+  FROM euromillions_draws
+  ORDER BY draw_date DESC
+  LIMIT 200
+  `,
+    );
 
     const randInt = (min, max) =>
       Math.floor(Math.random() * (max - min + 1)) + min;
@@ -314,12 +322,43 @@ router.post('/predictions/generate', async (req, res) => {
       return weights;
     };
 
+    const buildFrequencyWeights = (min, max, rows, keys) => {
+      const counts = new Map();
+
+      for (let n = min; n <= max; n++) {
+        counts.set(n, 1); // small baseline so every number remains possible
+      }
+
+      for (const row of rows) {
+        for (const key of keys) {
+          const n = Number(row[key]);
+          if (Number.isFinite(n)) {
+            counts.set(n, (counts.get(n) ?? 1) + 1);
+          }
+        }
+      }
+
+      return Array.from(counts.entries()).map(([n, weight]) => ({
+        n,
+        weight,
+      }));
+    };
+
     const generateOneLine = () => {
       if (strategy === 'ai:xgboost') {
         return {
-          main: weightedSampleUnique(buildLinearWeights(1, 50, 'ascending'), 5),
+          main: weightedSampleUnique(
+            buildFrequencyWeights(1, 50, historyRows, [
+              'n1',
+              'n2',
+              'n3',
+              'n4',
+              'n5',
+            ]),
+            5,
+          ),
           stars: weightedSampleUnique(
-            buildLinearWeights(1, 12, 'ascending'),
+            buildFrequencyWeights(1, 12, historyRows, ['s1', 's2']),
             2,
           ),
         };
