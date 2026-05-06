@@ -635,6 +635,43 @@ router.post('/predictions/generate', async (req, res) => {
       }));
     };
 
+    const buildLSTMWeights = (min, max, rows, keys) => {
+      const memory = new Map();
+
+      for (let n = min; n <= max; n++) {
+        memory.set(n, 1);
+      }
+
+      rows.forEach((row, index) => {
+        const memoryStrength = Math.max(1, rows.length - index);
+
+        for (const key of keys) {
+          const n = Number(row[key]);
+
+          if (Number.isFinite(n)) {
+            let retention = 1 + memoryStrength * 0.45;
+
+            // Long-memory continuation preference
+            if (index < rows.length * 0.35) {
+              retention += 2;
+            }
+
+            // Sequential smoothing
+            if (n >= min + 5 && n <= max - 5) {
+              retention += 1.25;
+            }
+
+            memory.set(n, (memory.get(n) ?? 1) + retention);
+          }
+        }
+      });
+
+      return Array.from(memory.entries()).map(([n, weight]) => ({
+        n,
+        weight,
+      }));
+    };
+
     const generateOneLine = () => {
       if (strategy === 'ai:xgboost') {
         return {
@@ -811,6 +848,27 @@ router.post('/predictions/generate', async (req, res) => {
             buildNeuralNetworkWeights(1, 12, historyRows, ['s1', 's2']),
             2,
             1.9,
+          ),
+        };
+      }
+
+      if (strategy === 'ai:lstm') {
+        return {
+          main: weightedSampleUnique(
+            buildLSTMWeights(1, 50, historyRows, [
+              'n1',
+              'n2',
+              'n3',
+              'n4',
+              'n5',
+            ]),
+            5,
+            1.7,
+          ),
+          stars: weightedSampleUnique(
+            buildLSTMWeights(1, 12, historyRows, ['s1', 's2']),
+            2,
+            1.6,
           ),
         };
       }
