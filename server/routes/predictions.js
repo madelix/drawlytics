@@ -720,6 +720,30 @@ router.post('/predictions/generate', async (req, res) => {
       }));
     };
 
+    const getBaseConfidence = (strategyKey) => {
+      const confidenceMap = {
+        'ai:xgboost': 72,
+        'ai:random_forest': 68,
+        'ai:bayesian': 74,
+        'ai:gradient_boosting': 66,
+        'ai:markov_chain': 63,
+        'ai:statistical_analysis': 70,
+        'ai:decision_tree': 67,
+        'ai:q_learning': 61,
+        'ai:neural_network': 69,
+        'ai:lstm': 65,
+        'ai:ensemble': 76,
+        'ai:meta_learning': 73,
+        balanced_hot_cold: 58,
+        hot_focused: 56,
+        cold_focused: 54,
+        overdue: 55,
+        pure_random: 35,
+      };
+
+      return confidenceMap[strategyKey] ?? 50;
+    };
+
     const generateOneLine = () => {
       if (strategy === 'ai:xgboost') {
         return {
@@ -1012,6 +1036,8 @@ router.post('/predictions/generate', async (req, res) => {
 
     for (let i = 0; i < lines; i++) {
       const line = generateOneLine();
+      const confidence =
+        getBaseConfidence(strategy) + Math.floor(Math.random() * 8) - 4;
       const model_name = strategy.startsWith('ai:')
         ? strategy
         : `make_magic:${strategy}`;
@@ -1049,18 +1075,19 @@ source
 $7
 )
         RETURNING
-          id,
-          lottery,
-          draw_date,
-          model_name,
-          main_numbers,
-          star_numbers,
-          confidence,
-          status,
-          created_at,
-          matched_main,
-          matched_stars,
-          result_label
+  id,
+  lottery,
+  draw_date,
+  model_name,
+  main_numbers,
+  star_numbers,
+  confidence,
+  status,
+  created_at,
+  matched_main,
+  matched_stars,
+  result_label,
+  source
         `,
         [
           'EuroMillions',
@@ -1068,7 +1095,7 @@ $7
           model_name,
           line.main,
           line.stars,
-          0,
+          confidence,
           source,
         ],
       );

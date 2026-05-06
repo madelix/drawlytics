@@ -1220,19 +1220,7 @@ export default function MyPredictionsPage() {
                               </div>
 
                               <div style={{ fontWeight: 600 }}>
-                                {(() => {
-                                  const modelKey =
-                                    p.source === 'strategy_mix'
-                                      ? 'strategy_mix'
-                                      : getModelKeyFromName(p.model_name);
-
-                                  const liveConfidence =
-                                    performanceByModelKey[modelKey]?.confidence;
-
-                                  return liveConfidence != null
-                                    ? `${(liveConfidence * 100).toFixed(0)}%`
-                                    : `${Number(p.confidence).toFixed(2)}%`;
-                                })()}
+                                {`${Math.round(Number(p.confidence) || 0)}%`}
                               </div>
 
                               {(p.matched_main != null ||
