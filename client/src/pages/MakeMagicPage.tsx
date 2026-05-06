@@ -32,6 +32,67 @@ const STRATEGIES = [
     description: 'AI-style boosted model for pattern-weighted predictions.',
   },
   {
+    value: 'ai:ensemble',
+    label: 'AI Ensemble',
+    description: 'Combines multiple AI-style model signals into one line.',
+  },
+  {
+    value: 'ai:random_forest',
+    label: 'AI Random Forest',
+    description: 'Tree-based AI-style model using repeated pattern sampling.',
+  },
+  {
+    value: 'ai:gradient_boosting',
+    label: 'AI Gradient Boosting',
+    description: 'Boosted AI-style model focused on stronger weighted signals.',
+  },
+  {
+    value: 'ai:statistical_analysis',
+    label: 'AI Statistical Analysis',
+    description: 'AI-assisted statistical weighting using historical patterns.',
+  },
+  {
+    value: 'ai:decision_tree',
+    label: 'AI Decision Tree',
+    description: 'Rule-based AI-style model using branching pattern logic.',
+  },
+  {
+    value: 'ai:q_learning',
+    label: 'AI Q-Learning',
+    description:
+      'Reinforcement-style model for testing reward-based selection.',
+  },
+  {
+    value: 'ai:neural_network',
+    label: 'AI Neural Network',
+    description:
+      'Neural-style weighted pattern model trained on historical draws.',
+  },
+  {
+    value: 'ai:lstm',
+    label: 'AI LSTM',
+    description:
+      'Sequence-focused AI model attempting temporal draw pattern learning.',
+  },
+  {
+    value: 'ai:markov_chain',
+    label: 'AI Markov Chain',
+    description:
+      'Transition-based model using historical sequence probabilities.',
+  },
+  {
+    value: 'ai:bayesian',
+    label: 'AI Bayesian',
+    description:
+      'Probability-driven AI model updating likelihoods from past outcomes.',
+  },
+  {
+    value: 'ai:meta_learning',
+    label: 'AI Meta Learning',
+    description:
+      'Adaptive AI model designed to learn which strategies perform best over time.',
+  },
+  {
     value: 'pure_random',
     label: 'Pure random',
     description: 'Uniform random within valid ranges.',
@@ -44,6 +105,17 @@ const STRATEGY_COLORS: Record<string, string> = {
   hot_focused: '#EF4444',
   cold_focused: '#2563EB',
   'ai:xgboost': '#06B6D4',
+  'ai:ensemble': '#14B8A6',
+  'ai:random_forest': '#0EA5E9',
+  'ai:gradient_boosting': '#8B5CF6',
+  'ai:statistical_analysis': '#6366F1',
+  'ai:decision_tree': '#10B981',
+  'ai:q_learning': '#EC4899',
+  'ai:neural_network': '#7C3AED',
+  'ai:lstm': '#2563EB',
+  'ai:markov_chain': '#84CC16',
+  'ai:bayesian': '#F59E0B',
+  'ai:meta_learning': '#A855F7',
   pure_random: '#22C55E',
 };
 
@@ -58,6 +130,17 @@ export function MakeMagicPage() {
     hot_focused: 1,
     cold_focused: 1,
     'ai:xgboost': 1,
+    'ai:ensemble': 1,
+    'ai:random_forest': 1,
+    'ai:gradient_boosting': 1,
+    'ai:statistical_analysis': 1,
+    'ai:decision_tree': 1,
+    'ai:q_learning': 1,
+    'ai:neural_network': 1,
+    'ai:lstm': 1,
+    'ai:markov_chain': 1,
+    'ai:bayesian': 1,
+    'ai:meta_learning': 1,
     pure_random: 1,
   });
   const [status, setStatus] = useState<SaveStatus>('idle');
@@ -88,6 +171,17 @@ export function MakeMagicPage() {
         hot_focused: 0,
         cold_focused: 0,
         'ai:xgboost': 0,
+        'ai:ensemble': 0,
+        'ai:random_forest': 0,
+        'ai:gradient_boosting': 0,
+        'ai:statistical_analysis': 0,
+        'ai:decision_tree': 0,
+        'ai:q_learning': 0,
+        'ai:neural_network': 0,
+        'ai:lstm': 0,
+        'ai:markov_chain': 0,
+        'ai:bayesian': 0,
+        'ai:meta_learning': 0,
         pure_random: 0,
       };
 
