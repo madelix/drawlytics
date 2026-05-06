@@ -1,6 +1,5 @@
 // client/src/pages/MyPredictionsPage.tsx
 import React, { CSSProperties, useEffect, useMemo, useState } from 'react';
-import { getModelPerformance } from '../api/performance';
 
 type PredictionRow = {
   id: number;
@@ -55,11 +54,6 @@ type PlayedMapResponse = {
   error?: string;
 };
 
-type PerformanceLookupRow = {
-  model_key: string;
-  confidence: number;
-};
-
 async function fetchJsonOrThrow<T>(
   url: string,
   init?: RequestInit,
@@ -99,37 +93,6 @@ function toDayKey(value: string | Date | null | undefined): string | null {
 function formatDayLabel(dayKey: string): string {
   const [y, m, d] = dayKey.split('-');
   return `${d}/${m}/${y}`;
-}
-
-function getModelKeyFromName(raw: string): string {
-  const s = String(raw ?? '')
-    .trim()
-    .toLowerCase();
-
-  if (s.startsWith('make_magic:')) {
-    return s.slice('make_magic:'.length).trim();
-  }
-
-  if (s.includes('cold-focused')) return 'cold_focused';
-  if (s.includes('hot-focused')) return 'hot_focused';
-  if (s.includes('balanced hot/cold')) return 'balanced_hot_cold';
-  if (s.includes('pure random')) return 'pure_random';
-  if (s.includes('overdue')) return 'overdue';
-  if (s.includes('ai ensemble')) return 'ai_ensemble';
-  if (s.includes('ai statistical analysis')) return 'ai_statistical_analysis';
-  if (s.includes('ai random forest')) return 'ai_random_forest';
-  if (s.includes('ai decision tree')) return 'ai_decision_tree';
-  if (s.includes('ai gradient boosting')) return 'ai_gradient_boosting';
-  if (s.includes('ai xgboost')) return 'ai_xgboost';
-  if (s.includes('ai q-learning')) return 'ai_q_learning';
-  if (s.includes('ai advanced analysis')) return 'ai_advanced_analysis';
-  if (s.includes('ai markov chain')) return 'ai_markov_chain';
-  if (s.includes('ai meta learning')) return 'ai_meta_learning';
-
-  return s
-    .replace(/ generator/g, '')
-    .replace(/-focused/g, '')
-    .replace(/\s+/g, '_');
 }
 
 function formatModelDisplayName(raw: string): string {
@@ -259,9 +222,6 @@ export default function MyPredictionsPage() {
   const [playingId, setPlayingId] = useState<number | null>(null);
 
   const [drawMap, setDrawMap] = useState<Record<string, DrawLookup>>({});
-  const [performanceByModelKey, setPerformanceByModelKey] = useState<
-    Record<string, PerformanceLookupRow>
-  >({});
 
   const [usage, setUsage] = useState<{
     used: number;
@@ -284,40 +244,7 @@ export default function MyPredictionsPage() {
     void loadPlayedMap();
     void loadDrawsForHighlighting();
     void loadUsage();
-    void loadModelPerformance();
   }, []);
-
-  async function loadModelPerformance() {
-    try {
-      const data = await getModelPerformance({ lottery: 'euromillions' });
-
-      const next: Record<string, PerformanceLookupRow> = {};
-
-      for (const model of data.models ?? []) {
-        const avgMain = Number(model.avg_main ?? 0);
-        const avgStars = Number(model.avg_stars ?? 0);
-        const avgTotal = avgMain + avgStars;
-        const checked = model.checked_predictions ?? 0;
-        const highHitCount = model.high_hit_predictions ?? 0;
-        const highHitRate = checked > 0 ? highHitCount / checked : 0;
-        const sampleFactor = Math.min(1, checked / 20);
-
-        const consistencyScore =
-          (avgTotal * 0.6 + highHitRate * 0.4) * sampleFactor;
-
-        const confidence = consistencyScore * 0.6 + sampleFactor * 0.4;
-
-        next[model.model_key] = {
-          model_key: model.model_key,
-          confidence,
-        };
-      }
-
-      setPerformanceByModelKey(next);
-    } catch (err) {
-      console.warn('Could not load model performance confidence', err);
-    }
-  }
 
   async function loadUsage() {
     try {
