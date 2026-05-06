@@ -286,19 +286,24 @@ router.post('/predictions/generate', async (req, res) => {
       return Array.from(set).sort((a, b) => a - b);
     };
 
-    const weightedSampleUnique = (weights, count) => {
+    const weightedSampleUnique = (weights, count, temperature = 1) => {
       const picked = new Set();
 
       while (picked.size < count) {
         const available = weights.filter((item) => !picked.has(item.n));
-        const totalWeight = available.reduce(
+        const adjusted = available.map((item) => ({
+          ...item,
+          weight: Math.pow(item.weight, 1 / temperature),
+        }));
+
+        const totalWeight = adjusted.reduce(
           (sum, item) => sum + item.weight,
           0,
         );
 
         let roll = Math.random() * totalWeight;
 
-        for (const item of available) {
+        for (const item of adjusted) {
           roll -= item.weight;
           if (roll <= 0) {
             picked.add(item.n);
@@ -344,11 +349,35 @@ router.post('/predictions/generate', async (req, res) => {
       }));
     };
 
+    const buildRecencyFrequencyWeights = (min, max, rows, keys) => {
+      const counts = new Map();
+
+      for (let n = min; n <= max; n++) {
+        counts.set(n, 1);
+      }
+
+      rows.forEach((row, index) => {
+        const recencyBoost = Math.max(1, rows.length - index);
+
+        for (const key of keys) {
+          const n = Number(row[key]);
+          if (Number.isFinite(n)) {
+            counts.set(n, (counts.get(n) ?? 1) + recencyBoost);
+          }
+        }
+      });
+
+      return Array.from(counts.entries()).map(([n, weight]) => ({
+        n,
+        weight,
+      }));
+    };
+
     const generateOneLine = () => {
       if (strategy === 'ai:xgboost') {
         return {
           main: weightedSampleUnique(
-            buildFrequencyWeights(1, 50, historyRows, [
+            buildRecencyFrequencyWeights(1, 50, historyRows, [
               'n1',
               'n2',
               'n3',
@@ -356,10 +385,12 @@ router.post('/predictions/generate', async (req, res) => {
               'n5',
             ]),
             5,
+            1.8,
           ),
           stars: weightedSampleUnique(
-            buildFrequencyWeights(1, 12, historyRows, ['s1', 's2']),
+            buildRecencyFrequencyWeights(1, 12, historyRows, ['s1', 's2']),
             2,
+            1.6,
           ),
         };
       }
