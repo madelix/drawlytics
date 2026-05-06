@@ -687,6 +687,39 @@ router.post('/predictions/generate', async (req, res) => {
       }));
     };
 
+    const buildMetaLearningWeights = (min, max, rows, keys) => {
+      const meta = new Map();
+
+      for (let n = min; n <= max; n++) {
+        meta.set(n, 1);
+      }
+
+      const recency = buildRecencyFrequencyWeights(min, max, rows, keys);
+      const bayesian = buildBayesianWeights(min, max, rows, keys);
+      const statistical = buildStatisticalWeights(min, max, rows, keys);
+      const trend = buildTrendBoostWeights(min, max, rows, keys);
+
+      for (let i = 0; i < recency.length; i++) {
+        const n = recency[i].n;
+
+        const combined =
+          recency[i].weight * 0.3 +
+          bayesian[i].weight * 0.2 +
+          statistical[i].weight * 0.25 +
+          trend[i].weight * 0.25;
+
+        // Adaptive exploration
+        const explorationBoost = Math.random() * 2;
+
+        meta.set(n, combined + explorationBoost);
+      }
+
+      return Array.from(meta.entries()).map(([n, weight]) => ({
+        n,
+        weight,
+      }));
+    };
+
     const generateOneLine = () => {
       if (strategy === 'ai:xgboost') {
         return {
@@ -925,6 +958,27 @@ router.post('/predictions/generate', async (req, res) => {
             ),
             2,
             1.9,
+          ),
+        };
+      }
+
+      if (strategy === 'ai:meta_learning') {
+        return {
+          main: weightedSampleUnique(
+            buildMetaLearningWeights(1, 50, historyRows, [
+              'n1',
+              'n2',
+              'n3',
+              'n4',
+              'n5',
+            ]),
+            5,
+            2.4,
+          ),
+          stars: weightedSampleUnique(
+            buildMetaLearningWeights(1, 12, historyRows, ['s1', 's2']),
+            2,
+            2.2,
           ),
         };
       }
