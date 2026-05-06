@@ -45,6 +45,13 @@ function strategyLabel(strategy: 'safe' | 'balanced' | 'aggressive') {
   return 'Balanced';
 }
 
+function reliabilityLabel(checked: number) {
+  if (checked >= 50) return 'Proven sample';
+  if (checked >= 20) return 'Reliable sample';
+  if (checked >= 10) return 'Building evidence';
+  return 'Low sample';
+}
+
 const MODEL_COLOR_MAP: Record<string, string> = {
   balanced_hot_cold: '#7C3AED', // purple
   hot_focused: '#EF4444', // red
@@ -96,6 +103,7 @@ type ChartRow = {
   recent_avg_total_hits_n: number;
 
   confidence: number;
+  reliability: string;
   jackpots: number;
   high_hit_predictions: number;
   four_plus_hits: number;
@@ -481,6 +489,7 @@ export default function ModelPerformancePage() {
           recommendation_score: recommendationScore,
 
           confidence: confidenceScore,
+          reliability: reliabilityLabel(checked),
           jackpots: r.jackpots ?? 0,
           high_hit_predictions: r.high_hit_predictions ?? 0,
           four_plus_hits: r.four_plus_hits ?? 0,
