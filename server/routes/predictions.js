@@ -672,6 +672,21 @@ router.post('/predictions/generate', async (req, res) => {
       }));
     };
 
+    const mergeWeightSets = (...sets) => {
+      const merged = new Map();
+
+      for (const set of sets) {
+        for (const item of set) {
+          merged.set(item.n, (merged.get(item.n) ?? 0) + item.weight);
+        }
+      }
+
+      return Array.from(merged.entries()).map(([n, weight]) => ({
+        n,
+        weight,
+      }));
+    };
+
     const generateOneLine = () => {
       if (strategy === 'ai:xgboost') {
         return {
@@ -869,6 +884,47 @@ router.post('/predictions/generate', async (req, res) => {
             buildLSTMWeights(1, 12, historyRows, ['s1', 's2']),
             2,
             1.6,
+          ),
+        };
+      }
+
+      if (strategy === 'ai:ensemble') {
+        return {
+          main: weightedSampleUnique(
+            mergeWeightSets(
+              buildRecencyFrequencyWeights(1, 50, historyRows, [
+                'n1',
+                'n2',
+                'n3',
+                'n4',
+                'n5',
+              ]),
+              buildBayesianWeights(1, 50, historyRows, [
+                'n1',
+                'n2',
+                'n3',
+                'n4',
+                'n5',
+              ]),
+              buildStatisticalWeights(1, 50, historyRows, [
+                'n1',
+                'n2',
+                'n3',
+                'n4',
+                'n5',
+              ]),
+            ),
+            5,
+            2.0,
+          ),
+          stars: weightedSampleUnique(
+            mergeWeightSets(
+              buildRecencyFrequencyWeights(1, 12, historyRows, ['s1', 's2']),
+              buildBayesianWeights(1, 12, historyRows, ['s1', 's2']),
+              buildStatisticalWeights(1, 12, historyRows, ['s1', 's2']),
+            ),
+            2,
+            1.9,
           ),
         };
       }
