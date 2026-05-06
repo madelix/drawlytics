@@ -1682,74 +1682,6 @@ export default function ModelPerformancePage() {
         <span style={{ color: '#166534', fontWeight: 600 }}> strong</span> (25+)
       </div>
 
-      {/* Confidence legend */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: 10,
-          flexWrap: 'wrap',
-          margin: '10px 0 12px',
-          fontSize: 12,
-          color: '#6b7280',
-          textAlign: 'center',
-        }}
-      >
-        <span style={{ fontWeight: 700, color: '#111827' }}>Confidence:</span>
-
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '4px 10px',
-            borderRadius: 999,
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            color: '#b91c1c',
-            fontWeight: 800,
-          }}
-          title="Low confidence (score < 0.33)"
-        >
-          Low <span style={{ fontWeight: 700, opacity: 0.8 }}>(0–0.32)</span>
-        </span>
-
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '4px 10px',
-            borderRadius: 999,
-            background: '#fffbeb',
-            border: '1px solid #fde68a',
-            color: '#b45309',
-            fontWeight: 800,
-          }}
-          title="Medium confidence (0.33–0.65)"
-        >
-          Medium{' '}
-          <span style={{ fontWeight: 700, opacity: 0.8 }}>(0.33–0.65)</span>
-        </span>
-
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '4px 10px',
-            borderRadius: 999,
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
-            color: '#166534',
-            fontWeight: 800,
-          }}
-          title="High confidence (score ≥ 0.66)"
-        >
-          High <span style={{ fontWeight: 700, opacity: 0.8 }}>(0.66+)</span>
-        </span>
-      </div>
-
       <div
         style={{
           fontWeight: 900,
@@ -1890,50 +1822,12 @@ export default function ModelPerformancePage() {
                   r.checked < 10 ? 'Low' : r.checked < 25 ? 'Medium' : 'High';
 
                 const conf = r.confidence ?? 0;
-                const confLabel =
-                  conf >= 0.66 ? 'High' : conf >= 0.33 ? 'Medium' : 'Low';
-                const confColor =
-                  conf >= 0.66
-                    ? '#166534'
-                    : conf >= 0.33
-                      ? '#b45309'
-                      : '#b91c1c';
-                const confFill =
-                  conf >= 0.66
-                    ? '#22c55e'
-                    : conf >= 0.33
-                      ? '#f59e0b'
-                      : '#ef4444';
+
+                const confFill = '#6d28d9';
 
                 const jackpotScore = r.upside_score;
 
-                const jackpotPotBg =
-                  jackpotScore >= 0.35
-                    ? '#ecfdf5'
-                    : jackpotScore >= 0.15
-                      ? '#fffbeb'
-                      : '#fef2f2';
-
-                const jackpotPotBorder =
-                  jackpotScore >= 0.35
-                    ? '1px solid #bbf7d0'
-                    : jackpotScore >= 0.15
-                      ? '1px solid #fde68a'
-                      : '1px solid #fecaca';
-
-                const jackpotPotColor =
-                  jackpotScore >= 0.35
-                    ? '#166534'
-                    : jackpotScore >= 0.15
-                      ? '#b45309'
-                      : '#b91c1c';
-
-                const jackpotPotLabel =
-                  jackpotScore >= 0.35
-                    ? 'High'
-                    : jackpotScore >= 0.15
-                      ? 'Medium'
-                      : 'Low';
+                const jackpotPotLabel = formatNum(jackpotScore, 2);
 
                 return (
                   <tr key={r.model_key}>
@@ -2000,86 +1894,27 @@ export default function ModelPerformancePage() {
                             </span>
                           )}
 
-                          {r.model_key === 'pure_random' && (
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 800,
-                                letterSpacing: '0.04em',
-                                textTransform: 'uppercase',
-                                padding: '3px 8px',
-                                borderRadius: 999,
-                                background: '#f8fafc',
-                                border: '1px dashed #cbd5f5',
-                                color: '#475569',
-                                marginLeft: 6,
-                              }}
-                            >
-                              Baseline
-                            </span>
-                          )}
+                          {r.model_key !== 'pure_random' &&
+                            r.baseline_compared >= 5 && (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 800,
+                                  letterSpacing: '0.04em',
+                                  textTransform: 'uppercase',
+                                  padding: '3px 8px',
+                                  borderRadius: 999,
+                                  background: '#f8fafc',
+                                  border: '1px dashed #cbd5f5',
+                                  color: '#475569',
+                                  marginLeft: 6,
+                                }}
+                              >
+                                Baseline
+                              </span>
+                            )}
 
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 800,
-                              letterSpacing: '0.04em',
-                              textTransform: 'uppercase',
-                              padding: '3px 8px',
-                              borderRadius: 999,
-                              background:
-                                r.personality === 'stable'
-                                  ? '#eef2ff' // soft blue
-                                  : r.personality === 'aggressive'
-                                    ? '#fff7ed' // orange (upside / risk)
-                                    : r.personality === 'balanced'
-                                      ? '#ecfdf5' // green
-                                      : '#faf5ff', // purple (new)
-
-                              color:
-                                r.personality === 'stable'
-                                  ? '#3730a3'
-                                  : r.personality === 'aggressive'
-                                    ? '#c2410c'
-                                    : r.personality === 'balanced'
-                                      ? '#166534'
-                                      : '#7c3aed',
-                              flex: '0 0 auto',
-                            }}
-                          >
-                            {r.personality === 'experimental'
-                              ? 'Emerging'
-                              : r.personality === 'stable'
-                                ? 'Reliable'
-                                : r.personality === 'aggressive'
-                                  ? 'High risk'
-                                  : 'Balanced'}
-                          </span>
-
-                          <span
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 800,
-                              color:
-                                delta === null
-                                  ? '#6b7280'
-                                  : delta > 0
-                                    ? '#16a34a'
-                                    : delta < 0
-                                      ? '#dc2626'
-                                      : '#6b7280',
-                              flex: '0 0 auto',
-                            }}
-                            title={
-                              delta === null
-                                ? 'New model'
-                                : delta > 0
-                                  ? `Up ${delta}`
-                                  : delta < 0
-                                    ? `Down ${Math.abs(delta)}`
-                                    : 'No change'
-                            }
-                          >
+                          {r.personality !== 'stable' && (
                             <span
                               style={{
                                 fontSize: 10,
@@ -2089,40 +1924,28 @@ export default function ModelPerformancePage() {
                                 padding: '3px 8px',
                                 borderRadius: 999,
                                 background:
-                                  trend === 'up'
-                                    ? '#ecfdf5'
-                                    : trend === 'down'
-                                      ? '#fef2f2'
-                                      : trend === 'flat'
-                                        ? '#f8fafc'
-                                        : '#faf5ff',
+                                  r.personality === 'aggressive'
+                                    ? '#fff7ed'
+                                    : r.personality === 'balanced'
+                                      ? '#ecfdf5'
+                                      : '#faf5ff',
+
                                 color:
-                                  trend === 'up'
-                                    ? '#166534'
-                                    : trend === 'down'
-                                      ? '#b91c1c'
-                                      : trend === 'flat'
-                                        ? '#475569'
-                                        : '#7c3aed',
+                                  r.personality === 'aggressive'
+                                    ? '#c2410c'
+                                    : r.personality === 'balanced'
+                                      ? '#166534'
+                                      : '#7c3aed',
                                 flex: '0 0 auto',
                               }}
-                              title={
-                                trend === 'up'
-                                  ? 'Recent performance improving'
-                                  : trend === 'down'
-                                    ? 'Recent performance declining'
-                                    : trend === 'flat'
-                                      ? 'Recent performance stable'
-                                      : 'Not enough previous data yet'
-                              }
                             >
-                              {trend === 'up'
-                                ? `↑ +${formatNum(r.trend_delta, 2)}`
-                                : trend === 'down'
-                                  ? `↓ ${formatNum(Math.abs(r.trend_delta), 2)}`
-                                  : 'Stable'}
+                              {r.personality === 'experimental'
+                                ? 'Emerging'
+                                : r.personality === 'aggressive'
+                                  ? 'High risk'
+                                  : 'Balanced'}
                             </span>
-                          </span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -2138,20 +1961,6 @@ export default function ModelPerformancePage() {
                         <span title="Checked vs total predictions (only checked are evaluated)">
                           {r.checked}/{r.total}
                         </span>
-
-                        <span
-                          title={`Sample reliability: ${reliabilityLabel}`}
-                          style={{
-                            fontSize: 12,
-                            opacity: 0.7,
-                          }}
-                        >
-                          {r.checked >= 25
-                            ? '🟢'
-                            : r.checked >= 10
-                              ? '🟡'
-                              : '🔴'}
-                        </span>
                       </div>
                     </td>
 
@@ -2165,56 +1974,22 @@ export default function ModelPerformancePage() {
                     >
                       <div>{formatNum(r.avg_total_hits, 2)}</div>
 
-                      {r.model_key !== 'pure_random' && (
-                        <div
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color:
-                              r.baseline_win_rate_global >= 0.55
-                                ? '#16a34a'
-                                : r.baseline_win_rate_global >= 0.45
-                                  ? '#b45309'
-                                  : '#dc2626',
-                            marginTop: 2,
-                          }}
-                          title="Percentage of comparable draws where this model beat Pure Random"
-                        >
-                          baseline win rate{' '}
-                          {Math.round(r.baseline_win_rate_global * 100)}% (n=
-                          {r.baseline_compared})
-                        </div>
-                      )}
-
-                      {(() => {
-                        const baseline = chartRows.find(
-                          (x) => x.model_key === 'pure_random',
-                        );
-                        if (!baseline || r.model_key === 'pure_random')
-                          return null;
-
-                        const diff = r.avg_total_hits - baseline.avg_total_hits;
-
-                        // hide tiny differences (noise)
-                        if (Math.abs(diff) < 0.05) return null;
-
-                        return (
+                      {r.model_key !== 'pure_random' &&
+                        r.baseline_compared >= 5 && (
                           <div
                             style={{
                               fontSize: 11,
-                              opacity: 0.7,
+                              fontWeight: 700,
                               color: '#6b7280',
+                              marginTop: 2,
                             }}
-                            title="Difference from Pure Random baseline"
+                            title="Percentage of comparable draws where this model beat Pure Random"
                           >
-                            {diff > 0
-                              ? `+${formatNum(diff, 2)} over baseline`
-                              : diff < 0
-                                ? `${formatNum(diff, 2)} below baseline`
-                                : '≈ random'}
+                            baseline win rate{' '}
+                            {Math.round(r.baseline_win_rate_global * 100)}% (n=
+                            {r.baseline_compared})
                           </div>
-                        );
-                      })()}
+                        )}
 
                       {rankingMode === 'upside' && (
                         <div
@@ -2241,16 +2016,6 @@ export default function ModelPerformancePage() {
                           consistency {formatNum(r.consistency_score, 2)}
                         </div>
                       )}
-
-                      <div
-                        style={{
-                          fontSize: 11,
-                          opacity: 0.7,
-                          color: '#6b7280',
-                        }}
-                      >
-                        sample {r.checked}
-                      </div>
                     </td>
 
                     {/* CONFIDENCE */}
@@ -2268,16 +2033,6 @@ export default function ModelPerformancePage() {
                           gap: 6,
                         }}
                       >
-                        <span
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 800,
-                            color: confColor,
-                          }}
-                        >
-                          {confLabel}
-                        </span>
-
                         <div
                           style={{
                             height: 6,
@@ -2292,13 +2047,20 @@ export default function ModelPerformancePage() {
                               height: '100%',
                               borderRadius: 999,
                               background: confFill,
+                              opacity: 0.9,
                               transition: 'width 0.4s ease',
                             }}
                           />
                         </div>
 
-                        <span style={{ fontSize: 11, color: '#6b7280' }}>
-                          conf {formatNum(conf, 2)}
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: '#6b7280',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {Math.round(conf * 100)}%
                         </span>
                       </div>
                     </td>
@@ -2311,19 +2073,23 @@ export default function ModelPerformancePage() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      <span
+                      <div
                         style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          padding: '4px 10px',
-                          borderRadius: 999,
-                          background: jackpotPotBg,
-                          border: jackpotPotBorder,
-                          color: jackpotPotColor,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 2,
                         }}
                       >
-                        {jackpotPotLabel} · {formatNum(jackpotScore, 2)}
-                      </span>
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: '#111827',
+                          }}
+                        >
+                          {jackpotPotLabel}
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 );
