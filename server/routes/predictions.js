@@ -561,6 +561,43 @@ router.post('/predictions/generate', async (req, res) => {
       }));
     };
 
+    const buildQLearningWeights = (min, max, rows, keys) => {
+      const rewards = new Map();
+
+      for (let n = min; n <= max; n++) {
+        rewards.set(n, 1);
+      }
+
+      rows.forEach((row, index) => {
+        const recencyReward = Math.max(1, rows.length - index);
+
+        for (const key of keys) {
+          const n = Number(row[key]);
+
+          if (Number.isFinite(n)) {
+            let reward = 1 + recencyReward * 0.4;
+
+            // Reward numbers that sit in active decision zones
+            if ((n >= 7 && n <= 18) || (n >= 31 && n <= 44)) {
+              reward += 2;
+            }
+
+            // Small exploration reward for edge numbers
+            if (n <= 5 || n >= max - 4) {
+              reward += 1.25;
+            }
+
+            rewards.set(n, (rewards.get(n) ?? 1) + reward);
+          }
+        }
+      });
+
+      return Array.from(rewards.entries()).map(([n, weight]) => ({
+        n,
+        weight,
+      }));
+    };
+
     const generateOneLine = () => {
       if (strategy === 'ai:xgboost') {
         return {
@@ -695,6 +732,27 @@ router.post('/predictions/generate', async (req, res) => {
             buildDecisionTreeWeights(1, 12, historyRows, ['s1', 's2']),
             2,
             2.0,
+          ),
+        };
+      }
+
+      if (strategy === 'ai:q_learning') {
+        return {
+          main: weightedSampleUnique(
+            buildQLearningWeights(1, 50, historyRows, [
+              'n1',
+              'n2',
+              'n3',
+              'n4',
+              'n5',
+            ]),
+            5,
+            2.3,
+          ),
+          stars: weightedSampleUnique(
+            buildQLearningWeights(1, 12, historyRows, ['s1', 's2']),
+            2,
+            2.2,
           ),
         };
       }
