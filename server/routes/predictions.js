@@ -524,6 +524,43 @@ router.post('/predictions/generate', async (req, res) => {
       }));
     };
 
+    const buildDecisionTreeWeights = (min, max, rows, keys) => {
+      const counts = new Map();
+
+      for (let n = min; n <= max; n++) {
+        counts.set(n, 1);
+      }
+
+      rows.forEach((row, index) => {
+        const depthWeight = Math.max(1, rows.length - index);
+
+        for (const key of keys) {
+          const n = Number(row[key]);
+
+          if (Number.isFinite(n)) {
+            let bonus = 1;
+
+            // Simulated split preference
+            if (n <= 10 || n >= 40) {
+              bonus += 1.5;
+            }
+
+            // Middle range slightly favoured
+            if (n >= 20 && n <= 35) {
+              bonus += 2;
+            }
+
+            counts.set(n, (counts.get(n) ?? 1) + bonus + depthWeight * 0.25);
+          }
+        }
+      });
+
+      return Array.from(counts.entries()).map(([n, weight]) => ({
+        n,
+        weight,
+      }));
+    };
+
     const generateOneLine = () => {
       if (strategy === 'ai:xgboost') {
         return {
@@ -635,6 +672,27 @@ router.post('/predictions/generate', async (req, res) => {
           ),
           stars: weightedSampleUnique(
             buildStatisticalWeights(1, 12, historyRows, ['s1', 's2']),
+            2,
+            2.0,
+          ),
+        };
+      }
+
+      if (strategy === 'ai:decision_tree') {
+        return {
+          main: weightedSampleUnique(
+            buildDecisionTreeWeights(1, 50, historyRows, [
+              'n1',
+              'n2',
+              'n3',
+              'n4',
+              'n5',
+            ]),
+            5,
+            1.9,
+          ),
+          stars: weightedSampleUnique(
+            buildDecisionTreeWeights(1, 12, historyRows, ['s1', 's2']),
             2,
             2.0,
           ),
