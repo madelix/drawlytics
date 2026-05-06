@@ -50,7 +50,18 @@ const MODEL_COLOR_MAP: Record<string, string> = {
   hot_focused: '#EF4444', // red
   cold_focused: '#2563EB', // blue
   overdue: '#F97316', // orange
+  strategy_mix: '#6d28d9', // strategy mix lavender/purple
   pure_random: '#22C55E', // green
+  ai_ensemble: '#8B5CF6',
+  ai_statistical_analysis: '#0EA5E9',
+  ai_random_forest: '#10B981',
+  ai_decision_tree: '#F59E0B',
+  ai_gradient_boosting: '#EF4444',
+  ai_xgboost: '#EC4899',
+  ai_q_learning: '#14B8A6',
+  ai_advanced_analysis: '#6366F1',
+  ai_markov_chain: '#84CC16',
+  ai_meta_learning: '#A855F7',
 };
 
 // Stable “hash -> hue” so each model always gets the same colour
@@ -437,8 +448,10 @@ export default function ModelPerformancePage() {
 
         let personality: ChartRow['personality'];
 
-        if (checked < 10) {
-          personality = 'experimental'; // emerging / low sample
+        if (r.model_key === 'strategy_mix') {
+          personality = 'balanced';
+        } else if (checked < 10) {
+          personality = 'experimental';
         } else if (consistencyScore >= 0.5) {
           personality = 'stable'; // reliable performer
         } else if (upsideScore >= 0.25 && consistencyScore < 0.3) {
@@ -456,6 +469,7 @@ export default function ModelPerformancePage() {
           checked: r.checked_predictions,
           total: r.total_predictions,
           checked_rate_pct: r.checked_rate_pct,
+          strategy_mix_predictions: r.strategy_mix_predictions ?? 0,
 
           avg_main_n: avgMain,
           avg_stars_n: avgStars,
@@ -1958,6 +1972,24 @@ export default function ModelPerformancePage() {
                           <span style={{ color: '#111827' }}>
                             {r.model_display_name}
                           </span>
+
+                          {r.model_key === 'strategy_mix' && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                letterSpacing: '0.04em',
+                                textTransform: 'uppercase',
+                                padding: '3px 8px',
+                                borderRadius: 999,
+                                background: '#f5f3ff',
+                                color: '#6d28d9',
+                                marginLeft: 6,
+                              }}
+                            >
+                              Strategy mix
+                            </span>
+                          )}
 
                           {r.model_key === 'pure_random' && (
                             <span

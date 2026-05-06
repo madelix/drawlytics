@@ -306,7 +306,9 @@ router.post('/predictions/generate', async (req, res) => {
 
     for (let i = 0; i < lines; i++) {
       const line = generateOneLine();
-      const model_name = `make_magic:${strategy}`;
+      const model_name = strategy.startsWith('ai:')
+        ? strategy
+        : `make_magic:${strategy}`;
 
       const { rows } = await pool.query(
         `

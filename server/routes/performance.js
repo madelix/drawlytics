@@ -23,7 +23,8 @@ router.get('/performance/models', async (req, res) => {
       normalized AS (
         SELECT
           CASE
-            WHEN model_name_lc LIKE 'make_magic:cold_focused%' THEN 'cold_focused'
+  WHEN source = 'strategy_mix' THEN 'strategy_mix'
+  WHEN model_name_lc LIKE 'make_magic:cold_focused%' THEN 'cold_focused'
             WHEN model_name_lc LIKE 'make_magic:hot_focused%' THEN 'hot_focused'
             WHEN model_name_lc LIKE 'make_magic:balanced_hot_cold%' THEN 'balanced_hot_cold'
             WHEN model_name_lc LIKE 'make_magic:pure_random%' THEN 'pure_random'
@@ -48,7 +49,7 @@ router.get('/performance/models', async (req, res) => {
           draw_date,
           status,
           matched_main,
-          matched_stars
+          matched_stars,
           source
         FROM base
       ),
@@ -56,17 +57,28 @@ router.get('/performance/models', async (req, res) => {
         SELECT
           model_key,
           CASE model_key
-            WHEN 'cold_focused' THEN 'Cold Focused'
+  WHEN 'strategy_mix' THEN 'Strategy Mix'
+  WHEN 'cold_focused' THEN 'Cold Focused'
             WHEN 'hot_focused' THEN 'Hot Focused'
             WHEN 'balanced_hot_cold' THEN 'Balanced Hot/Cold'
             WHEN 'pure_random' THEN 'Pure Random'
             WHEN 'overdue' THEN 'Overdue'
+            WHEN 'ai_ensemble' THEN 'AI Ensemble'
+WHEN 'ai_statistical_analysis' THEN 'AI Statistical Analysis'
+WHEN 'ai_random_forest' THEN 'AI Random Forest'
+WHEN 'ai_decision_tree' THEN 'AI Decision Tree'
+WHEN 'ai_gradient_boosting' THEN 'AI Gradient Boosting'
+WHEN 'ai_xgboost' THEN 'AI XGBoost'
+WHEN 'ai_q_learning' THEN 'AI Q-Learning'
+WHEN 'ai_advanced_analysis' THEN 'AI Advanced Analysis'
+WHEN 'ai_markov_chain' THEN 'AI Markov Chain'
+WHEN 'ai_meta_learning' THEN 'AI Meta Learning'
             ELSE INITCAP(REPLACE(model_key, '_', ' '))
           END AS model_display_name,
           draw_date,
           status,
           matched_main,
-          matched_stars
+          matched_stars,
           source
         FROM normalized
       ),
@@ -209,6 +221,16 @@ router.get('/performance/model-history', async (req, res) => {
             WHEN model_name_lc LIKE 'make_magic:balanced_hot_cold%' THEN 'balanced_hot_cold'
             WHEN model_name_lc LIKE 'make_magic:pure_random%' THEN 'pure_random'
             WHEN model_name_lc LIKE 'make_magic:overdue%' THEN 'overdue'
+            WHEN model_name_lc LIKE 'ai:ensemble%' THEN 'ai_ensemble'
+WHEN model_name_lc LIKE 'ai:statistical_analysis%' THEN 'ai_statistical_analysis'
+WHEN model_name_lc LIKE 'ai:random_forest%' THEN 'ai_random_forest'
+WHEN model_name_lc LIKE 'ai:decision_tree%' THEN 'ai_decision_tree'
+WHEN model_name_lc LIKE 'ai:gradient_boosting%' THEN 'ai_gradient_boosting'
+WHEN model_name_lc LIKE 'ai:xgboost%' THEN 'ai_xgboost'
+WHEN model_name_lc LIKE 'ai:q_learning%' THEN 'ai_q_learning'
+WHEN model_name_lc LIKE 'ai:advanced_analysis%' THEN 'ai_advanced_analysis'
+WHEN model_name_lc LIKE 'ai:markov_chain%' THEN 'ai_markov_chain'
+WHEN model_name_lc LIKE 'ai:meta_learning%' THEN 'ai_meta_learning'
 
             WHEN model_name_lc LIKE '%cold-focused generator%' THEN 'cold_focused'
             WHEN model_name_lc LIKE '%hot-focused generator%' THEN 'hot_focused'

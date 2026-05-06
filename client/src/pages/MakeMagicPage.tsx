@@ -27,6 +27,11 @@ const STRATEGIES = [
     description: 'Prioritises numbers with long gaps.',
   },
   {
+    value: 'ai:xgboost',
+    label: 'AI XGBoost',
+    description: 'AI-style boosted model for pattern-weighted predictions.',
+  },
+  {
     value: 'pure_random',
     label: 'Pure random',
     description: 'Uniform random within valid ranges.',
@@ -38,6 +43,7 @@ const STRATEGY_COLORS: Record<string, string> = {
   overdue: '#F97316',
   hot_focused: '#EF4444',
   cold_focused: '#2563EB',
+  'ai:xgboost': '#06B6D4',
   pure_random: '#22C55E',
 };
 
@@ -51,6 +57,7 @@ export function MakeMagicPage() {
     overdue: 1,
     hot_focused: 1,
     cold_focused: 1,
+    'ai:xgboost': 1,
     pure_random: 1,
   });
   const [status, setStatus] = useState<SaveStatus>('idle');
@@ -80,6 +87,7 @@ export function MakeMagicPage() {
         overdue: 0,
         hot_focused: 0,
         cold_focused: 0,
+        'ai:xgboost': 0,
         pure_random: 0,
       };
 
