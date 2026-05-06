@@ -598,6 +598,43 @@ router.post('/predictions/generate', async (req, res) => {
       }));
     };
 
+    const buildNeuralNetworkWeights = (min, max, rows, keys) => {
+      const signals = new Map();
+
+      for (let n = min; n <= max; n++) {
+        signals.set(n, 1);
+      }
+
+      rows.forEach((row, index) => {
+        const recencySignal = Math.max(1, rows.length - index);
+
+        for (const key of keys) {
+          const n = Number(row[key]);
+
+          if (Number.isFinite(n)) {
+            const normalizedPosition = (n - min) / (max - min || 1);
+
+            let activation =
+              1 +
+              recencySignal * 0.3 +
+              Math.sin(normalizedPosition * Math.PI) * 2;
+
+            // Soft hidden-layer style boost for central-ish patterns
+            if (normalizedPosition > 0.25 && normalizedPosition < 0.75) {
+              activation += 1.5;
+            }
+
+            signals.set(n, (signals.get(n) ?? 1) + activation);
+          }
+        }
+      });
+
+      return Array.from(signals.entries()).map(([n, weight]) => ({
+        n,
+        weight,
+      }));
+    };
+
     const generateOneLine = () => {
       if (strategy === 'ai:xgboost') {
         return {
@@ -753,6 +790,27 @@ router.post('/predictions/generate', async (req, res) => {
             buildQLearningWeights(1, 12, historyRows, ['s1', 's2']),
             2,
             2.2,
+          ),
+        };
+      }
+
+      if (strategy === 'ai:neural_network') {
+        return {
+          main: weightedSampleUnique(
+            buildNeuralNetworkWeights(1, 50, historyRows, [
+              'n1',
+              'n2',
+              'n3',
+              'n4',
+              'n5',
+            ]),
+            5,
+            2.0,
+          ),
+          stars: weightedSampleUnique(
+            buildNeuralNetworkWeights(1, 12, historyRows, ['s1', 's2']),
+            2,
+            1.9,
           ),
         };
       }
