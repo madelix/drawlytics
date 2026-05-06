@@ -144,7 +144,11 @@ export function MakeMagicPage() {
     pure_random: 1,
   });
   const [status, setStatus] = useState<SaveStatus>('idle');
+  const [generatingStrategy, setGeneratingStrategy] = useState<string | null>(
+    null,
+  );
   const [multiStatus, setMultiStatus] = useState<SaveStatus>('idle');
+  const [allAiStatus, setAllAiStatus] = useState<SaveStatus>('idle');
   const [hasSuggestedMix, setHasSuggestedMix] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -202,6 +206,7 @@ export function MakeMagicPage() {
     try {
       setStatus('saving');
       setError(null);
+      setGeneratingStrategy(selectedStrategyValue);
 
       // IMPORTANT:
       // - In dev: apiUrl('/api/...') stays relative, so Vite proxy handles it (no CORS).
@@ -236,10 +241,12 @@ export function MakeMagicPage() {
 
       setStatus('success');
       // tiny auto-reset after a moment
-      setTimeout(() => setStatus('idle'), 2000);
+      setStatus('idle');
+      setGeneratingStrategy(null);
     } catch (err: any) {
       console.error('Generate & save failed:', err);
       setStatus('error');
+      setGeneratingStrategy(null);
       setError(err?.message ?? 'Failed to generate predictions');
     }
   }
@@ -285,6 +292,41 @@ export function MakeMagicPage() {
       console.error('Multi generate failed:', err);
       setMultiStatus('error');
       setError(err?.message ?? 'Failed to generate multi-strategy predictions');
+    }
+  }
+  async function handleGenerateAllAiModels() {
+    try {
+      setAllAiStatus('saving');
+      setError(null);
+
+      const aiStrategies = STRATEGIES.filter((s) => s.value.startsWith('ai:'));
+
+      for (const s of aiStrategies) {
+        const res = await fetch(apiUrl('/api/predictions/generate'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            lottery: 'Euromillions',
+            strategy: s.value,
+            lines: 1,
+            source: 'ai_lab',
+          }),
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `Failed to generate ${s.label}`);
+        }
+      }
+
+      setAllAiStatus('success');
+      setTimeout(() => setAllAiStatus('idle'), 2000);
+    } catch (err: any) {
+      console.error('Generate all AI models failed:', err);
+      setAllAiStatus('error');
+      setError(err?.message ?? 'Failed to generate all AI models');
     }
   }
 
@@ -392,18 +434,25 @@ export function MakeMagicPage() {
                         onClick={() =>
                           handleGenerate(s.value, strategyLines[s.value])
                         }
+                        disabled={generatingStrategy === s.value}
                         style={{
                           padding: '6px 10px',
                           borderRadius: 6,
                           background: '#111827',
                           color: '#fff',
                           border: 'none',
-                          cursor: 'pointer',
+                          cursor:
+                            generatingStrategy === s.value
+                              ? 'default'
+                              : 'pointer',
+                          opacity: generatingStrategy === s.value ? 0.7 : 1,
                           fontSize: 12,
                           fontWeight: 600,
                         }}
                       >
-                        Generate
+                        {generatingStrategy === s.value
+                          ? 'Generating…'
+                          : 'Generate'}
                       </button>
                     </div>
                   </div>
@@ -455,29 +504,63 @@ export function MakeMagicPage() {
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={handleGenerateAll}
-              disabled={multiStatus === 'saving'}
+            <div
               style={{
-                borderRadius: 999,
-                border: 'none',
-                padding: '0.6rem 1.2rem',
-                fontSize: '0.9rem',
-                fontWeight: 700,
-                cursor: multiStatus === 'saving' ? 'default' : 'pointer',
-                background: 'linear-gradient(135deg, #804198 0%, #21409a 100%)',
-                color: '#ffffff',
-                opacity: multiStatus === 'saving' ? 0.7 : 1,
-                whiteSpace: 'nowrap',
+                display: 'flex',
+                gap: 12,
+                alignItems: 'center',
+                flexWrap: 'wrap',
               }}
             >
-              {multiStatus === 'saving'
-                ? 'Generating…'
-                : multiStatus === 'success'
-                  ? 'Saved!'
-                  : 'Generate strategy mix'}
-            </button>
+              <button
+                type="button"
+                onClick={handleGenerateAll}
+                disabled={multiStatus === 'saving'}
+                style={{
+                  borderRadius: 999,
+                  border: 'none',
+                  padding: '0.6rem 1.2rem',
+                  fontSize: '0.9rem',
+                  fontWeight: 700,
+                  cursor: multiStatus === 'saving' ? 'default' : 'pointer',
+                  background:
+                    'linear-gradient(135deg, #804198 0%, #21409a 100%)',
+                  color: '#ffffff',
+                  opacity: multiStatus === 'saving' ? 0.7 : 1,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {multiStatus === 'saving'
+                  ? 'Generating…'
+                  : multiStatus === 'success'
+                    ? 'Saved!'
+                    : 'Generate strategy mix'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleGenerateAllAiModels}
+                disabled={allAiStatus === 'saving'}
+                style={{
+                  borderRadius: 999,
+                  border: '1px solid #e5e7eb',
+                  padding: '0.6rem 1.2rem',
+                  fontSize: '0.9rem',
+                  fontWeight: 700,
+                  cursor: allAiStatus === 'saving' ? 'default' : 'pointer',
+                  background: '#ffffff',
+                  color: '#111827',
+                  opacity: allAiStatus === 'saving' ? 0.7 : 1,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {allAiStatus === 'saving'
+                  ? 'Running AI lab…'
+                  : allAiStatus === 'success'
+                    ? 'AI lab saved!'
+                    : 'Run AI lab'}
+              </button>
+            </div>
 
             {multiStatus === 'error' && error && (
               <div
