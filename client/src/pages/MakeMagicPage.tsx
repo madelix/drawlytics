@@ -403,7 +403,7 @@ export function MakeMagicPage() {
                           fontWeight: 600,
                         }}
                       >
-                        Save
+                        Generate
                       </button>
                     </div>
                   </div>

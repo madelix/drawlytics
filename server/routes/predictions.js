@@ -278,10 +278,58 @@ router.post('/predictions/generate', async (req, res) => {
       return Array.from(set).sort((a, b) => a - b);
     };
 
-    const generateOneLine = () => ({
-      main: sampleUnique(1, 50, 5),
-      stars: sampleUnique(1, 12, 2),
-    });
+    const weightedSampleUnique = (weights, count) => {
+      const picked = new Set();
+
+      while (picked.size < count) {
+        const available = weights.filter((item) => !picked.has(item.n));
+        const totalWeight = available.reduce(
+          (sum, item) => sum + item.weight,
+          0,
+        );
+
+        let roll = Math.random() * totalWeight;
+
+        for (const item of available) {
+          roll -= item.weight;
+          if (roll <= 0) {
+            picked.add(item.n);
+            break;
+          }
+        }
+      }
+
+      return Array.from(picked).sort((a, b) => a - b);
+    };
+
+    const buildLinearWeights = (min, max, direction = 'ascending') => {
+      const weights = [];
+
+      for (let n = min; n <= max; n++) {
+        const base = direction === 'descending' ? max - n + 1 : n - min + 1;
+
+        weights.push({ n, weight: base });
+      }
+
+      return weights;
+    };
+
+    const generateOneLine = () => {
+      if (strategy === 'ai:xgboost') {
+        return {
+          main: weightedSampleUnique(buildLinearWeights(1, 50, 'ascending'), 5),
+          stars: weightedSampleUnique(
+            buildLinearWeights(1, 12, 'ascending'),
+            2,
+          ),
+        };
+      }
+
+      return {
+        main: sampleUnique(1, 50, 5),
+        stars: sampleUnique(1, 12, 2),
+      };
+    };
 
     const saved = [];
     // Free plan limit (temporary)
