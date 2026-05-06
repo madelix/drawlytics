@@ -373,6 +373,157 @@ router.post('/predictions/generate', async (req, res) => {
       }));
     };
 
+    const sampleRangeBalancedMainNumbers = () => {
+      const low = weightedSampleUnique(
+        buildRecencyFrequencyWeights(1, 16, historyRows, [
+          'n1',
+          'n2',
+          'n3',
+          'n4',
+          'n5',
+        ]),
+        2,
+        2.2,
+      );
+
+      const mid = weightedSampleUnique(
+        buildRecencyFrequencyWeights(17, 33, historyRows, [
+          'n1',
+          'n2',
+          'n3',
+          'n4',
+          'n5',
+        ]),
+        2,
+        2.2,
+      );
+
+      const high = weightedSampleUnique(
+        buildRecencyFrequencyWeights(34, 50, historyRows, [
+          'n1',
+          'n2',
+          'n3',
+          'n4',
+          'n5',
+        ]),
+        1,
+        2.2,
+      );
+
+      return [...low, ...mid, ...high].sort((a, b) => a - b);
+    };
+
+    const buildBayesianWeights = (min, max, rows, keys) => {
+      const counts = new Map();
+
+      for (let n = min; n <= max; n++) {
+        counts.set(n, 1);
+      }
+
+      for (const row of rows) {
+        for (const key of keys) {
+          const n = Number(row[key]);
+
+          if (Number.isFinite(n)) {
+            counts.set(n, counts.get(n) + 1);
+          }
+        }
+      }
+
+      const total = Array.from(counts.values()).reduce((sum, v) => sum + v, 0);
+
+      return Array.from(counts.entries()).map(([n, count]) => ({
+        n,
+        weight: count / total,
+      }));
+    };
+
+    const buildTrendBoostWeights = (min, max, rows, keys) => {
+      const counts = new Map();
+
+      for (let n = min; n <= max; n++) {
+        counts.set(n, 1);
+      }
+
+      rows.forEach((row, index) => {
+        const recentWeight = Math.max(1, (rows.length - index) * 2);
+
+        for (const key of keys) {
+          const n = Number(row[key]);
+
+          if (Number.isFinite(n)) {
+            counts.set(n, (counts.get(n) ?? 1) + recentWeight);
+          }
+        }
+      });
+
+      return Array.from(counts.entries()).map(([n, weight]) => ({
+        n,
+        weight,
+      }));
+    };
+
+    const buildMarkovWeights = (min, max, rows, keys) => {
+      const transitions = new Map();
+
+      for (let n = min; n <= max; n++) {
+        transitions.set(n, 1);
+      }
+
+      for (let i = 0; i < rows.length - 1; i++) {
+        const current = rows[i];
+        const next = rows[i + 1];
+
+        const currentNums = keys
+          .map((k) => Number(current[k]))
+          .filter(Number.isFinite);
+
+        const nextNums = keys
+          .map((k) => Number(next[k]))
+          .filter(Number.isFinite);
+
+        for (const c of currentNums) {
+          for (const n of nextNums) {
+            const distance = Math.abs(c - n);
+
+            if (distance <= 5) {
+              transitions.set(n, (transitions.get(n) ?? 1) + (6 - distance));
+            }
+          }
+        }
+      }
+
+      return Array.from(transitions.entries()).map(([n, weight]) => ({
+        n,
+        weight,
+      }));
+    };
+
+    const buildStatisticalWeights = (min, max, rows, keys) => {
+      const counts = new Map();
+
+      for (let n = min; n <= max; n++) {
+        counts.set(n, 1);
+      }
+
+      rows.forEach((row, index) => {
+        const recencyWeight = Math.max(1, rows.length - index);
+
+        for (const key of keys) {
+          const n = Number(row[key]);
+
+          if (Number.isFinite(n)) {
+            counts.set(n, (counts.get(n) ?? 1) + 1 + recencyWeight * 0.35);
+          }
+        }
+      });
+
+      return Array.from(counts.entries()).map(([n, weight]) => ({
+        n,
+        weight,
+      }));
+    };
+
     const generateOneLine = () => {
       if (strategy === 'ai:xgboost') {
         return {
@@ -391,6 +542,101 @@ router.post('/predictions/generate', async (req, res) => {
             buildRecencyFrequencyWeights(1, 12, historyRows, ['s1', 's2']),
             2,
             1.6,
+          ),
+        };
+      }
+
+      if (strategy === 'ai:random_forest') {
+        return {
+          main: sampleRangeBalancedMainNumbers(),
+          stars: weightedSampleUnique(
+            buildRecencyFrequencyWeights(1, 12, historyRows, ['s1', 's2']),
+            2,
+            2.4,
+          ),
+        };
+      }
+
+      if (strategy === 'ai:bayesian') {
+        return {
+          main: weightedSampleUnique(
+            buildBayesianWeights(1, 50, historyRows, [
+              'n1',
+              'n2',
+              'n3',
+              'n4',
+              'n5',
+            ]),
+            5,
+            2.8,
+          ),
+          stars: weightedSampleUnique(
+            buildBayesianWeights(1, 12, historyRows, ['s1', 's2']),
+            2,
+            2.4,
+          ),
+        };
+      }
+
+      if (strategy === 'ai:gradient_boosting') {
+        return {
+          main: weightedSampleUnique(
+            buildTrendBoostWeights(1, 50, historyRows, [
+              'n1',
+              'n2',
+              'n3',
+              'n4',
+              'n5',
+            ]),
+            5,
+            1.2,
+          ),
+          stars: weightedSampleUnique(
+            buildTrendBoostWeights(1, 12, historyRows, ['s1', 's2']),
+            2,
+            1.1,
+          ),
+        };
+      }
+
+      if (strategy === 'ai:markov_chain') {
+        return {
+          main: weightedSampleUnique(
+            buildMarkovWeights(1, 50, historyRows, [
+              'n1',
+              'n2',
+              'n3',
+              'n4',
+              'n5',
+            ]),
+            5,
+            2.0,
+          ),
+          stars: weightedSampleUnique(
+            buildMarkovWeights(1, 12, historyRows, ['s1', 's2']),
+            2,
+            1.8,
+          ),
+        };
+      }
+
+      if (strategy === 'ai:statistical_analysis') {
+        return {
+          main: weightedSampleUnique(
+            buildStatisticalWeights(1, 50, historyRows, [
+              'n1',
+              'n2',
+              'n3',
+              'n4',
+              'n5',
+            ]),
+            5,
+            2.1,
+          ),
+          stars: weightedSampleUnique(
+            buildStatisticalWeights(1, 12, historyRows, ['s1', 's2']),
+            2,
+            2.0,
           ),
         };
       }
