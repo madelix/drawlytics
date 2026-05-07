@@ -5,7 +5,6 @@ import {
   type DrawsListResponse,
   type EuromillionsDraw,
 } from '../api/draws';
-import LatestDraw from '../components/LatestDraw';
 import { ScrollToTopButton } from '../components/ScrollToTopButton';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
@@ -17,6 +16,22 @@ export function AllDrawsPage() {
   const [data, setData] = useState<DrawsListResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState<number>(0);
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,17 +86,14 @@ export function AllDrawsPage() {
   return (
     <div className="dl-page dl-analysis-page">
       <header className="dl-analysis-header">
-        <h1 className="dl-hero-title">EuroMillions draw history</h1>
+        <h1 className="dl-hero-title">Draw History</h1>
         <p className="dl-section-subtitle">
-          Browsing 20 draws at a time. Most recent first.
+          Browse official draw results. EuroMillions is available now, with UK
+          Lotto and Set For Life planned.
         </p>
       </header>
 
       <main>
-        <section style={{ marginBottom: '2rem' }}>
-          <LatestDraw />
-        </section>
-
         {status === 'loading' && <p>Loading draws…</p>}
         {status === 'error' && <p style={{ color: 'red' }}>Error: {error}</p>}
 
@@ -89,51 +101,52 @@ export function AllDrawsPage() {
 
         {status === 'success' && draws.length > 0 && (
           <>
-            <table
-              className="dl-preview-table"
-              style={{ width: '100%', marginBottom: '1rem' }}
-            >
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left' }}>Date</th>
-                  <th style={{ textAlign: 'left' }}>Numbers</th>
-                  <th style={{ textAlign: 'left' }}>Stars</th>
-                </tr>
-              </thead>
-              <tbody>
-                {draws.map((d: EuromillionsDraw) => {
-                  const dateLabel = new Date(d.draw_date).toLocaleDateString();
-                  const numbers = [d.n1, d.n2, d.n3, d.n4, d.n5];
-                  const stars = [d.s1, d.s2];
+            <div className="dl-draws-list">
+              {draws.map((d: EuromillionsDraw) => {
+                const dateLabel = new Date(d.draw_date).toLocaleDateString();
+                const numbers = [d.n1, d.n2, d.n3, d.n4, d.n5];
+                const stars = [d.s1, d.s2];
 
-                  return (
-                    <tr key={d.id}>
-                      <td>{dateLabel}</td>
-                      <td>
-                        {numbers.map((n) => (
-                          <span
-                            key={n}
-                            className="dl-draw-pill dl-draw-pill--main"
-                          >
-                            {n}
-                          </span>
-                        ))}
-                      </td>
-                      <td>
-                        {stars.map((s) => (
-                          <span
-                            key={s}
-                            className="dl-draw-pill dl-draw-pill--star"
-                          >
-                            {s}
-                          </span>
-                        ))}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                return (
+                  <div key={d.id} className="dl-draw-card">
+                    <div className="dl-draw-card-kicker">EUROMILLIONS</div>
+                    <div className="dl-draw-card-header">Draw {dateLabel}</div>
+
+                    <div className="dl-draw-card-content">
+                      <div className="dl-draw-card-section">
+                        <div className="dl-draw-card-label">Main numbers</div>
+
+                        <div className="dl-draw-pill-row">
+                          {numbers.map((n) => (
+                            <span
+                              key={n}
+                              className="dl-draw-pill dl-draw-pill--main"
+                            >
+                              {n}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="dl-draw-card-section">
+                        <div className="dl-draw-card-label">Stars</div>
+
+                        <div className="dl-draw-pill-row">
+                          {stars.map((s) => (
+                            <span
+                              key={s}
+                              className="dl-draw-pill dl-draw-pill--star"
+                            >
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
             {pagination && (
               <div className="dl-pagination-bar">
@@ -141,7 +154,7 @@ export function AllDrawsPage() {
                   type="button"
                   onClick={handlePrev}
                   disabled={!canPrev}
-                  className="dl-cta-btn"
+                  className="dl-pagination-btn"
                   style={{ opacity: canPrev ? 1 : 0.5 }}
                 >
                   ← Previous
@@ -154,7 +167,7 @@ export function AllDrawsPage() {
                   type="button"
                   onClick={handleNext}
                   disabled={!canNext}
-                  className="dl-cta-btn"
+                  className="dl-pagination-btn"
                   style={{ opacity: canNext ? 1 : 0.5 }}
                 >
                   Next →
