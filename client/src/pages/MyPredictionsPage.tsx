@@ -1,5 +1,6 @@
 // client/src/pages/MyPredictionsPage.tsx
 import React, { CSSProperties, useEffect, useMemo, useState } from 'react';
+import { getModelDisplayName } from '../utils/modelDisplay';
 
 type PredictionRow = {
   id: number;
@@ -93,54 +94,6 @@ function toDayKey(value: string | Date | null | undefined): string | null {
 function formatDayLabel(dayKey: string): string {
   const [y, m, d] = dayKey.split('-');
   return `${d}/${m}/${y}`;
-}
-
-function formatModelDisplayName(raw: string): string {
-  const s = String(raw ?? '').trim();
-  if (!s) return 'Unknown model';
-
-  const lower = s.toLowerCase();
-
-  const key = lower
-    .replace(/^make_magic:/, '')
-    .replace(/^ai:/, 'ai_')
-    .replace(/\s+generator$/i, '')
-    .replace(/-focused/g, '_focused')
-    .replace(/:/g, '_')
-    .replace(/\s+/g, '_')
-    .trim();
-
-  const map: Record<string, string> = {
-    cold_focused: 'Cold Focused',
-    hot_focused: 'Hot Focused',
-    balanced_hot_cold: 'Balanced Hot/Cold',
-    pure_random: 'Pure Random',
-    overdue: 'Overdue',
-    strategy_mix: 'Strategy Mix',
-
-    ai_ensemble: 'AI Ensemble',
-    ai_statistical_analysis: 'AI Statistical Analysis',
-    ai_random_forest: 'AI Random Forest',
-    ai_decision_tree: 'AI Decision Tree',
-    ai_gradient_boosting: 'AI Gradient Boosting',
-    ai_xgboost: 'AI XGBoost',
-    ai_q_learning: 'AI Q-Learning',
-    ai_neural_network: 'AI Neural Network',
-    ai_lstm: 'AI LSTM',
-    ai_bayesian: 'AI Bayesian',
-    ai_markov_chain: 'AI Markov Chain',
-    ai_meta_learning: 'AI Meta Learning',
-  };
-
-  return (
-    map[key] ??
-    s
-      .replace(/^make_magic:/i, '')
-      .replace(/^ai:/i, 'AI ')
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (c) => c.toUpperCase())
-      .trim()
-  );
 }
 
 type DrawLookup = {
@@ -729,7 +682,7 @@ export default function MyPredictionsPage() {
                 ) {
                   bestMain = hits.main;
                   bestStars = hits.stars;
-                  bestModel = formatModelDisplayName(p.model_name);
+                  bestModel = getModelDisplayName(p.model_name);
                 }
               }
 
@@ -762,7 +715,7 @@ export default function MyPredictionsPage() {
                 ) {
                   bestMain = hits.main;
                   bestStars = hits.stars;
-                  bestModel = formatModelDisplayName(p.model_name);
+                  bestModel = getModelDisplayName(p.model_name);
                 }
               }
 
@@ -986,7 +939,7 @@ export default function MyPredictionsPage() {
                             </div>
 
                             <div style={{ fontWeight: 600 }}>
-                              {formatModelDisplayName(p.model_name)} — draw{' '}
+                              {getModelDisplayName(p.model_name)} — draw{' '}
                               {predDayKey
                                 ? formatDayLabel(predDayKey)
                                 : p.draw_date}
