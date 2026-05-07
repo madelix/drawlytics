@@ -1,6 +1,7 @@
 // server/routes/performance.js
 import express from 'express';
 import { pool } from '../db.js';
+import { MODEL_DISPLAY_NAMES } from '../modelMetadata.js';
 
 const router = express.Router();
 
@@ -180,7 +181,11 @@ GROUP BY named.model_key, named.model_display_name
     res.json({
       ok: true,
       lottery,
-      models: rows,
+      models: rows.map((row) => ({
+        ...row,
+        model_display_name:
+          MODEL_DISPLAY_NAMES[row.model_key] ?? row.model_display_name,
+      })),
     });
   } catch (err) {
     console.error('GET /performance/models failed:', err);
