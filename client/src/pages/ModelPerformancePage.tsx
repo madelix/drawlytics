@@ -152,9 +152,9 @@ function Card({
         background: '#fff',
         border: '1px solid #eef2f7',
         borderRadius: 16,
-        padding: 14,
+        padding: 'clamp(12px, 3vw, 14px)',
         boxShadow: '0 1px 0 rgba(0,0,0,0.02)',
-        minWidth: 280,
+        minWidth: 0,
         flex: '1 1 240px',
       }}
     >
@@ -245,6 +245,7 @@ export default function ModelPerformancePage() {
   const [strategyMode, setStrategyMode] = useState<
     'safe' | 'balanced' | 'aggressive'
   >('balanced');
+  const [isMobile, setIsMobile] = useState(false);
 
   const [rankDeltaByKey, setRankDeltaByKey] = useState<
     Record<string, number | null>
@@ -296,6 +297,21 @@ export default function ModelPerformancePage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 700px)');
+
+    const updateIsMobile = () => {
+      setIsMobile(mediaQuery.matches);
+    };
+
+    updateIsMobile();
+    mediaQuery.addEventListener('change', updateIsMobile);
+
+    return () => {
+      mediaQuery.removeEventListener('change', updateIsMobile);
+    };
   }, []);
 
   const summary = useMemo(() => {
@@ -720,26 +736,32 @@ export default function ModelPerformancePage() {
 
   const byLabel = useMemo(() => {
     const m = new Map<string, ChartRow>();
+
     for (const r of filtered) {
       const rank = filtered.findIndex((x) => x.model_key === r.model_key) + 1;
-      m.set(`#${rank} ${r.model_display_name}`, r);
+      const label = isMobile ? `#${rank}` : `#${rank} ${r.model_display_name}`;
+
+      m.set(label, r);
     }
+
     return m;
-  }, [filtered]);
+  }, [filtered, isMobile]);
 
   const barData = useMemo<NivoBarRow[]>(() => {
     return [...filtered]
       .map((r, i) => ({
-        model: `#${i + 1} ${r.model_display_name}`,
+        model: isMobile ? `#${i + 1}` : `#${i + 1} ${r.model_display_name}`,
         avg_total_hits:
           rankingMode === 'average'
             ? r.avg_total_hits
             : rankingMode === 'upside'
               ? r.upside_score
-              : r.consistency_score,
+              : rankingMode === 'consistency'
+                ? r.consistency_score
+                : r.baseline_weighted_score,
       }))
       .reverse();
-  }, [filtered, rankingMode]);
+  }, [filtered, rankingMode, isMobile]);
 
   const checkedCoveragePct = useMemo(() => {
     if (!summary.total) return null;
@@ -799,10 +821,31 @@ export default function ModelPerformancePage() {
   }, [baselineWinRate]);
 
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto', padding: '28px 16px' }}>
-      <header style={{ textAlign: 'center', marginBottom: 18 }}>
-        <h1 style={{ fontSize: '2.2rem', margin: 0 }}>Model performance</h1>
-        <p style={{ margin: '10px 0 0', color: '#6b7280' }}>
+    <div
+      style={{
+        maxWidth: 980,
+        margin: '0 auto',
+        padding: '20px 14px 28px',
+      }}
+    >
+      <header style={{ textAlign: 'center', marginBottom: 14 }}>
+        <h1
+          style={{
+            fontSize: 'clamp(2rem, 5vw, 2.2rem)',
+            lineHeight: 1.05,
+            margin: 0,
+          }}
+        >
+          Model performance
+        </h1>
+        <p
+          style={{
+            margin: '8px auto 0',
+            color: '#6b7280',
+            maxWidth: 680,
+            lineHeight: 1.45,
+          }}
+        >
           A simple view: higher bars = more matches on average (main + stars).
         </p>
       </header>
@@ -810,14 +853,20 @@ export default function ModelPerformancePage() {
       <div
         style={{
           display: 'flex',
-          gap: 10,
+          gap: isMobile ? 8 : 10,
           justifyContent: 'center',
-          alignItems: 'flex-start',
+          alignItems: isMobile ? 'stretch' : 'flex-start',
           flexWrap: 'wrap',
           marginBottom: 14,
         }}
       >
-        <label style={{ fontSize: 14, color: '#6b7280' }}>
+        <label
+          style={{
+            fontSize: 14,
+            color: '#6b7280',
+            width: isMobile ? '100%' : 'auto',
+          }}
+        >
           Lottery&nbsp;
           <input
             value={lottery}
@@ -827,6 +876,8 @@ export default function ModelPerformancePage() {
               borderRadius: 10,
               border: '1px solid #e5e7eb',
               background: '#fff',
+              width: isMobile ? '100%' : undefined,
+              marginTop: 4,
             }}
           />
         </label>
@@ -975,7 +1026,14 @@ export default function ModelPerformancePage() {
                   {scoreLabel(recommendedModel.upside_score, 'upside')}.
                 </div>
 
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: isMobile ? 4 : 6,
+                    flexWrap: 'wrap',
+                    marginTop: 2,
+                  }}
+                >
                   {[
                     { label: 'Safe', value: 'safe' as const },
                     { label: 'Balanced', value: 'balanced' as const },
@@ -989,14 +1047,14 @@ export default function ModelPerformancePage() {
                         type="button"
                         onClick={() => setStrategyMode(option.value)}
                         style={{
-                          padding: '4px 8px',
+                          padding: isMobile ? '3px 7px' : '4px 8px',
                           borderRadius: 999,
                           background: active ? '#111827' : '#f8fafc',
                           color: active ? '#fff' : '#374151',
                           border: active
                             ? '1px solid #111827'
                             : '1px solid #e5e7eb',
-                          fontSize: 11,
+                          fontSize: isMobile ? 10 : 11,
                           fontWeight: 700,
                           cursor: 'pointer',
                         }}
@@ -1036,9 +1094,9 @@ export default function ModelPerformancePage() {
 
       <div
         style={{
-          display: 'flex',
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
           gap: 10,
-          flexWrap: 'wrap',
           margin: '0 auto 14px',
           maxWidth: 980,
         }}
@@ -1115,61 +1173,179 @@ export default function ModelPerformancePage() {
 
         <div
           style={{
-            height: Math.max(260, 48 + filtered.length * 38),
-            padding: 10,
+            height: isMobile
+              ? 'auto'
+              : Math.max(260, 48 + filtered.length * 38),
+            padding: isMobile ? 14 : 10,
           }}
         >
-          <ResponsiveBar
-            data={barData}
-            keys={['avg_total_hits']}
-            indexBy="model"
-            layout="horizontal"
-            margin={{ top: 10, right: 24, bottom: 40, left: 220 }}
-            padding={0.3}
-            enableGridY={false}
-            enableGridX={true}
-            enableLabel={true}
-            label={(d) => formatNum(toNum(d.value, 0), 2)}
-            labelSkipWidth={36}
-            labelTextColor={{ from: 'color', modifiers: [['darker', 3]] }}
-            colors={(bar) => {
-              const label = String(bar.indexValue);
-              return byLabel.get(label)?.color ?? '#7c3aed';
-            }}
-            axisTop={null}
-            axisRight={null}
-            axisLeft={{
-              tickSize: 0,
-              tickPadding: 10,
-              tickRotation: 0,
-            }}
-            axisBottom={{
-              tickSize: 5,
-              tickPadding: 6,
-              legend: 'Avg total hits (main + stars)',
-              legendPosition: 'middle',
-              legendOffset: 32,
-            }}
-            onClick={(bar) => {
-              const label = String(bar.indexValue);
-              const model = byLabel.get(label);
+          {isMobile ? (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {filtered.map((r, i) => {
+                const value =
+                  rankingMode === 'average'
+                    ? r.avg_total_hits
+                    : rankingMode === 'upside'
+                      ? r.upside_score
+                      : rankingMode === 'consistency'
+                        ? r.consistency_score
+                        : r.baseline_weighted_score;
 
-              if (!model) return;
+                const maxValue = Math.max(
+                  ...filtered.map((model) =>
+                    rankingMode === 'average'
+                      ? model.avg_total_hits
+                      : rankingMode === 'upside'
+                        ? model.upside_score
+                        : rankingMode === 'consistency'
+                          ? model.consistency_score
+                          : model.baseline_weighted_score,
+                  ),
+                  1,
+                );
 
-              setSelectedModelKey((prev) =>
-                prev === model.model_key ? null : model.model_key,
-              );
-            }}
-            tooltip={() => null}
-            theme={{
-              axis: {
-                ticks: { text: { fill: '#6b7280', fontSize: 12 } },
-                legend: { text: { fill: '#6b7280', fontSize: 12 } },
-              },
-              grid: { line: { stroke: '#eef2f7', strokeWidth: 1 } },
-              labels: { text: { fontSize: 12, fontWeight: 700 } },
-            }}
-          />
+                const widthPct = Math.max(4, (value / maxValue) * 100);
+
+                return (
+                  <button
+                    key={r.model_key}
+                    type="button"
+                    onClick={() =>
+                      setSelectedModelKey((prev) =>
+                        prev === r.model_key ? null : r.model_key,
+                      )
+                    }
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '44px minmax(0, 1fr)',
+                      gap: 10,
+                      alignItems: 'center',
+                      border: 'none',
+                      background: 'transparent',
+                      padding: 0,
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span
+                      style={{
+                        justifySelf: 'start',
+                        fontSize: 12,
+                        fontWeight: 900,
+                        padding: '4px 8px',
+                        borderRadius: 999,
+                        background: i === 0 ? '#f59e0b' : '#f1f5f9',
+                        color: i === 0 ? '#111827' : '#111827',
+                      }}
+                    >
+                      #{i + 1}
+                    </span>
+
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: '#111827',
+                          marginBottom: 5,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {r.model_display_name}
+                      </div>
+
+                      <div
+                        style={{
+                          height: 26,
+                          borderRadius: 999,
+                          background: '#f1f5f9',
+                          overflow: 'hidden',
+                          position: 'relative',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${widthPct}%`,
+                            height: '100%',
+                            borderRadius: 999,
+                            background: r.color,
+                          }}
+                        />
+
+                        <span
+                          style={{
+                            position: 'absolute',
+                            right: 10,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            fontSize: 12,
+                            fontWeight: 900,
+                            color: '#111827',
+                          }}
+                        >
+                          {formatNum(value, 2)}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <ResponsiveBar
+              data={barData}
+              keys={['avg_total_hits']}
+              indexBy="model"
+              layout="horizontal"
+              margin={{ top: 10, right: 24, bottom: 40, left: 220 }}
+              padding={0.3}
+              enableGridY={false}
+              enableGridX={true}
+              enableLabel={true}
+              label={(d) => formatNum(toNum(d.value, 0), 2)}
+              labelSkipWidth={36}
+              labelTextColor={{ from: 'color', modifiers: [['darker', 3]] }}
+              colors={(bar) => {
+                const label = String(bar.indexValue);
+                return byLabel.get(label)?.color ?? '#7c3aed';
+              }}
+              axisTop={null}
+              axisRight={null}
+              axisLeft={{
+                tickSize: 0,
+                tickPadding: 10,
+                tickRotation: 0,
+              }}
+              axisBottom={{
+                tickSize: 5,
+                tickPadding: 6,
+                legend: 'Avg total hits (main + stars)',
+                legendPosition: 'middle',
+                legendOffset: 32,
+              }}
+              onClick={(bar) => {
+                const label = String(bar.indexValue);
+                const model = byLabel.get(label);
+
+                if (!model) return;
+
+                setSelectedModelKey((prev) =>
+                  prev === model.model_key ? null : model.model_key,
+                );
+              }}
+              tooltip={() => null}
+              theme={{
+                axis: {
+                  ticks: { text: { fill: '#6b7280', fontSize: 12 } },
+                  legend: { text: { fill: '#6b7280', fontSize: 12 } },
+                },
+                grid: { line: { stroke: '#eef2f7', strokeWidth: 1 } },
+                labels: { text: { fontSize: 12, fontWeight: 700 } },
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -1760,277 +1936,288 @@ export default function ModelPerformancePage() {
           overflow: 'hidden',
         }}
       >
-        {/* Scroll container (only scrolls when needed) */}
-        <div className="dl-table-scroll">
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-            }}
-          >
-            <thead>
-              <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-                {[
-                  'Model',
-                  'Checked',
-                  'Average hits',
-                  'Confidence',
-                  'Jackpot potential',
-                ].map((h) => (
-                  <th
-                    key={h}
+        {isMobile ? (
+          <div style={{ display: 'grid', gap: 10, padding: 12 }}>
+            {filtered.map((r) => {
+              const rank =
+                filtered.findIndex((x) => x.model_key === r.model_key) + 1;
+              const conf = r.confidence ?? 0;
+              const jackpotPotLabel = formatNum(r.upside_score, 2);
+
+              return (
+                <div
+                  key={r.model_key}
+                  style={{
+                    border: '1px solid #eef2f7',
+                    borderRadius: 14,
+                    padding: 12,
+                    background: '#fff',
+                  }}
+                >
+                  <div
                     style={{
-                      padding: '12px 12px',
-                      fontSize: 12,
-                      color: '#6b7280',
-                      borderBottom: '1px solid #eef2f7',
-                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      gap: 10,
+                      alignItems: 'flex-start',
                     }}
                   >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {filtered.map((r) => {
-                const rank =
-                  filtered.findIndex((x) => x.model_key === r.model_key) + 1;
-                const delta = rankDeltaByKey[r.model_key];
-                const trend = r.trend;
-
-                const reliabilityBg =
-                  r.checked < 10
-                    ? '#fef2f2'
-                    : r.checked < 25
-                      ? '#fffbeb'
-                      : '#f0fdf4';
-                const reliabilityBorder =
-                  r.checked < 10
-                    ? '1px solid #fecaca'
-                    : r.checked < 25
-                      ? '1px solid #fde68a'
-                      : '1px solid #bbf7d0';
-                const reliabilityColor =
-                  r.checked < 10
-                    ? '#b91c1c'
-                    : r.checked < 25
-                      ? '#b45309'
-                      : '#166534';
-                const reliabilityLabel =
-                  r.checked < 10 ? 'Low' : r.checked < 25 ? 'Medium' : 'High';
-
-                const conf = r.confidence ?? 0;
-
-                const confFill = '#6d28d9';
-
-                const jackpotScore = r.upside_score;
-
-                const jackpotPotLabel = formatNum(jackpotScore, 2);
-
-                return (
-                  <tr key={r.model_key}>
-                    {/* MODEL */}
-                    <td
+                    <span
                       style={{
-                        padding: '12px',
-                        borderBottom: '1px solid #f1f5f9',
-                        fontWeight: 700,
+                        fontSize: 12,
+                        fontWeight: 900,
+                        padding: '3px 8px',
+                        borderRadius: 999,
+                        background: rank === 1 ? '#f59e0b' : '#111827',
+                        color: rank === 1 ? '#111827' : '#fff',
+                        lineHeight: 1.2,
+                        flex: '0 0 auto',
                       }}
                     >
+                      #{rank}
+                    </span>
+
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 900,
+                          color: '#111827',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {r.model_display_name}
+                      </div>
+
                       <div
                         style={{
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: 12,
-                          minWidth: 0,
+                          gap: 6,
+                          flexWrap: 'wrap',
+                          marginTop: 8,
                         }}
                       >
-                        <span
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 900,
-                            padding: '3px 8px',
-                            borderRadius: 999,
-                            background: rank === 1 ? '#f59e0b' : '#111827',
-                            color: rank === 1 ? '#111827' : '#fff',
-                            lineHeight: 1.2,
-                            flex: '0 0 auto',
-                          }}
-                          title="Rank by avg total hits"
-                        >
-                          #{rank}
-                        </span>
+                        {r.model_key === 'strategy_mix' && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              letterSpacing: '0.04em',
+                              textTransform: 'uppercase',
+                              padding: '3px 8px',
+                              borderRadius: 999,
+                              background: '#f5f3ff',
+                              color: '#6d28d9',
+                            }}
+                          >
+                            Strategy mix
+                          </span>
+                        )}
 
+                        {r.model_key !== 'pure_random' &&
+                          r.baseline_compared >= 5 && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                letterSpacing: '0.04em',
+                                textTransform: 'uppercase',
+                                padding: '3px 8px',
+                                borderRadius: 999,
+                                background: '#f8fafc',
+                                border: '1px dashed #cbd5f5',
+                                color: '#475569',
+                              }}
+                            >
+                              Baseline
+                            </span>
+                          )}
+
+                        {r.personality !== 'stable' && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              letterSpacing: '0.04em',
+                              textTransform: 'uppercase',
+                              padding: '3px 8px',
+                              borderRadius: 999,
+                              background:
+                                r.personality === 'aggressive'
+                                  ? '#fff7ed'
+                                  : r.personality === 'balanced'
+                                    ? '#ecfdf5'
+                                    : '#faf5ff',
+                              color:
+                                r.personality === 'aggressive'
+                                  ? '#c2410c'
+                                  : r.personality === 'balanced'
+                                    ? '#166534'
+                                    : '#7c3aed',
+                            }}
+                          >
+                            {r.personality === 'experimental'
+                              ? 'Emerging'
+                              : r.personality === 'aggressive'
+                                ? 'High risk'
+                                : 'Balanced'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 10,
+                      marginTop: 12,
+                      fontSize: 12,
+                    }}
+                  >
+                    <div>
+                      <div style={{ color: '#6b7280' }}>Checked</div>
+                      <strong>
+                        {r.checked}/{r.total}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <div style={{ color: '#6b7280' }}>Average hits</div>
+                      <strong>{formatNum(r.avg_total_hits, 2)}</strong>
+                    </div>
+
+                    <div>
+                      <div style={{ color: '#6b7280' }}>Jackpot potential</div>
+                      <strong>{jackpotPotLabel}</strong>
+                    </div>
+
+                    <div>
+                      <div style={{ color: '#6b7280' }}>Confidence</div>
+                      <strong>{Math.round(conf * 100)}%</strong>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      height: 6,
+                      borderRadius: 999,
+                      background: '#eef2f7',
+                      overflow: 'hidden',
+                      marginTop: 10,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${Math.round(conf * 100)}%`,
+                        height: '100%',
+                        borderRadius: 999,
+                        background: '#6d28d9',
+                        opacity: 0.9,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="dl-table-scroll">
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+              }}
+            >
+              <thead>
+                <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
+                  {[
+                    'Model',
+                    'Checked',
+                    'Average hits',
+                    'Confidence',
+                    'Jackpot potential',
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: '12px 12px',
+                        fontSize: 12,
+                        color: '#6b7280',
+                        borderBottom: '1px solid #eef2f7',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              <tbody>
+                {filtered.map((r) => {
+                  const rank =
+                    filtered.findIndex((x) => x.model_key === r.model_key) + 1;
+                  const conf = r.confidence ?? 0;
+                  const jackpotPotLabel = formatNum(r.upside_score, 2);
+
+                  return (
+                    <tr key={r.model_key}>
+                      <td
+                        style={{
+                          padding: '12px',
+                          borderBottom: '1px solid #f1f5f9',
+                          fontWeight: 700,
+                        }}
+                      >
                         <div
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 8,
+                            gap: 12,
                             minWidth: 0,
-                            flex: 1,
                           }}
                         >
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 900,
+                              padding: '3px 8px',
+                              borderRadius: 999,
+                              background: rank === 1 ? '#f59e0b' : '#111827',
+                              color: rank === 1 ? '#111827' : '#fff',
+                              lineHeight: 1.2,
+                              flex: '0 0 auto',
+                            }}
+                          >
+                            #{rank}
+                          </span>
+
                           <span style={{ color: '#111827' }}>
                             {r.model_display_name}
                           </span>
-
-                          {r.model_key === 'strategy_mix' && (
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 800,
-                                letterSpacing: '0.04em',
-                                textTransform: 'uppercase',
-                                padding: '3px 8px',
-                                borderRadius: 999,
-                                background: '#f5f3ff',
-                                color: '#6d28d9',
-                                marginLeft: 6,
-                              }}
-                            >
-                              Strategy mix
-                            </span>
-                          )}
-
-                          {r.model_key !== 'pure_random' &&
-                            r.baseline_compared >= 5 && (
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  fontWeight: 800,
-                                  letterSpacing: '0.04em',
-                                  textTransform: 'uppercase',
-                                  padding: '3px 8px',
-                                  borderRadius: 999,
-                                  background: '#f8fafc',
-                                  border: '1px dashed #cbd5f5',
-                                  color: '#475569',
-                                  marginLeft: 6,
-                                }}
-                              >
-                                Baseline
-                              </span>
-                            )}
-
-                          {r.personality !== 'stable' && (
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 800,
-                                letterSpacing: '0.04em',
-                                textTransform: 'uppercase',
-                                padding: '3px 8px',
-                                borderRadius: 999,
-                                background:
-                                  r.personality === 'aggressive'
-                                    ? '#fff7ed'
-                                    : r.personality === 'balanced'
-                                      ? '#ecfdf5'
-                                      : '#faf5ff',
-
-                                color:
-                                  r.personality === 'aggressive'
-                                    ? '#c2410c'
-                                    : r.personality === 'balanced'
-                                      ? '#166534'
-                                      : '#7c3aed',
-                                flex: '0 0 auto',
-                              }}
-                            >
-                              {r.personality === 'experimental'
-                                ? 'Emerging'
-                                : r.personality === 'aggressive'
-                                  ? 'High risk'
-                                  : 'Balanced'}
-                            </span>
-                          )}
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    <td>
-                      <div
+                      <td>
+                        {r.checked}/{r.total}
+                      </td>
+
+                      <td
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
+                          padding: '12px',
+                          borderBottom: '1px solid #f1f5f9',
+                          fontWeight: 700,
                         }}
                       >
-                        <span title="Checked vs total predictions (only checked are evaluated)">
-                          {r.checked}/{r.total}
-                        </span>
-                      </div>
-                    </td>
+                        {formatNum(r.avg_total_hits, 2)}
+                      </td>
 
-                    {/* AVERAGE HITS */}
-                    <td
-                      style={{
-                        padding: '12px',
-                        borderBottom: '1px solid #f1f5f9',
-                        fontWeight: 700,
-                      }}
-                    >
-                      <div>{formatNum(r.avg_total_hits, 2)}</div>
-
-                      {r.model_key !== 'pure_random' &&
-                        r.baseline_compared >= 5 && (
-                          <div
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: '#6b7280',
-                              marginTop: 2,
-                            }}
-                            title="Percentage of comparable draws where this model beat Pure Random"
-                          >
-                            baseline win rate{' '}
-                            {Math.round(r.baseline_win_rate_global * 100)}% (n=
-                            {r.baseline_compared})
-                          </div>
-                        )}
-
-                      {rankingMode === 'upside' && (
-                        <div
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: '#6b7280',
-                            marginTop: 2,
-                          }}
-                        >
-                          upside {formatNum(r.upside_score, 2)}
-                        </div>
-                      )}
-
-                      {rankingMode === 'consistency' && (
-                        <div
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: '#6b7280',
-                            marginTop: 2,
-                          }}
-                        >
-                          consistency {formatNum(r.consistency_score, 2)}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* CONFIDENCE */}
-                    <td
-                      style={{
-                        padding: '12px',
-                        borderBottom: '1px solid #f1f5f9',
-                        minWidth: 140,
-                      }}
-                    >
-                      <div
+                      <td
                         style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 6,
+                          padding: '12px',
+                          borderBottom: '1px solid #f1f5f9',
+                          minWidth: 140,
                         }}
                       >
                         <div
@@ -2046,57 +2233,30 @@ export default function ModelPerformancePage() {
                               width: `${Math.round(conf * 100)}%`,
                               height: '100%',
                               borderRadius: 999,
-                              background: confFill,
+                              background: '#6d28d9',
                               opacity: 0.9,
-                              transition: 'width 0.4s ease',
                             }}
                           />
                         </div>
+                      </td>
 
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: '#6b7280',
-                            fontWeight: 600,
-                          }}
-                        >
-                          {Math.round(conf * 100)}%
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* JACKPOT POTENTIAL */}
-                    <td
-                      style={{
-                        padding: '12px',
-                        borderBottom: '1px solid #f1f5f9',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      <div
+                      <td
                         style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 2,
+                          padding: '12px',
+                          borderBottom: '1px solid #f1f5f9',
+                          whiteSpace: 'nowrap',
+                          fontWeight: 700,
                         }}
                       >
-                        <span
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 700,
-                            color: '#111827',
-                          }}
-                        >
-                          {jackpotPotLabel}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                        {jackpotPotLabel}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
