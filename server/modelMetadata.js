@@ -22,6 +22,8 @@ export const MODEL_DISPLAY_NAMES = {
   ai_meta_learning: 'AI Meta Learning',
 };
 
+export const MODEL_KEYS = Object.keys(MODEL_DISPLAY_NAMES);
+
 export function getModelDisplayName(modelKey) {
   return (
     MODEL_DISPLAY_NAMES[modelKey] ??

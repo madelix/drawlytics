@@ -1,7 +1,7 @@
 // server/routes/performance.js
 import express from 'express';
 import { pool } from '../db.js';
-import { MODEL_DISPLAY_NAMES } from '../modelMetadata.js';
+import { MODEL_DISPLAY_NAMES, getModelDisplayName } from '../modelMetadata.js';
 import { normalizeModelKey } from '../modelNormalization.js';
 
 const router = express.Router();
@@ -188,8 +188,7 @@ GROUP BY named.model_key, named.model_display_name
         return {
           ...row,
           model_key: normalizedKey,
-          model_display_name:
-            MODEL_DISPLAY_NAMES[normalizedKey] ?? row.model_display_name,
+          model_display_name: getModelDisplayName(normalizedKey),
         };
       }),
     });
