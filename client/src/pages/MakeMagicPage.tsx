@@ -150,6 +150,7 @@ export function MakeMagicPage() {
   const [multiStatus, setMultiStatus] = useState<SaveStatus>('idle');
   const [allAiStatus, setAllAiStatus] = useState<SaveStatus>('idle');
   const [hasSuggestedMix, setHasSuggestedMix] = useState(false);
+  const [isMobileFooter, setIsMobileFooter] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const selectedStrategy = STRATEGIES.find((s) => s.value === strategy)!;
@@ -160,6 +161,21 @@ export function MakeMagicPage() {
     } catch {
       setHasSuggestedMix(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 640px)');
+
+    const updateFooterLayout = () => {
+      setIsMobileFooter(mediaQuery.matches);
+    };
+
+    updateFooterLayout();
+    mediaQuery.addEventListener('change', updateFooterLayout);
+
+    return () => {
+      mediaQuery.removeEventListener('change', updateFooterLayout);
+    };
   }, []);
 
   function applySuggestedMix() {
@@ -461,17 +477,16 @@ export function MakeMagicPage() {
             </div>
           </div>
 
-          {/* FOOTER ROW: INFO + BUTTON */}
+          {/* FOOTER ROW: INFO + ACTIONS */}
           <div
             style={{
               marginTop: '1.5rem',
-              paddingTop: '0.75rem',
+              paddingTop: '0.9rem',
               borderTop: '1px solid rgba(148, 163, 184, 0.25)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: '0.75rem',
-              flexWrap: 'wrap',
+              display: 'grid',
+              gridTemplateColumns: isMobileFooter ? '1fr' : '1fr auto',
+              alignItems: isMobileFooter ? 'stretch' : 'center',
+              gap: isMobileFooter ? '0.9rem' : '1rem',
             }}
           >
             <p
@@ -485,39 +500,41 @@ export function MakeMagicPage() {
               view them later under <strong>My predictions</strong>.
             </p>
 
-            {hasSuggestedMix && (
-              <button
-                type="button"
-                onClick={applySuggestedMix}
-                style={{
-                  borderRadius: 999,
-                  border: '1px solid #e5e7eb',
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  background: '#fff',
-                  cursor: 'pointer',
-                  marginRight: 8,
-                }}
-              >
-                Apply suggested mix
-              </button>
-            )}
-
             <div
               style={{
                 display: 'flex',
-                gap: 12,
+                gap: isMobileFooter ? 8 : 12,
                 alignItems: 'center',
+                flexDirection: 'row',
                 flexWrap: 'wrap',
+                justifyContent: isMobileFooter ? 'center' : 'flex-end',
               }}
             >
+              {hasSuggestedMix && (
+                <button
+                  type="button"
+                  onClick={applySuggestedMix}
+                  style={{
+                    borderRadius: 14,
+                    border: '1px solid #e5e7eb',
+                    padding: '0.6rem 1rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    background: '#fff',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Apply strategy mix
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={handleGenerateAll}
                 disabled={multiStatus === 'saving'}
                 style={{
-                  borderRadius: 999,
+                  borderRadius: 14,
                   border: 'none',
                   padding: '0.6rem 1.2rem',
                   fontSize: '0.9rem',
@@ -534,7 +551,7 @@ export function MakeMagicPage() {
                   ? 'Generating…'
                   : multiStatus === 'success'
                     ? 'Saved!'
-                    : 'Generate strategy mix'}
+                    : 'Generate predictions'}
               </button>
 
               <button
@@ -542,9 +559,9 @@ export function MakeMagicPage() {
                 onClick={handleGenerateAllAiModels}
                 disabled={allAiStatus === 'saving'}
                 style={{
-                  borderRadius: 999,
+                  borderRadius: 14,
                   border: '1px solid #e5e7eb',
-                  padding: '0.6rem 1.2rem',
+                  padding: '0.6rem 1rem',
                   fontSize: '0.9rem',
                   fontWeight: 700,
                   cursor: allAiStatus === 'saving' ? 'default' : 'pointer',
@@ -565,14 +582,14 @@ export function MakeMagicPage() {
             {multiStatus === 'error' && error && (
               <div
                 style={{
-                  marginTop: 12,
+                  gridColumn: '1 / -1',
+                  marginTop: 4,
                   padding: '10px 12px',
                   borderRadius: 8,
                   background: '#fef2f2',
                   border: '1px solid #fecaca',
                   color: '#991b1b',
                   fontSize: '0.85rem',
-                  maxWidth: 420,
                   lineHeight: 1.4,
                 }}
               >
