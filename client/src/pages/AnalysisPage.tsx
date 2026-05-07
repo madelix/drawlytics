@@ -252,6 +252,8 @@ export function AnalysisPage() {
           if (!isMobile) return String(value);
           if (!Number.isFinite(n)) return String(value);
 
+          if (data.length <= 12) return String(value);
+
           return n % 5 === 0 ? String(value) : '';
         },
       }}

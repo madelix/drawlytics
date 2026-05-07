@@ -16,6 +16,21 @@ export function GapsPage() {
   const [gapsData, setGapsData] = useState<GapsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +82,12 @@ export function GapsPage() {
   const overdueStarsTop = starGapsRaw.slice(0, 5);
 
   return (
-    <div className="dl-page dl-analysis-page">
+    <div
+      className="dl-page dl-analysis-page"
+      style={{
+        padding: isMobile ? '1rem 0.75rem 4rem' : undefined,
+      }}
+    >
       <header className="dl-analysis-header">
         <h1 className="dl-hero-title">Overdue Numbers</h1>
         <p className="dl-section-subtitle">
@@ -151,11 +171,12 @@ export function GapsPage() {
                 padding={0.25}
                 valueScale={{ type: 'linear' }}
                 indexScale={{ type: 'band', round: true }}
-                colors="#804198"
+                colors={() => 'rgba(128, 65, 152, 0.75)'}
                 animate={true}
                 motionConfig="gentle"
                 enableGridX={false}
                 enableGridY={true}
+                enableLabel={!isMobile}
                 axisBottom={{
                   tickSize: 0,
                   tickPadding: 6,
@@ -163,6 +184,15 @@ export function GapsPage() {
                   legend: 'Number',
                   legendOffset: 32,
                   legendPosition: 'middle',
+                  format: (value) => {
+                    if (!isMobile) return String(value);
+
+                    const index = mainGaps.findIndex(
+                      (item) => item.label === String(value),
+                    );
+
+                    return index % 3 === 0 ? String(value) : '';
+                  },
                 }}
                 axisLeft={{
                   tickSize: 0,
@@ -227,11 +257,12 @@ export function GapsPage() {
                 padding={0.25}
                 valueScale={{ type: 'linear' }}
                 indexScale={{ type: 'band', round: true }}
-                colors="#21409a"
+                colors={() => 'rgba(33, 64, 154, 0.75)'}
                 animate={true}
                 motionConfig="gentle"
                 enableGridX={false}
                 enableGridY={true}
+                enableLabel={!isMobile}
                 axisBottom={{
                   tickSize: 0,
                   tickPadding: 6,
