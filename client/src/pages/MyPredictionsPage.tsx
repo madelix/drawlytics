@@ -101,59 +101,46 @@ function formatModelDisplayName(raw: string): string {
 
   const lower = s.toLowerCase();
 
-  const stripGenerator = (x: string) => x.replace(/\s+generator$/i, '').trim();
-
-  // make_magic:* canonical mappings
-  if (lower.startsWith('make_magic:')) {
-    const key = lower.slice('make_magic:'.length).trim();
-
-    const map: Record<string, string> = {
-      cold_focused: 'Cold Focused',
-      hot_focused: 'Hot Focused',
-      balanced_hot_cold: 'Balanced Hot/Cold',
-      pure_random: 'Pure Random',
-      overdue: 'Overdue',
-      ai_ensemble: 'AI Ensemble',
-      ai_statistical_analysis: 'AI Statistical Analysis',
-      ai_random_forest: 'AI Random Forest',
-      ai_decision_tree: 'AI Decision Tree',
-      ai_gradient_boosting: 'AI Gradient Boosting',
-      ai_xgboost: 'AI XGBoost',
-      ai_q_learning: 'AI Q-Learning',
-      ai_advanced_analysis: 'AI Advanced Analysis',
-      ai_markov_chain: 'AI Markov Chain',
-      ai_meta_learning: 'AI Meta Learning',
-    };
-
-    if (map[key]) return map[key];
-
-    // Fallback for unknown keys
-    return key
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (c) => c.toUpperCase())
-      .trim();
-  }
-
-  // Older strings like "Cold-focused generator"
-  if (lower.includes('generator')) {
-    let cleaned = stripGenerator(s);
-
-    cleaned = cleaned.replace(/-focused\b/gi, '');
-    cleaned = cleaned.replace(/\s{2,}/g, ' ').trim();
-
-    if (/balanced\s+hot\/cold/i.test(cleaned)) return 'Balanced Hot/Cold';
-
-    return cleaned
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (c) => c.toUpperCase())
-      .trim();
-  }
-
-  // Default
-  return s
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+  const key = lower
+    .replace(/^make_magic:/, '')
+    .replace(/^ai:/, 'ai_')
+    .replace(/\s+generator$/i, '')
+    .replace(/-focused/g, '_focused')
+    .replace(/:/g, '_')
+    .replace(/\s+/g, '_')
     .trim();
+
+  const map: Record<string, string> = {
+    cold_focused: 'Cold Focused',
+    hot_focused: 'Hot Focused',
+    balanced_hot_cold: 'Balanced Hot/Cold',
+    pure_random: 'Pure Random',
+    overdue: 'Overdue',
+    strategy_mix: 'Strategy Mix',
+
+    ai_ensemble: 'AI Ensemble',
+    ai_statistical_analysis: 'AI Statistical Analysis',
+    ai_random_forest: 'AI Random Forest',
+    ai_decision_tree: 'AI Decision Tree',
+    ai_gradient_boosting: 'AI Gradient Boosting',
+    ai_xgboost: 'AI XGBoost',
+    ai_q_learning: 'AI Q-Learning',
+    ai_neural_network: 'AI Neural Network',
+    ai_lstm: 'AI LSTM',
+    ai_bayesian: 'AI Bayesian',
+    ai_markov_chain: 'AI Markov Chain',
+    ai_meta_learning: 'AI Meta Learning',
+  };
+
+  return (
+    map[key] ??
+    s
+      .replace(/^make_magic:/i, '')
+      .replace(/^ai:/i, 'AI ')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+      .trim()
+  );
 }
 
 type DrawLookup = {

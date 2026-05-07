@@ -2,6 +2,7 @@
 import express from 'express';
 import { pool } from '../db.js';
 import { MODEL_DISPLAY_NAMES } from '../modelMetadata.js';
+import { normalizeModelKey } from '../modelNormalization.js';
 
 const router = express.Router();
 
@@ -181,11 +182,16 @@ GROUP BY named.model_key, named.model_display_name
     res.json({
       ok: true,
       lottery,
-      models: rows.map((row) => ({
-        ...row,
-        model_display_name:
-          MODEL_DISPLAY_NAMES[row.model_key] ?? row.model_display_name,
-      })),
+      models: rows.map((row) => {
+        const normalizedKey = normalizeModelKey(row.model_key);
+
+        return {
+          ...row,
+          model_key: normalizedKey,
+          model_display_name:
+            MODEL_DISPLAY_NAMES[normalizedKey] ?? row.model_display_name,
+        };
+      }),
     });
   } catch (err) {
     console.error('GET /performance/models failed:', err);
