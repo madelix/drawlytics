@@ -96,6 +96,21 @@ export function AnalysisPage() {
   // quick generate state
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   // ---------- Load frequency + hot/cold whenever range changes ----------
   useEffect(() => {
@@ -223,13 +238,22 @@ export function AnalysisPage() {
       motionConfig="gentle"
       enableGridX={false}
       enableGridY={true}
+      enableLabel={!isMobile}
       axisBottom={{
-        tickSize: 0,
-        tickPadding: 6,
+        tickSize: isMobile ? 0 : 5,
+        tickPadding: isMobile ? 4 : 5,
         tickRotation: 0,
         legend: 'Number',
-        legendOffset: 32,
         legendPosition: 'middle',
+        legendOffset: 36,
+        format: (value) => {
+          const n = Number(value);
+
+          if (!isMobile) return String(value);
+          if (!Number.isFinite(n)) return String(value);
+
+          return n % 5 === 0 ? String(value) : '';
+        },
       }}
       axisLeft={{
         tickSize: 0,
@@ -321,7 +345,12 @@ export function AnalysisPage() {
   }
 
   return (
-    <div className="dl-page dl-analysis-page">
+    <div
+      className="dl-page dl-analysis-page"
+      style={{
+        padding: isMobile ? '1rem 0.75rem 4rem' : undefined,
+      }}
+    >
       {/* HEADER */}
       <header className="dl-analysis-header">
         <h1 className="dl-hero-title">Number Analysis</h1>
@@ -334,7 +363,14 @@ export function AnalysisPage() {
       {/* CONFIG BAR */}
       <section className="dl-analysis-config">
         <div className="dl-config-card">
-          <div className="dl-config-row">
+          <div
+            className="dl-config-row"
+            style={{
+              alignItems: isMobile ? 'stretch' : undefined,
+              flexDirection: isMobile ? 'column' : undefined,
+              gap: isMobile ? '1rem' : undefined,
+            }}
+          >
             <div className="dl-config-item">
               <div className="dl-config-label">Lottery type</div>
               <div className="dl-config-value">EuroMillions</div>
