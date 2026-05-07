@@ -222,6 +222,7 @@ export default function MyPredictionsPage() {
   const [playingId, setPlayingId] = useState<number | null>(null);
 
   const [drawMap, setDrawMap] = useState<Record<string, DrawLookup>>({});
+  const [isMobile, setIsMobile] = useState(false);
 
   const [usage, setUsage] = useState<{
     used: number;
@@ -244,6 +245,21 @@ export default function MyPredictionsPage() {
     void loadPlayedMap();
     void loadDrawsForHighlighting();
     void loadUsage();
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 700px)');
+
+    const updateIsMobile = () => {
+      setIsMobile(mediaQuery.matches);
+    };
+
+    updateIsMobile();
+    mediaQuery.addEventListener('change', updateIsMobile);
+
+    return () => {
+      mediaQuery.removeEventListener('change', updateIsMobile);
+    };
   }, []);
 
   async function loadUsage() {
@@ -935,8 +951,8 @@ export default function MyPredictionsPage() {
                               : isPlayed
                                 ? '#f8fafc'
                                 : '#ffffff',
-                          borderRadius: '18px',
-                          padding: '1rem 1.25rem',
+                          borderRadius: isMobile ? '22px' : '18px',
+                          padding: isMobile ? '1rem' : '1rem 1.25rem',
                           boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
                           border: isPlayed
                             ? '1px solid #e5e7eb'
@@ -1051,9 +1067,12 @@ export default function MyPredictionsPage() {
 
                         <div
                           style={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            gap: '0.75rem',
+                            display: isMobile ? 'grid' : 'flex',
+                            gridTemplateColumns: isMobile
+                              ? 'minmax(0, 1fr) auto'
+                              : undefined,
+                            flexWrap: isMobile ? undefined : 'wrap',
+                            gap: isMobile ? '0.85rem 1rem' : '0.75rem',
                             alignItems: 'flex-start',
                           }}
                         >
@@ -1125,16 +1144,28 @@ export default function MyPredictionsPage() {
 
                           <div
                             style={{
-                              marginLeft: 'auto',
-                              textAlign: 'right',
-                              minWidth: 170,
+                              marginLeft: isMobile ? 0 : 'auto',
+                              textAlign: isMobile ? 'left' : 'right',
+                              minWidth: isMobile ? 0 : 170,
+                              width: isMobile ? '100%' : 'auto',
                               display: 'flex',
-                              flexDirection: 'column',
-                              gap: 8,
-                              alignItems: 'flex-end',
+                              flexDirection: isMobile ? 'row' : 'column',
+                              gap: isMobile ? 12 : 8,
+                              alignItems: isMobile ? 'center' : 'flex-end',
+                              justifyContent: isMobile
+                                ? 'space-between'
+                                : undefined,
+                              gridColumn: isMobile ? '1 / -1' : undefined,
                             }}
                           >
-                            <div style={{ textAlign: 'right' }}>
+                            <div
+                              style={{
+                                textAlign: isMobile ? 'left' : 'right',
+                                display: isMobile ? 'flex' : 'block',
+                                alignItems: isMobile ? 'baseline' : undefined,
+                                gap: isMobile ? 6 : undefined,
+                              }}
+                            >
                               <div
                                 style={{
                                   fontSize: '0.75rem',
@@ -1165,7 +1196,7 @@ export default function MyPredictionsPage() {
                                 </div>
                               )}
 
-                              {!draw && (
+                              {!isMobile && !draw && (
                                 <div
                                   style={{
                                     fontSize: '0.75rem',
