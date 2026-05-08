@@ -6,7 +6,7 @@ import * as schema from '../drizzle/schema.js';
 import { XMLParser } from 'fast-xml-parser';
 
 const router = express.Router();
-const { euromillions_draws } = schema;
+const { euromillions_draws, uk_lotto_draws, set_for_life_draws } = schema;
 
 /**
  * Convert input into YYYY-MM-DD (UTC day).
@@ -512,6 +512,44 @@ router.post('/cron/euromillions/sync', requireAdmin, async (_req, res) => {
     });
   } catch (e) {
     console.error('POST /cron/euromillions/sync failed:', e);
+    res.status(500).json({ ok: false, error: 'cron_sync_failed' });
+  }
+});
+
+/* ──────────────────────────────────────────────
+   POST /api/cron/uk-lotto/sync
+   Admin-only. Intended for Railway Cron.
+   ────────────────────────────────────────────── */
+router.post('/cron/uk-lotto/sync', requireAdmin, async (_req, res) => {
+  try {
+    return res.json({
+      ok: true,
+      lottery: 'uk_lotto',
+      mode: 'not_implemented_yet',
+      message:
+        'UK Lotto cron route is wired, but live sync is not implemented yet.',
+    });
+  } catch (e) {
+    console.error('POST /cron/uk-lotto/sync failed:', e);
+    res.status(500).json({ ok: false, error: 'cron_sync_failed' });
+  }
+});
+
+/* ──────────────────────────────────────────────
+   POST /api/cron/set-for-life/sync
+   Admin-only. Intended for Railway Cron.
+   ────────────────────────────────────────────── */
+router.post('/cron/set-for-life/sync', requireAdmin, async (_req, res) => {
+  try {
+    return res.json({
+      ok: true,
+      lottery: 'set_for_life',
+      mode: 'not_implemented_yet',
+      message:
+        'Set For Life cron route is wired, but live sync is not implemented yet.',
+    });
+  } catch (e) {
+    console.error('POST /cron/set-for-life/sync failed:', e);
     res.status(500).json({ ok: false, error: 'cron_sync_failed' });
   }
 });
