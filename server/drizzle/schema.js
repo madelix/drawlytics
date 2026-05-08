@@ -34,17 +34,26 @@ export const euromillions_draws = pgTable('euromillions_draws', {
 /* =========================
    UK Lotto draws
 ========================= */
-export const uk_lotto_draws = pgTable('uk_lotto_draws', {
-  id: serial('id').primaryKey(),
-  draw_date: date('draw_date').notNull(),
+export const uk_lotto_draws = pgTable(
+  'uk_lotto_draws',
+  {
+    id: serial('id').primaryKey(),
+    draw_date: date('draw_date').notNull(),
 
-  n1: smallint('n1').notNull(),
-  n2: smallint('n2').notNull(),
-  n3: smallint('n3').notNull(),
-  n4: smallint('n4').notNull(),
-  n5: smallint('n5').notNull(),
-  n6: smallint('n6').notNull(),
+    n1: smallint('n1').notNull(),
+    n2: smallint('n2').notNull(),
+    n3: smallint('n3').notNull(),
+    n4: smallint('n4').notNull(),
+    n5: smallint('n5').notNull(),
+    n6: smallint('n6').notNull(),
 
-  bonus_ball: smallint('bonus_ball').notNull(),
-  created_at: timestamp('created_at').defaultNow().notNull(),
-});
+    bonus_ball: smallint('bonus_ball').notNull(),
+
+    created_at: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    uk_lotto_draw_date_unique: uniqueIndex(
+      'uk_lotto_draws_draw_date_unique',
+    ).on(t.draw_date),
+  }),
+);

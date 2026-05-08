@@ -1,6 +1,6 @@
 {
-  "id": "7768ce26-a080-494d-8cbb-02c531aa7512",
-  "prevId": "c9f2b9da-4da8-45ee-9d74-8bf702adc60a",
+  "id": "0c7296cd-6d95-432d-a6ec-bffbba9a9c55",
+  "prevId": "7768ce26-a080-494d-8cbb-02c531aa7512",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -144,7 +144,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "uk_lotto_draws_draw_date_unique": {
+          "name": "uk_lotto_draws_draw_date_unique",
+          "columns": [
+            {
+              "expression": "draw_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

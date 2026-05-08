@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "uk_lotto_draws_draw_date_unique" ON "uk_lotto_draws" USING btree ("draw_date");
