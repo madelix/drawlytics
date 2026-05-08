@@ -927,7 +927,7 @@ export default function MyPredictionsPage() {
                                 marginBottom: 2,
                               }}
                             >
-                              {p.lottery}
+                              {lotteryConfig.displayName}
                               {p.source === 'strategy_mix' && (
                                 <span
                                   style={{
