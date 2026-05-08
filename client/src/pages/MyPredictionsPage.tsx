@@ -1138,8 +1138,12 @@ export default function MyPredictionsPage() {
                                     marginTop: 2,
                                   }}
                                 >
-                                  Hits: {p.matched_main ?? 0} main /{' '}
-                                  {p.matched_stars ?? 0} stars
+                                  Hits: {p.matched_main ?? 0}{' '}
+                                  {mainGroup?.shortLabel.toLowerCase() ??
+                                    'main'}{' '}
+                                  / {p.matched_stars ?? 0}{' '}
+                                  {secondaryGroup?.shortLabel.toLowerCase() ??
+                                    'stars'}
                                   {p.result_label ? ` • ${p.result_label}` : ''}
                                 </div>
                               )}
