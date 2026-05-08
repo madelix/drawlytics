@@ -2,6 +2,7 @@
 import React, { CSSProperties, useEffect, useMemo, useState } from 'react';
 import { getModelDisplayName } from '../utils/modelDisplay';
 import { getLotteryConfig } from '../config/lotteries';
+import { getMainGroup, getSecondaryGroup } from '../utils/lotteryNumbers';
 
 type PredictionRow = {
   id: number;
@@ -866,12 +867,8 @@ export default function MyPredictionsPage() {
                   items.map((p) => {
                     const predDayKey = toDayKey(p.draw_date);
                     const lotteryConfig = getLotteryConfig(p.lottery);
-                    const mainGroup = lotteryConfig.numberGroups.find(
-                      (group) => group.key === 'main',
-                    );
-                    const secondaryGroup = lotteryConfig.numberGroups.find(
-                      (group) => group.key !== 'main',
-                    );
+                    const mainGroup = getMainGroup(p.lottery);
+                    const secondaryGroup = getSecondaryGroup(p.lottery);
                     const draw = predDayKey ? drawMap[predDayKey] : undefined;
                     const canTogglePlayed = !draw; // lock played when results exist
                     const isPlayed = Boolean(playedMap[p.id]);
