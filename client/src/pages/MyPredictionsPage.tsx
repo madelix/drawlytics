@@ -1,6 +1,7 @@
 // client/src/pages/MyPredictionsPage.tsx
 import React, { CSSProperties, useEffect, useMemo, useState } from 'react';
 import { getModelDisplayName } from '../utils/modelDisplay';
+import { getLotteryConfig } from '../config/lotteries';
 
 type PredictionRow = {
   id: number;
@@ -864,6 +865,13 @@ export default function MyPredictionsPage() {
                 {isOpen &&
                   items.map((p) => {
                     const predDayKey = toDayKey(p.draw_date);
+                    const lotteryConfig = getLotteryConfig(p.lottery);
+                    const mainGroup = lotteryConfig.numberGroups.find(
+                      (group) => group.key === 'main',
+                    );
+                    const secondaryGroup = lotteryConfig.numberGroups.find(
+                      (group) => group.key !== 'main',
+                    );
                     const draw = predDayKey ? drawMap[predDayKey] : undefined;
                     const canTogglePlayed = !draw; // lock played when results exist
                     const isPlayed = Boolean(playedMap[p.id]);
@@ -1026,7 +1034,7 @@ export default function MyPredictionsPage() {
                                 marginBottom: 4,
                               }}
                             >
-                              Main numbers
+                              {mainGroup?.label ?? 'Main numbers'}
                               {mainHitCount != null
                                 ? ` (hits: ${mainHitCount})`
                                 : ''}
@@ -1059,7 +1067,7 @@ export default function MyPredictionsPage() {
                                 marginBottom: 4,
                               }}
                             >
-                              Stars
+                              {secondaryGroup?.label ?? 'Stars'}
                               {starHitCount != null
                                 ? ` (hits: ${starHitCount})`
                                 : ''}
