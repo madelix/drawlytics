@@ -158,17 +158,29 @@ app.get('/api/frequency', async (_req, res) => {
 app.get('/api/frequency/latest-n', async (req, res) => {
   try {
     const config = getLotteryAnalysisConfig(req.query.lottery);
-
     const rawN = req.query.n;
-    let n = parseInt(rawN != null ? String(rawN) : '100', 10);
-    if (Number.isNaN(n) || n <= 0) n = 100;
-    if (n > 1000) n = 1000;
 
-    const draws = await db
+    let n = parseInt(rawN != null ? String(rawN) : '100', 10);
+
+    const useAllDraws = n === -1;
+
+    if (Number.isNaN(n)) n = 100;
+
+    if (!useAllDraws) {
+      if (n <= 0) n = 100;
+      if (n > 1000) n = 1000;
+    }
+
+    let query = db
       .select()
       .from(config.table)
-      .orderBy(desc(config.table.draw_date))
-      .limit(n);
+      .orderBy(desc(config.table.draw_date));
+
+    if (!useAllDraws) {
+      query = query.limit(n);
+    }
+
+    const draws = await query;
 
     const main = new Map();
     const stars = new Map();
@@ -215,18 +227,30 @@ app.get('/api/hot-cold', async (req, res) => {
     const rawTop = req.query.top;
 
     let n = parseInt(rawN != null ? String(rawN) : '100', 10);
-    if (Number.isNaN(n) || n <= 0) n = 100;
-    if (n > 1000) n = 1000;
+
+    const useAllDraws = n === -1;
+
+    if (Number.isNaN(n)) n = 100;
+
+    if (!useAllDraws) {
+      if (n <= 0) n = 100;
+      if (n > 1000) n = 1000;
+    }
 
     let top = parseInt(rawTop != null ? String(rawTop) : '5', 10);
     if (Number.isNaN(top) || top <= 0) top = 5;
     if (top > 25) top = 25;
 
-    const draws = await db
+    let query = db
       .select()
       .from(config.table)
-      .orderBy(desc(config.table.draw_date))
-      .limit(n);
+      .orderBy(desc(config.table.draw_date));
+
+    if (!useAllDraws) {
+      query = query.limit(n);
+    }
+
+    const draws = await query;
 
     const main = new Map();
     const stars = new Map();
@@ -285,12 +309,14 @@ app.get('/api/hot-cold', async (req, res) => {
    Gap / Overdue analysis (full history)
    GET /api/gaps
    ────────────────────────────────────────────── */
-app.get('/api/gaps', async (_req, res) => {
+app.get('/api/gaps', async (req, res) => {
   try {
+    const config = getLotteryAnalysisConfig(req.query.lottery);
+
     const draws = await db
       .select()
-      .from(euromillions_draws)
-      .orderBy(desc(euromillions_draws.draw_date));
+      .from(config.table)
+      .orderBy(desc(config.table.draw_date));
 
     const totalDraws = draws.length;
     const mainLastSeen = new Map();
@@ -299,13 +325,17 @@ app.get('/api/gaps', async (_req, res) => {
     draws.forEach((d, index) => {
       const drawDate = d.draw_date;
 
-      [d.n1, d.n2, d.n3, d.n4, d.n5].forEach((num) => {
+      config.mainColumns.forEach((col) => {
+        const num = d[col.name];
+
         if (num != null && !mainLastSeen.has(num)) {
           mainLastSeen.set(num, { gap: index, lastSeen: drawDate });
         }
       });
 
-      [d.s1, d.s2].forEach((num) => {
+      config.specialColumns.forEach((col) => {
+        const num = d[col.name];
+
         if (num != null && !starLastSeen.has(num)) {
           starLastSeen.set(num, { gap: index, lastSeen: drawDate });
         }
@@ -313,7 +343,7 @@ app.get('/api/gaps', async (_req, res) => {
     });
 
     const mainGaps = [];
-    for (let n = 1; n <= 50; n++) {
+    for (let n = 1; n <= config.mainMax; n++) {
       const info = mainLastSeen.get(n);
       mainGaps.push({
         number: n,
@@ -323,7 +353,7 @@ app.get('/api/gaps', async (_req, res) => {
     }
 
     const starGaps = [];
-    for (let n = 1; n <= 12; n++) {
+    for (let n = 1; n <= config.specialMax; n++) {
       const info = starLastSeen.get(n);
       starGaps.push({
         number: n,
@@ -337,6 +367,7 @@ app.get('/api/gaps', async (_req, res) => {
 
     res.json({
       ok: true,
+      lottery: config.key,
       main: mainGaps,
       stars: starGaps,
       totalDrawsConsidered: totalDraws,

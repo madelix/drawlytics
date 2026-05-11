@@ -102,8 +102,12 @@ export type GapsResponse = {
   error?: string;
 };
 
-export async function getGaps(): Promise<GapsResponse> {
-  const res = await fetch(apiUrl('/api/gaps'));
+export async function getGaps(lottery = 'euromillions'): Promise<GapsResponse> {
+  const params = new URLSearchParams({
+    lottery,
+  });
+
+  const res = await fetch(apiUrl(`/api/gaps?${params}`));
 
   if (!res.ok) {
     const text = await res.text();

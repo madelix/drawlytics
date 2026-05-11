@@ -15,6 +15,8 @@ export type LotteryConfig = {
   mainNumbers: number;
   specialNumbers: number;
   specialLabel: string;
+  hotChipClass: string;
+
   numberGroups: NumberGroup[];
 };
 
@@ -25,6 +27,7 @@ export const LOTTERIES: LotteryConfig[] = [
     mainNumbers: 5,
     specialNumbers: 2,
     specialLabel: 'Stars',
+    hotChipClass: 'dl-chip-hot-euromillions',
     numberGroups: [
       {
         key: 'main',
@@ -50,6 +53,7 @@ export const LOTTERIES: LotteryConfig[] = [
     mainNumbers: 6,
     specialNumbers: 1,
     specialLabel: 'Bonus Ball',
+    hotChipClass: 'dl-chip-hot-uk-lotto',
     numberGroups: [
       {
         key: 'main',
@@ -75,6 +79,7 @@ export const LOTTERIES: LotteryConfig[] = [
     mainNumbers: 5,
     specialNumbers: 1,
     specialLabel: 'Life Ball',
+    hotChipClass: 'dl-chip-hot-set-for-life',
     numberGroups: [
       {
         key: 'main',

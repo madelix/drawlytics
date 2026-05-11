@@ -944,6 +944,23 @@ body {
   border-color: #bfddff;
 }
 
+/* Lottery-specific chip accents */
+.dl-chip-hot-euromillions {
+  border-color: #e0d6ff;
+}
+
+.dl-chip-cold-euromillions {
+  border-color: #bfddff;
+}
+
+.dl-chip-hot-uk-lotto {
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+.dl-chip-hot-set-for-life {
+  border-color: rgba(13, 148, 136, 0.35);
+}
+
 /* Landing preview header status */
 .dl-preview-status {
   display: inline-flex;

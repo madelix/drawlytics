@@ -3,10 +3,8 @@ import { useEffect, useState } from 'react';
 import {
   getFrequencyLatestN,
   getHotCold,
-  getGaps,
   FrequencyLatestNResponse,
   HotColdResponse,
-  GapsResponse,
   NumberCount,
 } from '../api/analysis';
 import { ResponsiveBar } from '@nivo/bar';
@@ -24,6 +22,7 @@ const RANGE_OPTIONS: RangeOption[] = [
   { label: 'Last 50 draws', value: 50 },
   { label: 'Last 100 draws', value: 100 },
   { label: 'Last 200 draws', value: 200 },
+  { label: 'All draws', value: -1 },
 ];
 
 const HOT_COLD_TOP = 5;
@@ -33,49 +32,6 @@ type BarDatum = {
   number: number;
   count: number;
 };
-
-type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
-
-// --------- helper: next EuroMillions draw date (Tue/Fri) ----------
-function getNextEuroMillionsDrawDate(from: Date = new Date()): string {
-  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  const day = d.getDay(); // 0 = Sun, 1 = Mon, ..., 2 = Tue, 5 = Fri
-
-  let daysToAdd: number;
-  if (day <= 2) {
-    // Sun/Mon/Tue → this week's Tuesday
-    daysToAdd = 2 - day;
-  } else if (day <= 5) {
-    // Wed/Thu/Fri → this week's Friday
-    daysToAdd = 5 - day;
-  } else {
-    // Saturday → next Tuesday
-    daysToAdd = 3;
-  }
-
-  d.setDate(d.getDate() + daysToAdd);
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
-}
-
-// --------- helper: generate random numbers ----------
-function generateUniqueNumbers(max: number, count: number): number[] {
-  const nums = new Set<number>();
-  while (nums.size < count) {
-    const n = Math.floor(Math.random() * max) + 1; // 1..max
-    nums.add(n);
-  }
-  return Array.from(nums).sort((a, b) => a - b);
-}
-
-function generateMainNumbers(): number[] {
-  // EuroMillions: 5 main numbers 1..50
-  return generateUniqueNumbers(50, 5);
-}
-
-function generateStarNumbers(): number[] {
-  // EuroMillions: 2 stars 1..12
-  return generateUniqueNumbers(12, 2);
-}
 
 export function AnalysisPage() {
   const [range, setRange] = useState<number>(100);
@@ -95,13 +51,7 @@ export function AnalysisPage() {
   const [hotColdLoading, setHotColdLoading] = useState(false);
   const [hotColdError, setHotColdError] = useState<string | null>(null);
 
-  const [gapsData, setGapsData] = useState<GapsResponse | null>(null);
-  const [gapsLoading, setGapsLoading] = useState(false);
-  const [gapsError, setGapsError] = useState<string | null>(null);
-
   // quick generate state
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -159,38 +109,6 @@ export function AnalysisPage() {
     };
   }, [range, selectedLottery]);
 
-  // ---------- Load gaps once (full history) ----------
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setGapsLoading(true);
-      setGapsError(null);
-
-      try {
-        const gaps = await getGaps();
-        if (!cancelled) {
-          setGapsData(gaps);
-        }
-      } catch (err: any) {
-        if (!cancelled) {
-          const msg = err?.message ?? 'Failed to load gaps';
-          setGapsError(msg);
-        }
-      } finally {
-        if (!cancelled) {
-          setGapsLoading(false);
-        }
-      }
-    }
-
-    load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   // ---------- Basic derived data ----------
   const mainFreq: NumberCount[] = freqData?.main ?? [];
   const starFreq: NumberCount[] = freqData?.stars ?? [];
@@ -208,8 +126,8 @@ export function AnalysisPage() {
   const maxStarCount =
     sortedStarFreq.reduce((max, item) => Math.max(max, item.count), 0) || 1;
 
-  const overdueMain = gapsData?.main.slice(0, 5) ?? [];
-  const overdueStars = gapsData?.stars.slice(0, 5) ?? [];
+  const rangeLabel =
+    range === -1 ? 'all recorded draws' : `the last ${range} draws`;
 
   // ---------- Colour helpers ----------
   const mainColourScale = (intensity: number) => {
@@ -308,50 +226,6 @@ export function AnalysisPage() {
     />
   );
 
-  // ---------- Quick generate prediction (client-side) ----------
-  async function handleQuickGenerate() {
-    try {
-      setSaveStatus('saving');
-      setSaveError(null);
-
-      const drawDate = getNextEuroMillionsDrawDate();
-      const main_numbers = generateMainNumbers();
-      const star_numbers = generateStarNumbers();
-
-      const body = {
-        lottery: 'Euromillions',
-        draw_date: drawDate,
-        model_name: 'Balanced hot/cold generator',
-        main_numbers,
-        star_numbers,
-        confidence: '0.00',
-        status: 'pending',
-      };
-
-      // IMPORTANT:
-      // - In dev: this stays relative (/api/...) so Vite proxy works and avoids CORS.
-      // - In prod: your apiUrl helper can prepend a real base URL if you choose.
-      const res = await fetch(apiUrl('/api/predictions'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(
-          `API error (${res.status}): ${text || 'Failed to save prediction'}`,
-        );
-      }
-
-      setSaveStatus('success');
-    } catch (err: any) {
-      console.error('Quick generate failed:', err);
-      setSaveError(err?.message ?? 'Failed to generate prediction');
-      setSaveStatus('error');
-    }
-  }
-
   return (
     <div
       className="dl-page dl-analysis-page"
@@ -363,8 +237,8 @@ export function AnalysisPage() {
       <header className="dl-analysis-header">
         <h1 className="dl-hero-title">Number Analysis</h1>
         <p className="dl-section-subtitle">
-          Discover trends, hot &amp; cold numbers, and overdue numbers from
-          recent EuroMillions draws.
+          Compare hot, cold, and frequency patterns across supported lottery
+          draws.
         </p>
       </header>
 
@@ -399,21 +273,19 @@ export function AnalysisPage() {
                       type="button"
                       onClick={() => setSelectedLottery(lottery.key)}
                       style={{
-                        borderRadius: 999,
+                        borderRadius: 8,
                         border: active
-                          ? '1px solid rgba(128, 65, 152, 0.9)'
-                          : '1px solid rgba(148, 163, 184, 0.25)',
+                          ? '1px solid #111827'
+                          : '1px solid rgba(148, 163, 184, 0.35)',
                         padding: '0.45rem 0.9rem',
                         fontSize: '0.82rem',
-                        fontWeight: 500,
+                        fontWeight: 600,
                         cursor: 'pointer',
                         transition: 'all 0.18s ease',
-                        background: active
-                          ? 'linear-gradient(135deg, #804198 0%, #21409a 100%)'
-                          : 'rgba(255,255,255,0.75)',
+                        background: active ? '#111827' : '#ffffff',
                         color: active ? '#ffffff' : '#334155',
                         boxShadow: active
-                          ? '0 6px 16px rgba(33,64,154,0.22)'
+                          ? '0 4px 10px rgba(15, 23, 42, 0.18)'
                           : 'none',
                       }}
                     >
@@ -445,98 +317,63 @@ export function AnalysisPage() {
               </div>
             </div>
           </div>
-
-          {/* Quick generate action */}
-          <div
-            style={{
-              marginTop: '1rem',
-              paddingTop: '0.75rem',
-              borderTop: '1px solid rgba(148, 163, 184, 0.25)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: '0.75rem',
-              flexWrap: 'wrap',
-            }}
-          >
-            <p
-              style={{
-                fontSize: '0.8rem',
-                color: 'var(--dl-text-subtle, #6b7280)',
-                margin: 0,
-              }}
-            >
-              Generate a quick line based on a balanced strategy and save it to
-              your <strong>My Predictions</strong> page.
-            </p>
-
-            <div style={{ textAlign: 'right' }}>
-              <button
-                type="button"
-                onClick={handleQuickGenerate}
-                disabled={saveStatus === 'saving'}
-                style={{
-                  borderRadius: 999,
-                  border: 'none',
-                  padding: '0.45rem 1.1rem',
-                  fontSize: '0.85rem',
-                  fontWeight: 500,
-                  cursor: saveStatus === 'saving' ? 'default' : 'pointer',
-                  background:
-                    'linear-gradient(135deg, #804198 0%, #21409a 100%)',
-                  color: '#ffffff',
-                  opacity: saveStatus === 'saving' ? 0.7 : 1,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {saveStatus === 'saving'
-                  ? 'Generating…'
-                  : 'Generate quick prediction'}
-              </button>
-              {saveStatus === 'success' && (
-                <div
-                  style={{
-                    marginTop: 4,
-                    fontSize: '0.75rem',
-                    color: '#16a34a',
-                  }}
-                >
-                  Done! Check the My Predictions page.
-                </div>
-              )}
-              {saveStatus === 'error' && saveError && (
-                <div
-                  style={{
-                    marginTop: 4,
-                    fontSize: '0.75rem',
-                    color: '#b91c1c',
-                    maxWidth: 260,
-                  }}
-                >
-                  {saveError}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </section>
 
-      {/* HOT / COLD / OVERDUE SUMMARY */}
-      <section className="dl-analysis-grid">
+      {/* HOT / COLD SUMMARY */}
+      <section
+        className="dl-analysis-grid"
+        style={{
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+        }}
+      >
         {/* Hot Main */}
         <div className="dl-analysis-card">
-          <h2>Hot Numbers (Main)</h2>
+          <h2>Hot Main Numbers</h2>
+
           {hotColdLoading && <p>Loading hot numbers…</p>}
+
           {hotColdError && (
             <p style={{ color: 'red' }}>Error: {hotColdError}</p>
           )}
+
           {!hotColdLoading && hotColdData && (
             <div className="dl-chip-row">
               {hotColdData.hot.main.map((item) => (
-                <span key={item.number} className="dl-chip-main">
+                <span
+                  key={item.number}
+                  className={`dl-chip-main ${selectedLotteryConfig.hotChipClass}`}
+                >
                   {item.number}
                   <span className="dl-chip-sub">
-                    {item.count} hits (last {hotColdData.requestedN} draws)
+                    {item.count} hits ({rangeLabel})
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Hot Special */}
+        <div className="dl-analysis-card">
+          <h2>Hot {selectedLotteryConfig.specialLabel}</h2>
+
+          {hotColdLoading && <p>Loading hot numbers…</p>}
+
+          {hotColdError && (
+            <p style={{ color: 'red' }}>Error: {hotColdError}</p>
+          )}
+
+          {!hotColdLoading && hotColdData && (
+            <div className="dl-chip-row">
+              {hotColdData.hot.stars.map((item) => (
+                <span
+                  key={item.number}
+                  className={`dl-chip-main ${selectedLotteryConfig.hotChipClass}`}
+                >
+                  {item.number}
+                  <span className="dl-chip-sub">
+                    {item.count} hits ({rangeLabel})
                   </span>
                 </span>
               ))}
@@ -546,18 +383,21 @@ export function AnalysisPage() {
 
         {/* Cold Main */}
         <div className="dl-analysis-card">
-          <h2>Cold Numbers (Main)</h2>
+          <h2>Cold Main Numbers</h2>
+
           {hotColdLoading && <p>Loading cold numbers…</p>}
+
           {hotColdError && (
             <p style={{ color: 'red' }}>Error: {hotColdError}</p>
           )}
+
           {!hotColdLoading && hotColdData && (
             <div className="dl-chip-row">
               {hotColdData.cold.main.map((item) => (
                 <span key={item.number} className="dl-chip-main dl-chip-cold">
                   {item.number}
                   <span className="dl-chip-sub">
-                    {item.count} hits (last {hotColdData.requestedN} draws)
+                    {item.count} hits ({rangeLabel})
                   </span>
                 </span>
               ))}
@@ -565,63 +405,28 @@ export function AnalysisPage() {
           )}
         </div>
 
-        {/* Overdue summary */}
+        {/* Cold Special */}
         <div className="dl-analysis-card">
-          <h2>Overdue Numbers</h2>
-          {gapsLoading && <p>Loading overdue numbers…</p>}
-          {gapsError && <p style={{ color: 'red' }}>Error: {gapsError}</p>}
+          <h2>Cold {selectedLotteryConfig.specialLabel}</h2>
 
-          <div className="dl-overdue-grid">
-            <div className="dl-overdue-col">
-              <h3 className="dl-overdue-subtitle">Main numbers</h3>
-              {gapsData && (
-                <p className="dl-gaps-summary-meta dl-overdue-meta">
-                  Based on full EuroMillions history (
-                  {gapsData.totalDrawsConsidered} draws).
-                </p>
-              )}
+          {hotColdLoading && <p>Loading cold numbers…</p>}
 
-              {!gapsLoading && !gapsError && (
-                <ul className="dl-gap-list">
-                  {overdueMain.map((item) => (
-                    <li key={item.number}>
-                      <span className="dl-gap-number">{item.number}</span>
-                      <span className="dl-gap-text">
-                        {item.gap} draws since last seen{' '}
-                        {item.lastSeen ? `(${item.lastSeen})` : '(never seen)'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+          {hotColdError && (
+            <p style={{ color: 'red' }}>Error: {hotColdError}</p>
+          )}
+
+          {!hotColdLoading && hotColdData && (
+            <div className="dl-chip-row">
+              {hotColdData.cold.stars.map((item) => (
+                <span key={item.number} className="dl-chip-main dl-chip-cold">
+                  {item.number}
+                  <span className="dl-chip-sub">
+                    {item.count} hits ({rangeLabel})
+                  </span>
+                </span>
+              ))}
             </div>
-
-            <div className="dl-overdue-col">
-              <h3 className="dl-overdue-subtitle">Stars</h3>
-              {gapsData && (
-                <p className="dl-gaps-summary-meta dl-overdue-meta">
-                  Based on full EuroMillions history (
-                  {gapsData.totalDrawsConsidered} draws).
-                </p>
-              )}
-
-              {!gapsLoading && !gapsError && (
-                <ul className="dl-gap-list">
-                  {overdueStars.map((item) => (
-                    <li key={item.number}>
-                      <span className="dl-gap-number dl-gap-number-star">
-                        {item.number}
-                      </span>
-                      <span className="dl-gap-text">
-                        {item.gap} draws since last seen{' '}
-                        {item.lastSeen ? `(${item.lastSeen})` : '(never seen)'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       </section>
 
@@ -631,7 +436,7 @@ export function AnalysisPage() {
         <div className="dl-analysis-card">
           <h2>Main Number Frequency</h2>
           <p className="dl-config-hint">
-            Frequency of each main number in the last {range} draws.
+            Frequency of each main number across {rangeLabel}.
           </p>
 
           {freqLoading && <p>Loading frequency…</p>}
@@ -650,9 +455,10 @@ export function AnalysisPage() {
 
         {/* STARS */}
         <div className="dl-analysis-card">
-          <h2>Star Number Frequency</h2>
+          <h2>{selectedLotteryConfig.specialLabel} Frequency</h2>
           <p className="dl-config-hint">
-            Frequency of each star number in the last {range} draws.
+            Frequency of each {selectedLotteryConfig.specialLabel.toLowerCase()}{' '}
+            number across {rangeLabel}.
           </p>
 
           {freqLoading && <p>Loading frequency…</p>}
@@ -663,7 +469,7 @@ export function AnalysisPage() {
                 sortedStarFreq,
                 maxStarCount,
                 starColourScale,
-                'Star',
+                selectedLotteryConfig.specialLabel,
               )}
             </div>
           )}
