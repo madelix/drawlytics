@@ -209,6 +209,8 @@ app.get('/api/frequency/latest-n', async (req, res) => {
    ────────────────────────────────────────────── */
 app.get('/api/hot-cold', async (req, res) => {
   try {
+    const config = getLotteryAnalysisConfig(req.query.lottery);
+
     const rawN = req.query.n;
     const rawTop = req.query.top;
 
@@ -222,18 +224,21 @@ app.get('/api/hot-cold', async (req, res) => {
 
     const draws = await db
       .select()
-      .from(euromillions_draws)
-      .orderBy(desc(euromillions_draws.draw_date))
+      .from(config.table)
+      .orderBy(desc(config.table.draw_date))
       .limit(n);
 
     const main = new Map();
     const stars = new Map();
 
     for (const d of draws) {
-      [d.n1, d.n2, d.n3, d.n4, d.n5].forEach((num) => {
+      config.mainColumns.forEach((col) => {
+        const num = d[col.name];
         if (num != null) main.set(num, (main.get(num) || 0) + 1);
       });
-      [d.s1, d.s2].forEach((num) => {
+
+      config.specialColumns.forEach((col) => {
+        const num = d[col.name];
         if (num != null) stars.set(num, (stars.get(num) || 0) + 1);
       });
     }
@@ -263,6 +268,7 @@ app.get('/api/hot-cold', async (req, res) => {
 
     res.json({
       ok: true,
+      lottery: config.key,
       requestedN: n,
       totalDrawsConsidered: draws.length,
       top,

@@ -131,7 +131,7 @@ export function AnalysisPage() {
       try {
         const [freq, hotCold] = await Promise.all([
           getFrequencyLatestN(range, selectedLottery),
-          getHotCold(range, HOT_COLD_TOP),
+          getHotCold(range, HOT_COLD_TOP, selectedLottery),
         ]);
 
         if (!cancelled) {

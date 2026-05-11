@@ -66,8 +66,15 @@ export type HotColdResponse = {
 export async function getHotCold(
   n: number,
   top: number,
+  lottery = 'euromillions',
 ): Promise<HotColdResponse> {
-  const res = await fetch(apiUrl(`/api/hot-cold?n=${n}&top=${top}`));
+  const params = new URLSearchParams({
+    n: String(n),
+    top: String(top),
+    lottery,
+  });
+
+  const res = await fetch(apiUrl(`/api/hot-cold?${params}`));
 
   if (!res.ok) {
     const text = await res.text();
