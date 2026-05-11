@@ -1075,16 +1075,64 @@ router.post('/cron/uk-lotto/sync', requireAdmin, async (_req, res) => {
    ────────────────────────────────────────────── */
 router.post('/cron/set-for-life/sync', requireAdmin, async (_req, res) => {
   try {
+    const fetched = await fetchLatestSetForLifeFromFeed();
+
+    if (!fetched.ok) {
+      return res.status(fetched.status).json({
+        ok: false,
+        error: fetched.error,
+        ...(fetched.meta ? fetched.meta : {}),
+      });
+    }
+
+    const { url, payload } = fetched;
+    const { draw_date, n1, n2, n3, n4, n5, life_ball } = payload;
+
+    const existingRows = await db
+      .select()
+      .from(set_for_life_draws)
+      .where(eq(set_for_life_draws.draw_date, draw_date))
+      .limit(1);
+
+    const existing = existingRows[0] ?? null;
+
+    if (
+      existing &&
+      existing.n1 === n1 &&
+      existing.n2 === n2 &&
+      existing.n3 === n3 &&
+      existing.n4 === n4 &&
+      existing.n5 === n5 &&
+      existing.life_ball === life_ball
+    ) {
+      return res.json({
+        ok: true,
+        lottery: 'set_for_life',
+        mode: 'no_change',
+        source: url,
+        draw: existing,
+      });
+    }
+
+    const result = await upsertSetForLifeDraw(payload);
+
+    if (!result.ok) {
+      return res.status(result.status).json({
+        ok: false,
+        error: result.error,
+      });
+    }
+
     return res.json({
       ok: true,
       lottery: 'set_for_life',
-      mode: 'not_implemented_yet',
-      message:
-        'Set For Life cron route is wired, but live sync is not implemented yet.',
+      mode: 'fetched_and_upserted',
+      source: url,
+      draw: result.draw,
     });
   } catch (e) {
     console.error('POST /cron/set-for-life/sync failed:', e);
-    res.status(500).json({ ok: false, error: 'cron_sync_failed' });
+    return res.status(500).json({ ok: false, error: 'cron_sync_failed' });
   }
 });
 
