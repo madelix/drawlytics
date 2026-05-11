@@ -16,7 +16,67 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Pull tables from the Drizzle schema
-const { euromillions_draws } = schema;
+const { euromillions_draws, uk_lotto_draws, set_for_life_draws } = schema;
+
+function getLotteryAnalysisConfig(rawLottery) {
+  const lottery = String(rawLottery ?? 'euromillions')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+
+  if (lottery === 'uk_lotto') {
+    return {
+      key: 'uk_lotto',
+      table: uk_lotto_draws,
+      mainColumns: [
+        uk_lotto_draws.n1,
+        uk_lotto_draws.n2,
+        uk_lotto_draws.n3,
+        uk_lotto_draws.n4,
+        uk_lotto_draws.n5,
+        uk_lotto_draws.n6,
+      ],
+      specialColumns: [uk_lotto_draws.bonus_ball],
+      mainMax: 59,
+      specialMax: 59,
+      specialResponseKey: 'stars',
+    };
+  }
+
+  if (lottery === 'set_for_life') {
+    return {
+      key: 'set_for_life',
+      table: set_for_life_draws,
+      mainColumns: [
+        set_for_life_draws.n1,
+        set_for_life_draws.n2,
+        set_for_life_draws.n3,
+        set_for_life_draws.n4,
+        set_for_life_draws.n5,
+      ],
+      specialColumns: [set_for_life_draws.life_ball],
+      mainMax: 47,
+      specialMax: 10,
+      specialResponseKey: 'stars',
+    };
+  }
+
+  return {
+    key: 'euromillions',
+    table: euromillions_draws,
+    mainColumns: [
+      euromillions_draws.n1,
+      euromillions_draws.n2,
+      euromillions_draws.n3,
+      euromillions_draws.n4,
+      euromillions_draws.n5,
+    ],
+    specialColumns: [euromillions_draws.s1, euromillions_draws.s2],
+    mainMax: 50,
+    specialMax: 12,
+    specialResponseKey: 'stars',
+  };
+}
 
 app.use(
   cors({
@@ -97,6 +157,8 @@ app.get('/api/frequency', async (_req, res) => {
    ────────────────────────────────────────────── */
 app.get('/api/frequency/latest-n', async (req, res) => {
   try {
+    const config = getLotteryAnalysisConfig(req.query.lottery);
+
     const rawN = req.query.n;
     let n = parseInt(rawN != null ? String(rawN) : '100', 10);
     if (Number.isNaN(n) || n <= 0) n = 100;
@@ -104,18 +166,21 @@ app.get('/api/frequency/latest-n', async (req, res) => {
 
     const draws = await db
       .select()
-      .from(euromillions_draws)
-      .orderBy(desc(euromillions_draws.draw_date))
+      .from(config.table)
+      .orderBy(desc(config.table.draw_date))
       .limit(n);
 
     const main = new Map();
     const stars = new Map();
 
     for (const d of draws) {
-      [d.n1, d.n2, d.n3, d.n4, d.n5].forEach((num) => {
+      config.mainColumns.forEach((col) => {
+        const num = d[col.name];
         if (num != null) main.set(num, (main.get(num) || 0) + 1);
       });
-      [d.s1, d.s2].forEach((num) => {
+
+      config.specialColumns.forEach((col) => {
+        const num = d[col.name];
         if (num != null) stars.set(num, (stars.get(num) || 0) + 1);
       });
     }
@@ -127,6 +192,7 @@ app.get('/api/frequency/latest-n', async (req, res) => {
 
     res.json({
       ok: true,
+      lottery: config.key,
       main: toArr(main),
       stars: toArr(stars),
       requestedN: n,
@@ -137,7 +203,6 @@ app.get('/api/frequency/latest-n', async (req, res) => {
     res.status(500).json({ ok: false, error: 'frequency_latest_n_failed' });
   }
 });
-
 /* ──────────────────────────────────────────────
    Hot/Cold numbers on the last N draws
    GET /api/hot-cold?n=100&top=5
