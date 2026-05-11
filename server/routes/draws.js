@@ -182,6 +182,68 @@ async function upsertUkLottoDraw(payload) {
     draw: rows[0] ?? null,
   };
 }
+
+async function upsertSetForLifeDraw(payload) {
+  const { draw_date, n1, n2, n3, n4, n5, life_ball } = payload ?? {};
+
+  const day = normalizeDayString(draw_date);
+  if (!day) {
+    return { ok: false, status: 400, error: 'invalid_draw_date' };
+  }
+
+  const nums = [n1, n2, n3, n4, n5];
+
+  if (
+    nums.some((v) => typeof v !== 'number' || !Number.isFinite(v)) ||
+    typeof life_ball !== 'number' ||
+    !Number.isFinite(life_ball)
+  ) {
+    return { ok: false, status: 400, error: 'invalid_numbers' };
+  }
+
+  const inRange = (x, min, max) => x >= min && x <= max;
+
+  if (nums.some((x) => !inRange(x, 1, 47)) || !inRange(life_ball, 1, 10)) {
+    return { ok: false, status: 400, error: 'numbers_out_of_range' };
+  }
+
+  await db
+    .insert(set_for_life_draws)
+    .values({
+      draw_date: day,
+      n1,
+      n2,
+      n3,
+      n4,
+      n5,
+      life_ball,
+    })
+    .onConflictDoUpdate({
+      target: set_for_life_draws.draw_date,
+      set: {
+        n1,
+        n2,
+        n3,
+        n4,
+        n5,
+        life_ball,
+      },
+    });
+
+  const rows = await db
+    .select()
+    .from(set_for_life_draws)
+    .where(eq(set_for_life_draws.draw_date, day))
+    .limit(1);
+
+  return {
+    ok: true,
+    status: 200,
+    day,
+    draw: rows[0] ?? null,
+  };
+}
+
 /**
  * Fetch + parse latest EuroMillions draw from XML feed.
  * Returns a normalized payload ready for upsertEuroMillionsDraw.
@@ -407,6 +469,123 @@ async function fetchLatestUkLottoFromFeed() {
     status: 200,
     url,
     payload: { draw_date, n1, n2, n3, n4, n5, n6, bonus_ball },
+  };
+}
+
+async function fetchLatestSetForLifeFromFeed() {
+  const url = (process.env.SET_FOR_LIFE_FEED_URL || '').trim();
+  if (!url) {
+    return { ok: false, status: 500, error: 'feed_url_not_configured' };
+  }
+
+  const ac = new AbortController();
+  const timeoutId = setTimeout(() => ac.abort(), 10_000);
+
+  let r;
+  try {
+    r = await fetch(url, {
+      headers: { Accept: 'application/xml,text/xml,*/*' },
+      signal: ac.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!r.ok) {
+    return {
+      ok: false,
+      status: 502,
+      error: 'feed_fetch_failed',
+      meta: { status: r.status },
+    };
+  }
+
+  const xml = await r.text();
+
+  const head = xml.trim().slice(0, 200).toLowerCase();
+  if (head.startsWith('<!doctype html') || head.startsWith('<html')) {
+    return {
+      ok: false,
+      status: 502,
+      error: 'feed_not_xml',
+      meta: { status: r.status },
+    };
+  }
+
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '',
+    trimValues: true,
+  });
+
+  const parsed = parser.parse(xml);
+
+  const game = parsed?.['draw-results']?.game;
+  const drawDateRaw = game?.draw?.['draw-date'];
+  const balls = game?.balls;
+
+  const ballNodes = Array.isArray(balls?.ball)
+    ? balls.ball
+    : balls?.ball
+      ? [balls.ball]
+      : [];
+
+  const mainNums = ballNodes
+    .map((b) => {
+      const ord = Number(b?.number);
+      const val = Number(b?.['#text'] ?? b);
+      return { ord, val };
+    })
+    .filter((x) => Number.isFinite(x.ord) && Number.isFinite(x.val))
+    .sort((a, b) => a.ord - b.ord)
+    .map((x) => x.val);
+
+  const bonusNodes = Array.isArray(balls?.['bonus-ball'])
+    ? balls['bonus-ball']
+    : balls?.['bonus-ball']
+      ? [balls['bonus-ball']]
+      : [];
+
+  const lifeNums = bonusNodes
+    .filter((bb) => {
+      const type = String(bb?.type ?? '')
+        .toLowerCase()
+        .replace(/\s+/g, '');
+
+      return type === 'lifeball';
+    })
+    .map((bb) => {
+      const ord = Number(bb?.number);
+      const val = Number(bb?.['#text'] ?? bb);
+      return { ord, val };
+    })
+    .filter((x) => Number.isFinite(x.ord) && Number.isFinite(x.val))
+    .sort((a, b) => a.ord - b.ord)
+    .map((x) => x.val);
+
+  const draw_date = normalizeDayString(drawDateRaw);
+
+  if (!draw_date || mainNums.length < 5 || lifeNums.length < 1) {
+    return {
+      ok: false,
+      status: 500,
+      error: 'feed_parse_failed',
+      meta: {
+        draw_date_raw: drawDateRaw ?? null,
+        parsed_main_count: mainNums.length,
+        parsed_life_ball_count: lifeNums.length,
+      },
+    };
+  }
+
+  const [n1, n2, n3, n4, n5] = mainNums.slice(0, 5);
+  const [life_ball] = lifeNums.slice(0, 1);
+
+  return {
+    ok: true,
+    status: 200,
+    url,
+    payload: { draw_date, n1, n2, n3, n4, n5, life_ball },
   };
 }
 
@@ -693,6 +872,73 @@ router.post('/draws/uk-lotto/fetch-latest', requireAdmin, async (_req, res) => {
     return res.status(500).json({ ok: false, error: 'fetch_latest_failed' });
   }
 });
+
+router.post(
+  '/draws/set-for-life/fetch-latest',
+  requireAdmin,
+  async (_req, res) => {
+    try {
+      const fetched = await fetchLatestSetForLifeFromFeed();
+
+      if (!fetched.ok) {
+        return res.status(fetched.status).json({
+          ok: false,
+          error: fetched.error,
+          ...(fetched.meta ? fetched.meta : {}),
+        });
+      }
+
+      const { url, payload } = fetched;
+      const { draw_date, n1, n2, n3, n4, n5, life_ball } = payload;
+
+      const existingRows = await db
+        .select()
+        .from(set_for_life_draws)
+        .where(eq(set_for_life_draws.draw_date, draw_date))
+        .limit(1);
+
+      const existing = existingRows[0] ?? null;
+
+      if (
+        existing &&
+        existing.n1 === n1 &&
+        existing.n2 === n2 &&
+        existing.n3 === n3 &&
+        existing.n4 === n4 &&
+        existing.n5 === n5 &&
+        existing.life_ball === life_ball
+      ) {
+        return res.json({
+          ok: true,
+          lottery: 'set_for_life',
+          mode: 'no_change',
+          source: url,
+          draw: existing,
+        });
+      }
+
+      const result = await upsertSetForLifeDraw(payload);
+
+      if (!result.ok) {
+        return res.status(result.status).json({
+          ok: false,
+          error: result.error,
+        });
+      }
+
+      return res.json({
+        ok: true,
+        lottery: 'set_for_life',
+        mode: 'fetched_and_upserted',
+        source: url,
+        draw: result.draw,
+      });
+    } catch (e) {
+      console.error('POST /draws/set-for-life/fetch-latest failed:', e);
+      return res.status(500).json({ ok: false, error: 'fetch_latest_failed' });
+    }
+  },
+);
 
 /* ──────────────────────────────────────────────
    POST /api/cron/euromillions/sync
