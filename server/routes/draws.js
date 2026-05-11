@@ -117,6 +117,71 @@ async function upsertEuroMillionsDraw(payload) {
   return { ok: true, status: 200, day, draw: rows[0] ?? null };
 }
 
+async function upsertUkLottoDraw(payload) {
+  const { draw_date, n1, n2, n3, n4, n5, n6, bonus_ball } = payload ?? {};
+
+  const day = normalizeDayString(draw_date);
+  if (!day) {
+    return { ok: false, status: 400, error: 'invalid_draw_date' };
+  }
+
+  const nums = [n1, n2, n3, n4, n5, n6];
+
+  // type check
+  if (
+    nums.some((v) => typeof v !== 'number' || !Number.isFinite(v)) ||
+    typeof bonus_ball !== 'number' ||
+    !Number.isFinite(bonus_ball)
+  ) {
+    return { ok: false, status: 400, error: 'invalid_numbers' };
+  }
+
+  // range check
+  const inRange = (x, min, max) => x >= min && x <= max;
+
+  if (nums.some((x) => !inRange(x, 1, 59)) || !inRange(bonus_ball, 1, 59)) {
+    return { ok: false, status: 400, error: 'numbers_out_of_range' };
+  }
+
+  // UPSERT by draw_date
+  await db
+    .insert(uk_lotto_draws)
+    .values({
+      draw_date: day,
+      n1,
+      n2,
+      n3,
+      n4,
+      n5,
+      n6,
+      bonus_ball,
+    })
+    .onConflictDoUpdate({
+      target: uk_lotto_draws.draw_date,
+      set: {
+        n1,
+        n2,
+        n3,
+        n4,
+        n5,
+        n6,
+        bonus_ball,
+      },
+    });
+
+  const rows = await db
+    .select()
+    .from(uk_lotto_draws)
+    .where(eq(uk_lotto_draws.draw_date, day))
+    .limit(1);
+
+  return {
+    ok: true,
+    status: 200,
+    day,
+    draw: rows[0] ?? null,
+  };
+}
 /**
  * Fetch + parse latest EuroMillions draw from XML feed.
  * Returns a normalized payload ready for upsertEuroMillionsDraw.
@@ -232,6 +297,116 @@ async function fetchLatestEuroMillionsFromFeed() {
     status: 200,
     url,
     payload: { draw_date, n1, n2, n3, n4, n5, s1, s2 },
+  };
+}
+
+async function fetchLatestUkLottoFromFeed() {
+  const url = (process.env.UK_LOTTO_FEED_URL || '').trim();
+  if (!url) {
+    return { ok: false, status: 500, error: 'feed_url_not_configured' };
+  }
+
+  const ac = new AbortController();
+  const timeoutId = setTimeout(() => ac.abort(), 10_000);
+
+  let r;
+  try {
+    r = await fetch(url, {
+      headers: { Accept: 'application/xml,text/xml,*/*' },
+      signal: ac.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!r.ok) {
+    return {
+      ok: false,
+      status: 502,
+      error: 'feed_fetch_failed',
+      meta: { status: r.status },
+    };
+  }
+
+  const xml = await r.text();
+
+  const head = xml.trim().slice(0, 200).toLowerCase();
+  if (head.startsWith('<!doctype html') || head.startsWith('<html')) {
+    return {
+      ok: false,
+      status: 502,
+      error: 'feed_not_xml',
+      meta: { status: r.status },
+    };
+  }
+
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '',
+    trimValues: true,
+  });
+
+  const parsed = parser.parse(xml);
+
+  const game = parsed?.['draw-results']?.game;
+  const drawDateRaw = game?.draw?.['draw-date'];
+  const balls = game?.balls;
+
+  const ballNodes = Array.isArray(balls?.ball)
+    ? balls.ball
+    : balls?.ball
+      ? [balls.ball]
+      : [];
+
+  const mainNums = ballNodes
+    .map((b) => {
+      const ord = Number(b?.number);
+      const val = Number(b?.['#text'] ?? b);
+      return { ord, val };
+    })
+    .filter((x) => Number.isFinite(x.ord) && Number.isFinite(x.val))
+    .sort((a, b) => a.ord - b.ord)
+    .map((x) => x.val);
+
+  const bonusNodes = Array.isArray(balls?.['bonus-ball'])
+    ? balls['bonus-ball']
+    : balls?.['bonus-ball']
+      ? [balls['bonus-ball']]
+      : [];
+
+  const bonusNums = bonusNodes
+    .map((bb) => {
+      const ord = Number(bb?.number);
+      const val = Number(bb?.['#text'] ?? bb);
+      return { ord, val };
+    })
+    .filter((x) => Number.isFinite(x.ord) && Number.isFinite(x.val))
+    .sort((a, b) => a.ord - b.ord)
+    .map((x) => x.val);
+
+  const draw_date = normalizeDayString(drawDateRaw);
+
+  if (!draw_date || mainNums.length < 6 || bonusNums.length < 1) {
+    return {
+      ok: false,
+      status: 500,
+      error: 'feed_parse_failed',
+      meta: {
+        draw_date_raw: drawDateRaw ?? null,
+        parsed_main_count: mainNums.length,
+        parsed_bonus_count: bonusNums.length,
+      },
+    };
+  }
+
+  const [n1, n2, n3, n4, n5, n6] = mainNums.slice(0, 6);
+  const [bonus_ball] = bonusNums.slice(0, 1);
+
+  return {
+    ok: true,
+    status: 200,
+    url,
+    payload: { draw_date, n1, n2, n3, n4, n5, n6, bonus_ball },
   };
 }
 
@@ -454,6 +629,70 @@ router.post(
     }
   },
 );
+
+router.post('/draws/uk-lotto/fetch-latest', requireAdmin, async (_req, res) => {
+  try {
+    const fetched = await fetchLatestUkLottoFromFeed();
+
+    if (!fetched.ok) {
+      return res.status(fetched.status).json({
+        ok: false,
+        error: fetched.error,
+        ...(fetched.meta ? fetched.meta : {}),
+      });
+    }
+
+    const { url, payload } = fetched;
+    const { draw_date, n1, n2, n3, n4, n5, n6, bonus_ball } = payload;
+
+    const existingRows = await db
+      .select()
+      .from(uk_lotto_draws)
+      .where(eq(uk_lotto_draws.draw_date, draw_date))
+      .limit(1);
+
+    const existing = existingRows[0] ?? null;
+
+    if (
+      existing &&
+      existing.n1 === n1 &&
+      existing.n2 === n2 &&
+      existing.n3 === n3 &&
+      existing.n4 === n4 &&
+      existing.n5 === n5 &&
+      existing.n6 === n6 &&
+      existing.bonus_ball === bonus_ball
+    ) {
+      return res.json({
+        ok: true,
+        lottery: 'uk_lotto',
+        mode: 'no_change',
+        source: url,
+        draw: existing,
+      });
+    }
+
+    const result = await upsertUkLottoDraw(payload);
+
+    if (!result.ok) {
+      return res.status(result.status).json({
+        ok: false,
+        error: result.error,
+      });
+    }
+
+    return res.json({
+      ok: true,
+      lottery: 'uk_lotto',
+      mode: 'fetched_and_upserted',
+      source: url,
+      draw: result.draw,
+    });
+  } catch (e) {
+    console.error('POST /draws/uk-lotto/fetch-latest failed:', e);
+    return res.status(500).json({ ok: false, error: 'fetch_latest_failed' });
+  }
+});
 
 /* ──────────────────────────────────────────────
    POST /api/cron/euromillions/sync
