@@ -21,8 +21,14 @@ export type FrequencyLatestNResponse = {
 
 export async function getFrequencyLatestN(
   n: number,
+  lottery = 'euromillions',
 ): Promise<FrequencyLatestNResponse> {
-  const res = await fetch(apiUrl(`/api/frequency/latest-n?n=${n}`));
+  const params = new URLSearchParams({
+    n: String(n),
+    lottery,
+  });
+
+  const res = await fetch(apiUrl(`/api/frequency/latest-n?${params}`));
 
   if (!res.ok) {
     const text = await res.text();

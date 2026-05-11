@@ -130,7 +130,7 @@ export function AnalysisPage() {
 
       try {
         const [freq, hotCold] = await Promise.all([
-          getFrequencyLatestN(range),
+          getFrequencyLatestN(range, selectedLottery),
           getHotCold(range, HOT_COLD_TOP),
         ]);
 
@@ -157,7 +157,7 @@ export function AnalysisPage() {
     return () => {
       cancelled = true;
     };
-  }, [range]);
+  }, [range, selectedLottery]);
 
   // ---------- Load gaps once (full history) ----------
   useEffect(() => {
