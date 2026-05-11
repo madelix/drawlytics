@@ -83,3 +83,45 @@ export const set_for_life_draws = pgTable(
     ).on(t.draw_date),
   }),
 );
+
+/* =========================
+   Predictions
+========================= */
+export const predictions = pgTable('predictions', {
+  id: serial('id').primaryKey(),
+  lottery: varchar('lottery', { length: 32 }).default('euromillions').notNull(),
+  draw_date: date('draw_date').notNull(),
+  model_name: varchar('model_name', { length: 120 }).notNull(),
+  main_numbers: smallint('main_numbers').array().notNull(),
+  star_numbers: smallint('star_numbers').array().notNull(),
+  confidence: numeric('confidence', { precision: 5, scale: 2 }).notNull(),
+  status: varchar('status', { length: 24 }).default('pending').notNull(),
+  matched_main: smallint('matched_main'),
+  matched_stars: smallint('matched_stars'),
+  result_label: varchar('result_label', { length: 24 }),
+  created_at: timestamp('created_at').defaultNow().notNull(),
+});
+
+/* =========================
+   Played predictions
+========================= */
+export const played_predictions = pgTable(
+  'played_predictions',
+  {
+    id: serial('id').primaryKey(),
+    lottery: varchar('lottery', { length: 40 }).notNull(),
+    draw_date: date('draw_date').notNull(),
+    prediction_id: integer('prediction_id')
+      .notNull()
+      .references(() => predictions.id, { onDelete: 'cascade' }),
+    played_at: timestamp('played_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    notes: text('notes'),
+  },
+  (t) => ({
+    played_predictions_lottery_draw_prediction_unique: uniqueIndex(
+      'played_predictions_lottery_draw_prediction_unique',
+    ).on(t.lottery, t.draw_date, t.prediction_id),
+  }),
+);

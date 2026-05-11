@@ -194,7 +194,6 @@ router.get('/played-predictions', async (req, res) => {
         draw_date: played_predictions.draw_date,
         played_at: played_predictions.played_at,
         notes: played_predictions.notes,
-        played_model_name: played_predictions.model_name,
 
         model_name: predictions.model_name,
         main_numbers: predictions.main_numbers,

@@ -1,26 +1,30 @@
-export type LotteryNumberGroup = {
+export type LotteryKey = 'euromillions' | 'uk_lotto' | 'set_for_life';
+
+export type NumberGroup = {
   key: 'main' | 'stars' | 'bonus' | 'life';
   label: string;
   shortLabel: string;
   count: number;
   min: number;
   max: number;
-
-  // Optional relationship metadata
-  samePoolAs?: 'main';
-  excludeFrom?: 'main';
 };
 
 export type LotteryConfig = {
-  key: 'euromillions' | 'uk_lotto' | 'set_for_life';
-  displayName: string;
-  numberGroups: LotteryNumberGroup[];
+  key: LotteryKey;
+  label: string;
+  mainNumbers: number;
+  specialNumbers: number;
+  specialLabel: string;
+  numberGroups: NumberGroup[];
 };
 
-export const LOTTERIES: Record<LotteryConfig['key'], LotteryConfig> = {
-  euromillions: {
+export const LOTTERIES: LotteryConfig[] = [
+  {
     key: 'euromillions',
-    displayName: 'EuroMillions',
+    label: 'EuroMillions',
+    mainNumbers: 5,
+    specialNumbers: 2,
+    specialLabel: 'Stars',
     numberGroups: [
       {
         key: 'main',
@@ -32,7 +36,7 @@ export const LOTTERIES: Record<LotteryConfig['key'], LotteryConfig> = {
       },
       {
         key: 'stars',
-        label: 'Stars',
+        label: 'Lucky Stars',
         shortLabel: 'Stars',
         count: 2,
         min: 1,
@@ -40,10 +44,12 @@ export const LOTTERIES: Record<LotteryConfig['key'], LotteryConfig> = {
       },
     ],
   },
-
-  uk_lotto: {
+  {
     key: 'uk_lotto',
-    displayName: 'UK Lotto',
+    label: 'UK Lotto',
+    mainNumbers: 6,
+    specialNumbers: 1,
+    specialLabel: 'Bonus Ball',
     numberGroups: [
       {
         key: 'main',
@@ -60,15 +66,15 @@ export const LOTTERIES: Record<LotteryConfig['key'], LotteryConfig> = {
         count: 1,
         min: 1,
         max: 59,
-        samePoolAs: 'main',
-        excludeFrom: 'main',
       },
     ],
   },
-
-  set_for_life: {
+  {
     key: 'set_for_life',
-    displayName: 'Set For Life',
+    label: 'Set For Life',
+    mainNumbers: 5,
+    specialNumbers: 1,
+    specialLabel: 'Life Ball',
     numberGroups: [
       {
         key: 'main',
@@ -88,8 +94,14 @@ export const LOTTERIES: Record<LotteryConfig['key'], LotteryConfig> = {
       },
     ],
   },
-};
+];
 
 export function getLotteryConfig(key: string): LotteryConfig {
-  return LOTTERIES[key as LotteryConfig['key']] ?? LOTTERIES.euromillions;
+  const found = LOTTERIES.find((l) => l.key === key);
+
+  if (!found) {
+    return LOTTERIES[0];
+  }
+
+  return found;
 }

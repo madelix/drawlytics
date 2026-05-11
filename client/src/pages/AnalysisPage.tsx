@@ -12,6 +12,7 @@ import {
 import { ResponsiveBar } from '@nivo/bar';
 import { ScrollToTopButton } from '../components/ScrollToTopButton';
 import { apiUrl } from '../api/apiClient';
+import { LOTTERIES, LotteryKey, getLotteryConfig } from '../config/lotteries';
 
 // ---------- Types ----------
 type RangeOption = {
@@ -78,6 +79,11 @@ function generateStarNumbers(): number[] {
 
 export function AnalysisPage() {
   const [range, setRange] = useState<number>(100);
+
+  const [selectedLottery, setSelectedLottery] =
+    useState<LotteryKey>('euromillions');
+
+  const selectedLotteryConfig = getLotteryConfig(selectedLottery);
 
   const [freqData, setFreqData] = useState<FrequencyLatestNResponse | null>(
     null,
@@ -375,7 +381,47 @@ export function AnalysisPage() {
           >
             <div className="dl-config-item">
               <div className="dl-config-label">Lottery type</div>
-              <div className="dl-config-value">EuroMillions</div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
+                  marginTop: '0.35rem',
+                }}
+              >
+                {LOTTERIES.map((lottery) => {
+                  const active = selectedLottery === lottery.key;
+
+                  return (
+                    <button
+                      key={lottery.key}
+                      type="button"
+                      onClick={() => setSelectedLottery(lottery.key)}
+                      style={{
+                        borderRadius: 999,
+                        border: active
+                          ? '1px solid rgba(128, 65, 152, 0.9)'
+                          : '1px solid rgba(148, 163, 184, 0.25)',
+                        padding: '0.45rem 0.9rem',
+                        fontSize: '0.82rem',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.18s ease',
+                        background: active
+                          ? 'linear-gradient(135deg, #804198 0%, #21409a 100%)'
+                          : 'rgba(255,255,255,0.75)',
+                        color: active ? '#ffffff' : '#334155',
+                        boxShadow: active
+                          ? '0 6px 16px rgba(33,64,154,0.22)'
+                          : 'none',
+                      }}
+                    >
+                      {lottery.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="dl-config-item dl-config-item--right">
