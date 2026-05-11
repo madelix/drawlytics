@@ -761,16 +761,65 @@ router.post('/cron/euromillions/sync', requireAdmin, async (_req, res) => {
    ────────────────────────────────────────────── */
 router.post('/cron/uk-lotto/sync', requireAdmin, async (_req, res) => {
   try {
+    const fetched = await fetchLatestUkLottoFromFeed();
+
+    if (!fetched.ok) {
+      return res.status(fetched.status).json({
+        ok: false,
+        error: fetched.error,
+        ...(fetched.meta ? fetched.meta : {}),
+      });
+    }
+
+    const { url, payload } = fetched;
+    const { draw_date, n1, n2, n3, n4, n5, n6, bonus_ball } = payload;
+
+    const existingRows = await db
+      .select()
+      .from(uk_lotto_draws)
+      .where(eq(uk_lotto_draws.draw_date, draw_date))
+      .limit(1);
+
+    const existing = existingRows[0] ?? null;
+
+    if (
+      existing &&
+      existing.n1 === n1 &&
+      existing.n2 === n2 &&
+      existing.n3 === n3 &&
+      existing.n4 === n4 &&
+      existing.n5 === n5 &&
+      existing.n6 === n6 &&
+      existing.bonus_ball === bonus_ball
+    ) {
+      return res.json({
+        ok: true,
+        lottery: 'uk_lotto',
+        mode: 'no_change',
+        source: url,
+        draw: existing,
+      });
+    }
+
+    const result = await upsertUkLottoDraw(payload);
+
+    if (!result.ok) {
+      return res.status(result.status).json({
+        ok: false,
+        error: result.error,
+      });
+    }
+
     return res.json({
       ok: true,
       lottery: 'uk_lotto',
-      mode: 'not_implemented_yet',
-      message:
-        'UK Lotto cron route is wired, but live sync is not implemented yet.',
+      mode: 'fetched_and_upserted',
+      source: url,
+      draw: result.draw,
     });
   } catch (e) {
     console.error('POST /cron/uk-lotto/sync failed:', e);
-    res.status(500).json({ ok: false, error: 'cron_sync_failed' });
+    return res.status(500).json({ ok: false, error: 'cron_sync_failed' });
   }
 });
 
