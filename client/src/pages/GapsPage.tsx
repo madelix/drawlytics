@@ -188,7 +188,10 @@ export function GapsPage() {
         </div>
 
         <div className="dl-gaps-summary-card">
-          <h3>Most overdue {specialLabel.toLowerCase()}</h3>
+          <h3>
+            Most overdue {specialLabel.toLowerCase()}
+            {specialLabel.endsWith('s') ? '' : ' numbers'}
+          </h3>
           {gapsData && (
             <p className="dl-gaps-summary-meta">
               Based on full EuroMillions history (
