@@ -340,10 +340,7 @@ export function AnalysisPage() {
           {!hotColdLoading && hotColdData && (
             <div className="dl-chip-row">
               {hotColdData.hot.main.map((item) => (
-                <span
-                  key={item.number}
-                  className={`dl-chip-main ${selectedLotteryConfig.hotChipClass}`}
-                >
+                <span key={item.number} className="dl-chip-main dl-chip-hot">
                   {item.number}
                   <span className="dl-chip-sub">
                     {item.count} hits ({rangeLabel})
@@ -367,10 +364,7 @@ export function AnalysisPage() {
           {!hotColdLoading && hotColdData && (
             <div className="dl-chip-row">
               {hotColdData.hot.stars.map((item) => (
-                <span
-                  key={item.number}
-                  className={`dl-chip-main ${selectedLotteryConfig.hotChipClass}`}
-                >
+                <span key={item.number} className="dl-chip-main dl-chip-hot">
                   {item.number}
                   <span className="dl-chip-sub">
                     {item.count} hits ({rangeLabel})
