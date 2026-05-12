@@ -1,5 +1,6 @@
 // client/src/api/draws.ts
 import { apiGetJson } from './apiClient';
+import type { LotteryKey } from '../config/lotteries';
 
 export type LatestDrawResponse = {
   ok: boolean;
@@ -43,13 +44,18 @@ export type DrawsListResponse = {
 };
 
 export async function getDraws(
-  params: { limit?: number; offset?: number } = {},
+  params: {
+    limit?: number;
+    offset?: number;
+    lottery?: LotteryKey;
+  } = {},
 ): Promise<DrawsListResponse> {
-  const { limit = 20, offset = 0 } = params;
+  const { limit = 20, offset = 0, lottery = 'euromillions' } = params;
 
   const qs = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
+    lottery,
   });
 
   return apiGetJson<DrawsListResponse>(`/api/draws/all?${qs.toString()}`);

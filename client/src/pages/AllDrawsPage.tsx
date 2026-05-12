@@ -6,6 +6,7 @@ import {
   type EuromillionsDraw,
 } from '../api/draws';
 import { ScrollToTopButton } from '../components/ScrollToTopButton';
+import { LOTTERIES, getLotteryConfig, LotteryKey } from '../config/lotteries';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
@@ -16,6 +17,10 @@ export function AllDrawsPage() {
   const [data, setData] = useState<DrawsListResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState<number>(0);
+  const [selectedLottery, setSelectedLottery] =
+    useState<LotteryKey>('euromillions');
+
+  const lotteryConfig = getLotteryConfig(selectedLottery);
 
   const [isMobile, setIsMobile] = useState(false);
 
@@ -41,7 +46,11 @@ export function AllDrawsPage() {
         setStatus('loading');
         setError(null);
 
-        const result = await getDraws({ limit: PAGE_SIZE, offset });
+        const result = await getDraws({
+          limit: PAGE_SIZE,
+          offset,
+          lottery: selectedLottery,
+        });
         if (cancelled) return;
 
         if (!result.ok) {
@@ -65,7 +74,7 @@ export function AllDrawsPage() {
     return () => {
       cancelled = true;
     };
-  }, [offset]);
+  }, [offset, selectedLottery]);
 
   const draws = data?.draws ?? [];
   const pagination = data?.pagination;
@@ -88,10 +97,68 @@ export function AllDrawsPage() {
       <header className="dl-analysis-header">
         <h1 className="dl-hero-title">Draw History</h1>
         <p className="dl-section-subtitle">
-          Browse official draw results. EuroMillions is available now, with UK
-          Lotto and Set For Life planned.
+          Browse official historical draw results across supported lotteries.
         </p>
       </header>
+
+      <section className="dl-analysis-config">
+        <div className="dl-config-card">
+          <div
+            className="dl-config-row"
+            style={{
+              alignItems: isMobile ? 'stretch' : undefined,
+              flexDirection: isMobile ? 'column' : undefined,
+              gap: isMobile ? '1rem' : undefined,
+            }}
+          >
+            <div className="dl-config-item">
+              <div className="dl-config-label">Lottery type</div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
+                  marginTop: '0.35rem',
+                }}
+              >
+                {LOTTERIES.map((lottery) => {
+                  const active = selectedLottery === lottery.key;
+
+                  return (
+                    <button
+                      key={lottery.key}
+                      type="button"
+                      onClick={() => {
+                        setSelectedLottery(lottery.key);
+                        setOffset(0);
+                      }}
+                      style={{
+                        borderRadius: 8,
+                        border: active
+                          ? '1px solid #111827'
+                          : '1px solid rgba(148, 163, 184, 0.35)',
+                        padding: '0.45rem 0.9rem',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.18s ease',
+                        background: active ? '#111827' : '#ffffff',
+                        color: active ? '#ffffff' : '#334155',
+                        boxShadow: active
+                          ? '0 4px 10px rgba(15, 23, 42, 0.18)'
+                          : 'none',
+                      }}
+                    >
+                      {lottery.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <main>
         {status === 'loading' && <p>Loading draws…</p>}
@@ -109,7 +176,9 @@ export function AllDrawsPage() {
 
                 return (
                   <div key={d.id} className="dl-draw-card">
-                    <div className="dl-draw-card-kicker">EUROMILLIONS</div>
+                    <div className="dl-draw-card-kicker">
+                      {lotteryConfig.label.toUpperCase()}
+                    </div>
                     <div className="dl-draw-card-header">Draw {dateLabel}</div>
 
                     <div className="dl-draw-card-content">
