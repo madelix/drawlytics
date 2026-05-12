@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { ResponsiveBar } from '@nivo/bar';
 import { ScrollToTopButton } from '../components/ScrollToTopButton';
 
+import { LOTTERIES, getLotteryConfig, LotteryKey } from '../config/lotteries';
+
 import { getGaps, GapsResponse } from '../api/analysis';
 
 type GapDatum = {
@@ -13,6 +15,10 @@ type GapDatum = {
 };
 
 export function GapsPage() {
+  const [selectedLottery, setSelectedLottery] =
+    useState<LotteryKey>('euromillions');
+
+  const lotteryConfig = getLotteryConfig(selectedLottery);
   const [gapsData, setGapsData] = useState<GapsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +36,7 @@ export function GapsPage() {
     return () => {
       window.removeEventListener('resize', checkMobile);
     };
-  }, []);
+  }, [selectedLottery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,7 +46,7 @@ export function GapsPage() {
       setError(null);
 
       try {
-        const res = await getGaps();
+        const res = await getGaps(selectedLottery);
         if (!cancelled) {
           setGapsData(res);
         }
@@ -61,10 +67,11 @@ export function GapsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [selectedLottery]);
 
   const mainGapsRaw = gapsData?.main ?? [];
   const starGapsRaw = gapsData?.stars ?? [];
+  const specialLabel = lotteryConfig.specialLabel;
 
   const mainGaps: GapDatum[] = mainGapsRaw.slice(0, 20).map((item) => ({
     label: String(item.number),
@@ -90,11 +97,68 @@ export function GapsPage() {
     >
       <header className="dl-analysis-header">
         <h1 className="dl-hero-title">Overdue Numbers</h1>
+
         <p className="dl-section-subtitle">
-          Explore EuroMillions numbers that haven&apos;t been drawn for the
-          longest time, based on the full draw history.
+          Explore {lotteryConfig.label} numbers that haven&apos;t been drawn for
+          the longest time, based on the full draw history.
         </p>
       </header>
+
+      <section className="dl-analysis-config">
+        <div className="dl-config-card">
+          <div
+            className="dl-config-row"
+            style={{
+              alignItems: isMobile ? 'stretch' : undefined,
+              flexDirection: isMobile ? 'column' : undefined,
+              gap: isMobile ? '1rem' : undefined,
+            }}
+          >
+            <div className="dl-config-item">
+              <div className="dl-config-label">Lottery type</div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
+                  marginTop: '0.35rem',
+                }}
+              >
+                {LOTTERIES.map((lottery) => {
+                  const active = selectedLottery === lottery.key;
+
+                  return (
+                    <button
+                      key={lottery.key}
+                      type="button"
+                      onClick={() => setSelectedLottery(lottery.key)}
+                      style={{
+                        borderRadius: 8,
+                        border: active
+                          ? '1px solid #111827'
+                          : '1px solid rgba(148, 163, 184, 0.35)',
+                        padding: '0.45rem 0.9rem',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.18s ease',
+                        background: active ? '#111827' : '#ffffff',
+                        color: active ? '#ffffff' : '#334155',
+                        boxShadow: active
+                          ? '0 4px 10px rgba(15, 23, 42, 0.18)'
+                          : 'none',
+                      }}
+                    >
+                      {lottery.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section className="dl-gaps-top">
         <div className="dl-gaps-summary-card">
@@ -124,7 +188,7 @@ export function GapsPage() {
         </div>
 
         <div className="dl-gaps-summary-card">
-          <h3>Most overdue stars</h3>
+          <h3>Most overdue {specialLabel.toLowerCase()}</h3>
           {gapsData && (
             <p className="dl-gaps-summary-meta">
               Based on full EuroMillions history (
@@ -240,9 +304,9 @@ export function GapsPage() {
         </div>
 
         <div className="dl-gaps-chart-card">
-          <h2>Star number gaps</h2>
+          <h2>{specialLabel} gaps</h2>
           <p className="dl-config-hint">
-            Top 12 star numbers ordered by time since last drawn.
+            Top special numbers ordered by time since last drawn.
           </p>
 
           {loading && <p>Loading chart…</p>}
@@ -302,7 +366,9 @@ export function GapsPage() {
                 }}
                 tooltip={({ data }: { data: GapDatum }) => (
                   <div className="dl-chart-tooltip">
-                    <strong>Star {data.label}</strong>
+                    <strong>
+                      {specialLabel} {data.label}
+                    </strong>
                     <span>{data.gap} draws since last seen</span>
                     <span className="dl-chart-tooltip-sub">
                       Last seen: {data.lastSeenLabel}
