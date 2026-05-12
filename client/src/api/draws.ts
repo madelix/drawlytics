@@ -18,7 +18,7 @@ export async function getLatestDraw(): Promise<LatestDrawResponse> {
   return apiGetJson<LatestDrawResponse>('/api/draws/latest');
 }
 
-export type EuromillionsDraw = {
+export type LotteryDraw = {
   id: number;
   draw_date: string;
   n1: number;
@@ -26,14 +26,17 @@ export type EuromillionsDraw = {
   n3: number;
   n4: number;
   n5: number;
-  s1: number;
-  s2: number;
+  n6?: number | null;
+  s1?: number | null;
+  s2?: number | null;
+  bonus_ball?: number | null;
+  life_ball?: number | null;
   created_at: string;
 };
 
 export type DrawsListResponse = {
   ok: boolean;
-  draws: EuromillionsDraw[];
+  draws: LotteryDraw[];
   pagination: {
     limit: number;
     offset: number;
@@ -57,6 +60,6 @@ export async function getDraws(
     offset: String(offset),
     lottery,
   });
-
+  console.log('All draws query:', qs.toString());
   return apiGetJson<DrawsListResponse>(`/api/draws/all?${qs.toString()}`);
 }

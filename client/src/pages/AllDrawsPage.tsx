@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   getDraws,
   type DrawsListResponse,
-  type EuromillionsDraw,
+  type LotteryDraw,
 } from '../api/draws';
 import { ScrollToTopButton } from '../components/ScrollToTopButton';
 import { LOTTERIES, getLotteryConfig, LotteryKey } from '../config/lotteries';
@@ -81,6 +81,14 @@ export function AllDrawsPage() {
 
   const canPrev = offset > 0;
   const canNext = !!pagination?.hasMore;
+
+  const mainGroup = lotteryConfig.numberGroups.find(
+    (group) => group.key === 'main',
+  );
+
+  const specialGroup = lotteryConfig.numberGroups.find(
+    (group) => group.key !== 'main',
+  );
 
   const handlePrev = () => {
     if (!canPrev) return;
@@ -169,24 +177,36 @@ export function AllDrawsPage() {
         {status === 'success' && draws.length > 0 && (
           <>
             <div className="dl-draws-list">
-              {draws.map((d: EuromillionsDraw) => {
+              {draws.map((d: LotteryDraw) => {
                 const dateLabel = new Date(d.draw_date).toLocaleDateString();
-                const numbers = [d.n1, d.n2, d.n3, d.n4, d.n5];
-                const stars = [d.s1, d.s2];
+
+                const numbers = [d.n1, d.n2, d.n3, d.n4, d.n5, d.n6].filter(
+                  (value): value is number => typeof value === 'number',
+                );
+
+                const specialNumbers = [
+                  d.s1,
+                  d.s2,
+                  d.bonus_ball,
+                  d.life_ball,
+                ].filter((value): value is number => typeof value === 'number');
 
                 return (
                   <div key={d.id} className="dl-draw-card">
                     <div className="dl-draw-card-kicker">
                       {lotteryConfig.label.toUpperCase()}
                     </div>
+
                     <div className="dl-draw-card-header">Draw {dateLabel}</div>
 
                     <div className="dl-draw-card-content">
                       <div className="dl-draw-card-section">
-                        <div className="dl-draw-card-label">Main numbers</div>
+                        <div className="dl-draw-card-label">
+                          {mainGroup?.label ?? 'Main numbers'}
+                        </div>
 
                         <div className="dl-draw-pill-row">
-                          {numbers.map((n) => (
+                          {numbers.map((n: number) => (
                             <span
                               key={n}
                               className="dl-draw-pill dl-draw-pill--main"
@@ -198,10 +218,12 @@ export function AllDrawsPage() {
                       </div>
 
                       <div className="dl-draw-card-section">
-                        <div className="dl-draw-card-label">Stars</div>
+                        <div className="dl-draw-card-label">
+                          {specialGroup?.label ?? 'Special numbers'}
+                        </div>
 
                         <div className="dl-draw-pill-row">
-                          {stars.map((s) => (
+                          {specialNumbers.map((s: number) => (
                             <span
                               key={s}
                               className="dl-draw-pill dl-draw-pill--star"

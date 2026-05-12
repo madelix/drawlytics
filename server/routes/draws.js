@@ -619,16 +619,28 @@ router.get('/draws/all', async (req, res) => {
     if (limit > 200) limit = 200;
     if (Number.isNaN(offset) || offset < 0) offset = 0;
 
+    const lottery = String(req.query.lottery ?? 'euromillions');
+
+    let table;
+
+    if (lottery === 'uk_lotto') {
+      table = uk_lotto_draws;
+    } else if (lottery === 'set_for_life') {
+      table = set_for_life_draws;
+    } else {
+      table = euromillions_draws;
+    }
+
     const draws = await db
       .select()
-      .from(euromillions_draws)
-      .orderBy(desc(euromillions_draws.draw_date))
+      .from(table)
+      .orderBy(desc(table.draw_date))
       .limit(limit)
       .offset(offset);
 
     const countRows = await db
       .select({ count: sql`count(*)`.mapWith(Number) })
-      .from(euromillions_draws);
+      .from(table);
 
     const total = countRows?.[0]?.count ?? 0;
     const hasMore = offset + draws.length < total;

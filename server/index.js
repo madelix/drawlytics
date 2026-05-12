@@ -427,14 +427,34 @@ app.get('/api/draws/all', async (req, res) => {
     if (limit > 200) limit = 200;
     if (Number.isNaN(offset) || offset < 0) offset = 0;
 
+    const config = getLotteryAnalysisConfig(req.query.lottery);
+
     const draws = await db
-      .select()
-      .from(euromillions_draws)
-      .orderBy(desc(euromillions_draws.draw_date))
+      .select({
+        id: config.table.id,
+        draw_date: config.table.draw_date,
+
+        n1: config.table.n1,
+        n2: config.table.n2,
+        n3: config.table.n3,
+        n4: config.table.n4,
+        n5: config.table.n5,
+
+        n6: config.table.n6,
+
+        s1: config.table.s1,
+        s2: config.table.s2,
+
+        bonus_ball: config.table.bonus_ball,
+        life_ball: config.table.life_ball,
+      })
+      .from(config.table)
+      .orderBy(desc(config.table.draw_date))
       .limit(limit)
       .offset(offset);
 
-    const allRows = await db.select().from(euromillions_draws);
+    const allRows = await db.select().from(config.table);
+
     const total = allRows.length;
     const hasMore = offset + draws.length < total;
 
