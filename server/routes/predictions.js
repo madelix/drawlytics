@@ -1218,7 +1218,7 @@ router.post('/predictions/check', async (req, res) => {
         result_label,
         status
       FROM predictions
-      WHERE (lottery = 'EuroMillions' OR lottery = 'Euromillions')
+      WHERE lottery IN ('euromillions', 'uk_lotto', 'set_for_life', 'EuroMillions', 'Euromillions')
         AND (
           $2::boolean = false
           OR matched_main IS NULL
@@ -1288,30 +1288,77 @@ router.post('/predictions/check', async (req, res) => {
     const daysQuery = Array.from(expandedDays);
 
     const drawsByDay = new Map();
+    const drawsByLotteryAndDay = new Map();
 
-    const put = (day, main, stars) => {
-      if (main.length === 5 && stars.length === 2) {
-        drawsByDay.set(day, { main, stars });
-      }
+    const put = (lottery, day, main, stars) => {
+      if (!day) return;
+
+      const key = `${lottery}:${day}`;
+      drawsByLotteryAndDay.set(key, { main, stars });
     };
 
     try {
-      const { rows: drawRows } = await pool.query(
+      const euromillionsRows = await pool.query(
         `
-        SELECT draw_date, n1,n2,n3,n4,n5, s1,s2
-        FROM euromillions_draws
-        WHERE draw_date::date = ANY($1::date[])
-        `,
+  SELECT draw_date, n1,n2,n3,n4,n5, s1,s2
+  FROM euromillions_draws
+  WHERE draw_date::date = ANY($1::date[])
+  `,
         [daysQuery],
       );
 
-      for (const r of drawRows) {
+      for (const r of euromillionsRows.rows) {
         const day = toYYYYMMDD(r.draw_date);
+
         const main = [r.n1, r.n2, r.n3, r.n4, r.n5]
           .map(Number)
           .filter(Number.isFinite);
+
         const stars = [r.s1, r.s2].map(Number).filter(Number.isFinite);
-        if (day) put(day, main, stars);
+
+        put('euromillions', day, main, stars);
+      }
+
+      const ukLottoRows = await pool.query(
+        `
+  SELECT draw_date, n1,n2,n3,n4,n5,n6, bonus_ball
+  FROM uk_lotto_draws
+  WHERE draw_date::date = ANY($1::date[])
+  `,
+        [daysQuery],
+      );
+
+      for (const r of ukLottoRows.rows) {
+        const day = toYYYYMMDD(r.draw_date);
+
+        const main = [r.n1, r.n2, r.n3, r.n4, r.n5, r.n6]
+          .map(Number)
+          .filter(Number.isFinite);
+
+        const stars = [r.bonus_ball].map(Number).filter(Number.isFinite);
+
+        put('uk_lotto', day, main, stars);
+      }
+
+      const setForLifeRows = await pool.query(
+        `
+  SELECT draw_date, n1,n2,n3,n4,n5, life_ball
+  FROM set_for_life_draws
+  WHERE draw_date::date = ANY($1::date[])
+  `,
+        [daysQuery],
+      );
+
+      for (const r of setForLifeRows.rows) {
+        const day = toYYYYMMDD(r.draw_date);
+
+        const main = [r.n1, r.n2, r.n3, r.n4, r.n5]
+          .map(Number)
+          .filter(Number.isFinite);
+
+        const stars = [r.life_ball].map(Number).filter(Number.isFinite);
+
+        put('set_for_life', day, main, stars);
       }
     } catch (e) {
       console.error('Draw fetch failed (n1..s2).', e);
@@ -1323,12 +1370,14 @@ router.post('/predictions/check', async (req, res) => {
     let skipped = 0;
 
     const shifted = [];
-    const findDrawDay = (day) => {
-      if (drawsByDay.has(day)) return day;
+    const findDrawDay = (lottery, day) => {
+      if (drawsByLotteryAndDay.has(`${lottery}:${day}`)) return day;
+
       for (let i = 1; i <= 3; i++) {
         const d2 = addDays(day, i);
-        if (drawsByDay.has(d2)) return d2;
+        if (drawsByLotteryAndDay.has(`${lottery}:${d2}`)) return d2;
       }
+
       return null;
     };
 
@@ -1338,7 +1387,12 @@ router.post('/predictions/check', async (req, res) => {
       const pMain = toNums(p.main_numbers);
       const pStars = toNums(p.star_numbers);
 
-      if (pMain.length !== 5 || pStars.length !== 2) {
+      const predictionConfig = getPredictionLotteryConfig(p.lottery);
+
+      if (
+        pMain.length !== predictionConfig.mainCount ||
+        pStars.length !== predictionConfig.specialCount
+      ) {
         skipped++;
         continue;
       }
@@ -1360,7 +1414,8 @@ router.post('/predictions/check', async (req, res) => {
         continue;
       }
 
-      const drawDay = findDrawDay(day);
+      const predictionLottery = getPredictionLotteryConfig(p.lottery).key;
+      const drawDay = findDrawDay(predictionLottery, day);
       if (!drawDay) {
         await pool.query(
           `
@@ -1379,7 +1434,7 @@ router.post('/predictions/check', async (req, res) => {
 
       if (drawDay !== day) shifted.push([day, drawDay]);
 
-      const draw = drawsByDay.get(drawDay);
+      const draw = drawsByLotteryAndDay.get(`${predictionLottery}:${drawDay}`);
       const mMain = countMatches(pMain, draw.main);
       const mStars = countMatches(pStars, draw.stars);
       const label =
