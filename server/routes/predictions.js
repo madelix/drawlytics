@@ -4,6 +4,59 @@ import { pool } from '../db.js';
 
 const router = express.Router();
 
+function getPredictionLotteryConfig(lotteryRaw) {
+  const lottery = String(lotteryRaw ?? 'euromillions')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  if (lottery === 'uk_lotto') {
+    return {
+      key: 'uk_lotto',
+      label: 'UK Lotto',
+      table: 'uk_lotto_draws',
+      mainKeys: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6'],
+      specialKeys: ['bonus_ball'],
+      mainMin: 1,
+      mainMax: 59,
+      mainCount: 6,
+      specialMin: 1,
+      specialMax: 59,
+      specialCount: 1,
+    };
+  }
+
+  if (lottery === 'set_for_life') {
+    return {
+      key: 'set_for_life',
+      label: 'Set For Life',
+      table: 'set_for_life_draws',
+      mainKeys: ['n1', 'n2', 'n3', 'n4', 'n5'],
+      specialKeys: ['life_ball'],
+      mainMin: 1,
+      mainMax: 47,
+      mainCount: 5,
+      specialMin: 1,
+      specialMax: 10,
+      specialCount: 1,
+    };
+  }
+
+  return {
+    key: 'euromillions',
+    label: 'EuroMillions',
+    table: 'euromillions_draws',
+    mainKeys: ['n1', 'n2', 'n3', 'n4', 'n5'],
+    specialKeys: ['s1', 's2'],
+    mainMin: 1,
+    mainMax: 50,
+    mainCount: 5,
+    specialMin: 1,
+    specialMax: 12,
+    specialCount: 2,
+  };
+}
+
 /**
  * Resolve EuroMillions draw date:
  * - If client provides draw_date: validate and use it (date-only UTC midnight)
@@ -174,16 +227,27 @@ router.post('/predictions/generate', async (req, res) => {
     const drawDateRaw = req.body?.draw_date ? String(req.body.draw_date) : null;
 
     const lottery = lotteryRaw.toLowerCase();
-    const isEuroMillions =
-      lottery === 'euromillions' ||
-      lottery === 'euro millions' ||
-      lottery === 'euro-millions' ||
-      lotteryRaw === 'EuroMillions' ||
-      lotteryRaw === 'Euromillions';
 
-    if (!isEuroMillions) {
-      return res.status(400).json({ ok: false, error: 'unsupported_lottery' });
+    const supportedLotteries = [
+      'euromillions',
+      'euro millions',
+      'euro-millions',
+      'uk_lotto',
+      'uk lotto',
+      'uk-lotto',
+      'set_for_life',
+      'set for life',
+      'set-for-life',
+    ];
+
+    if (!supportedLotteries.includes(lottery)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'unsupported_lottery',
+      });
     }
+
+    const lotteryConfig = getPredictionLotteryConfig(lotteryRaw);
 
     const lines = Number.isFinite(linesRaw) ? Math.floor(linesRaw) : 1;
     if (lines < 1 || lines > 5) {
@@ -197,8 +261,8 @@ router.post('/predictions/generate', async (req, res) => {
     const draw_date = resolved.draw_date;
     const { rows: historyRows } = await pool.query(
       `
-  SELECT n1, n2, n3, n4, n5, s1, s2
-  FROM euromillions_draws
+  SELECT *
+  FROM ${lotteryConfig.table}
   ORDER BY draw_date DESC
   LIMIT 200
   `,
@@ -935,8 +999,16 @@ router.post('/predictions/generate', async (req, res) => {
       }
 
       return {
-        main: sampleUnique(1, 50, 5),
-        stars: sampleUnique(1, 12, 2),
+        main: sampleUnique(
+          lotteryConfig.mainMin,
+          lotteryConfig.mainMax,
+          lotteryConfig.mainCount,
+        ),
+        stars: sampleUnique(
+          lotteryConfig.specialMin,
+          lotteryConfig.specialMax,
+          lotteryConfig.specialCount,
+        ),
       };
     };
 
