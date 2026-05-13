@@ -1094,7 +1094,7 @@ $7
   source
         `,
         [
-          'EuroMillions',
+          lotteryConfig.key,
           draw_date,
           model_name,
           line.main,
