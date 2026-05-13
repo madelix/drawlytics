@@ -66,7 +66,7 @@ function getPredictionLotteryConfig(lotteryRaw) {
  *       - if today is Tue/Fri AND it's <= 19:20 Europe/London, use TODAY
  *       - otherwise use the next Tue/Fri
  */
-async function resolveEuroMillionsDrawDate(drawDateRaw) {
+async function resolveLotteryDrawDate(drawDateRaw, lotteryConfig) {
   // 1) Client provided draw date -> validate and use it
   if (drawDateRaw) {
     const parsed = new Date(String(drawDateRaw));
@@ -85,10 +85,10 @@ async function resolveEuroMillionsDrawDate(drawDateRaw) {
     const next = await pool.query(
       `
       SELECT draw_date
-      FROM euromillions_draws
-      WHERE draw_date >= CURRENT_DATE
-      ORDER BY draw_date ASC
-      LIMIT 1
+FROM ${lotteryConfig.table}
+WHERE draw_date >= CURRENT_DATE
+ORDER BY draw_date ASC
+LIMIT 1
       `,
     );
 
@@ -108,7 +108,14 @@ async function resolveEuroMillionsDrawDate(drawDateRaw) {
   );
 
   const day = todayUtc.getUTCDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
-  const isDrawDay = day === 2 || day === 5; // Tue/Fri
+  const drawDays =
+    lotteryConfig.key === 'uk_lotto'
+      ? [3, 6] // Wed + Sat
+      : lotteryConfig.key === 'set_for_life'
+        ? [1, 4] // Mon + Thu
+        : [2, 5]; // Tue + Fri
+
+  const isDrawDay = drawDays.includes(day);
 
   // Cutoff: 19:20 Europe/London on draw days
   const cutoffHour = 19;
@@ -141,9 +148,7 @@ async function resolveEuroMillionsDrawDate(drawDateRaw) {
     return diff === 0 ? 7 : diff;
   };
 
-  const toTue = daysUntil(2);
-  const toFri = daysUntil(5);
-  const add = Math.min(toTue, toFri);
+  const add = Math.min(...drawDays.map(daysUntil));
 
   const nextDraw = new Date(todayUtc);
   nextDraw.setUTCDate(nextDraw.getUTCDate() + add);
@@ -254,7 +259,7 @@ router.post('/predictions/generate', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'invalid_lines' });
     }
 
-    const resolved = await resolveEuroMillionsDrawDate(drawDateRaw);
+    const resolved = await resolveLotteryDrawDate(drawDateRaw, lotteryConfig);
     if (!resolved.ok) {
       return res.status(400).json({ ok: false, error: resolved.error });
     }
