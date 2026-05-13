@@ -744,19 +744,23 @@ router.post('/predictions/generate', async (req, res) => {
       if (strategy === 'ai:xgboost') {
         return {
           main: weightedSampleUnique(
-            buildRecencyFrequencyWeights(1, 50, historyRows, [
-              'n1',
-              'n2',
-              'n3',
-              'n4',
-              'n5',
-            ]),
-            5,
+            buildRecencyFrequencyWeights(
+              lotteryConfig.mainMin,
+              lotteryConfig.mainMax,
+              historyRows,
+              lotteryConfig.mainKeys,
+            ),
+            lotteryConfig.mainCount,
             1.8,
           ),
           stars: weightedSampleUnique(
-            buildRecencyFrequencyWeights(1, 12, historyRows, ['s1', 's2']),
-            2,
+            buildRecencyFrequencyWeights(
+              lotteryConfig.specialMin,
+              lotteryConfig.specialMax,
+              historyRows,
+              lotteryConfig.specialKeys,
+            ),
+            lotteryConfig.specialCount,
             1.6,
           ),
         };
@@ -764,10 +768,24 @@ router.post('/predictions/generate', async (req, res) => {
 
       if (strategy === 'ai:random_forest') {
         return {
-          main: sampleRangeBalancedMainNumbers(),
+          main: weightedSampleUnique(
+            buildRecencyFrequencyWeights(
+              lotteryConfig.mainMin,
+              lotteryConfig.mainMax,
+              historyRows,
+              lotteryConfig.mainKeys,
+            ),
+            lotteryConfig.mainCount,
+            2.2,
+          ),
           stars: weightedSampleUnique(
-            buildRecencyFrequencyWeights(1, 12, historyRows, ['s1', 's2']),
-            2,
+            buildRecencyFrequencyWeights(
+              lotteryConfig.specialMin,
+              lotteryConfig.specialMax,
+              historyRows,
+              lotteryConfig.specialKeys,
+            ),
+            lotteryConfig.specialCount,
             2.4,
           ),
         };

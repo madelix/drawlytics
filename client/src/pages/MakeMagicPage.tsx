@@ -232,6 +232,12 @@ export function MakeMagicPage() {
       // IMPORTANT:
       // - In dev: apiUrl('/api/...') stays relative, so Vite proxy handles it (no CORS).
       // - In prod: apiUrl can prepend a base if you ever choose to.
+      console.log('Generating prediction:', {
+        lottery: selectedLottery,
+        strategy: selectedStrategyValue,
+        lines: selectedLineCount,
+      });
+
       const res = await fetch(apiUrl('/api/predictions/generate'), {
         method: 'POST',
         headers: {
