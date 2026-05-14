@@ -794,19 +794,23 @@ router.post('/predictions/generate', async (req, res) => {
       if (strategy === 'ai:bayesian') {
         return {
           main: weightedSampleUnique(
-            buildBayesianWeights(1, 50, historyRows, [
-              'n1',
-              'n2',
-              'n3',
-              'n4',
-              'n5',
-            ]),
-            5,
+            buildBayesianWeights(
+              lotteryConfig.mainMin,
+              lotteryConfig.mainMax,
+              historyRows,
+              lotteryConfig.mainKeys,
+            ),
+            lotteryConfig.mainCount,
             2.8,
           ),
           stars: weightedSampleUnique(
-            buildBayesianWeights(1, 12, historyRows, ['s1', 's2']),
-            2,
+            buildBayesianWeights(
+              lotteryConfig.specialMin,
+              lotteryConfig.specialMax,
+              historyRows,
+              lotteryConfig.specialKeys,
+            ),
+            lotteryConfig.specialCount,
             2.4,
           ),
         };
@@ -815,19 +819,23 @@ router.post('/predictions/generate', async (req, res) => {
       if (strategy === 'ai:gradient_boosting') {
         return {
           main: weightedSampleUnique(
-            buildTrendBoostWeights(1, 50, historyRows, [
-              'n1',
-              'n2',
-              'n3',
-              'n4',
-              'n5',
-            ]),
-            5,
+            buildTrendBoostWeights(
+              lotteryConfig.mainMin,
+              lotteryConfig.mainMax,
+              historyRows,
+              lotteryConfig.mainKeys,
+            ),
+            lotteryConfig.mainCount,
             1.2,
           ),
           stars: weightedSampleUnique(
-            buildTrendBoostWeights(1, 12, historyRows, ['s1', 's2']),
-            2,
+            buildTrendBoostWeights(
+              lotteryConfig.specialMin,
+              lotteryConfig.specialMax,
+              historyRows,
+              lotteryConfig.specialKeys,
+            ),
+            lotteryConfig.specialCount,
             1.1,
           ),
         };
@@ -836,19 +844,23 @@ router.post('/predictions/generate', async (req, res) => {
       if (strategy === 'ai:markov_chain') {
         return {
           main: weightedSampleUnique(
-            buildMarkovWeights(1, 50, historyRows, [
-              'n1',
-              'n2',
-              'n3',
-              'n4',
-              'n5',
-            ]),
-            5,
+            buildMarkovWeights(
+              lotteryConfig.mainMin,
+              lotteryConfig.mainMax,
+              historyRows,
+              lotteryConfig.mainKeys,
+            ),
+            lotteryConfig.mainCount,
             2.0,
           ),
           stars: weightedSampleUnique(
-            buildMarkovWeights(1, 12, historyRows, ['s1', 's2']),
-            2,
+            buildMarkovWeights(
+              lotteryConfig.specialMin,
+              lotteryConfig.specialMax,
+              historyRows,
+              lotteryConfig.specialKeys,
+            ),
+            lotteryConfig.specialCount,
             1.8,
           ),
         };
@@ -857,19 +869,23 @@ router.post('/predictions/generate', async (req, res) => {
       if (strategy === 'ai:statistical_analysis') {
         return {
           main: weightedSampleUnique(
-            buildStatisticalWeights(1, 50, historyRows, [
-              'n1',
-              'n2',
-              'n3',
-              'n4',
-              'n5',
-            ]),
-            5,
+            buildStatisticalWeights(
+              lotteryConfig.mainMin,
+              lotteryConfig.mainMax,
+              historyRows,
+              lotteryConfig.mainKeys,
+            ),
+            lotteryConfig.mainCount,
             2.1,
           ),
           stars: weightedSampleUnique(
-            buildStatisticalWeights(1, 12, historyRows, ['s1', 's2']),
-            2,
+            buildStatisticalWeights(
+              lotteryConfig.specialMin,
+              lotteryConfig.specialMax,
+              historyRows,
+              lotteryConfig.specialKeys,
+            ),
+            lotteryConfig.specialCount,
             2.0,
           ),
         };
@@ -878,19 +894,23 @@ router.post('/predictions/generate', async (req, res) => {
       if (strategy === 'ai:decision_tree') {
         return {
           main: weightedSampleUnique(
-            buildDecisionTreeWeights(1, 50, historyRows, [
-              'n1',
-              'n2',
-              'n3',
-              'n4',
-              'n5',
-            ]),
-            5,
+            buildDecisionTreeWeights(
+              lotteryConfig.mainMin,
+              lotteryConfig.mainMax,
+              historyRows,
+              lotteryConfig.mainKeys,
+            ),
+            lotteryConfig.mainCount,
             1.9,
           ),
           stars: weightedSampleUnique(
-            buildDecisionTreeWeights(1, 12, historyRows, ['s1', 's2']),
-            2,
+            buildDecisionTreeWeights(
+              lotteryConfig.specialMin,
+              lotteryConfig.specialMax,
+              historyRows,
+              lotteryConfig.specialKeys,
+            ),
+            lotteryConfig.specialCount,
             2.0,
           ),
         };
@@ -899,19 +919,23 @@ router.post('/predictions/generate', async (req, res) => {
       if (strategy === 'ai:q_learning') {
         return {
           main: weightedSampleUnique(
-            buildQLearningWeights(1, 50, historyRows, [
-              'n1',
-              'n2',
-              'n3',
-              'n4',
-              'n5',
-            ]),
-            5,
+            buildQLearningWeights(
+              lotteryConfig.mainMin,
+              lotteryConfig.mainMax,
+              historyRows,
+              lotteryConfig.mainKeys,
+            ),
+            lotteryConfig.mainCount,
             2.3,
           ),
           stars: weightedSampleUnique(
-            buildQLearningWeights(1, 12, historyRows, ['s1', 's2']),
-            2,
+            buildQLearningWeights(
+              lotteryConfig.specialMin,
+              lotteryConfig.specialMax,
+              historyRows,
+              lotteryConfig.specialKeys,
+            ),
+            lotteryConfig.specialCount,
             2.2,
           ),
         };
@@ -920,19 +944,23 @@ router.post('/predictions/generate', async (req, res) => {
       if (strategy === 'ai:neural_network') {
         return {
           main: weightedSampleUnique(
-            buildNeuralNetworkWeights(1, 50, historyRows, [
-              'n1',
-              'n2',
-              'n3',
-              'n4',
-              'n5',
-            ]),
-            5,
+            buildNeuralNetworkWeights(
+              lotteryConfig.mainMin,
+              lotteryConfig.mainMax,
+              historyRows,
+              lotteryConfig.mainKeys,
+            ),
+            lotteryConfig.mainCount,
             2.0,
           ),
           stars: weightedSampleUnique(
-            buildNeuralNetworkWeights(1, 12, historyRows, ['s1', 's2']),
-            2,
+            buildNeuralNetworkWeights(
+              lotteryConfig.specialMin,
+              lotteryConfig.specialMax,
+              historyRows,
+              lotteryConfig.specialKeys,
+            ),
+            lotteryConfig.specialCount,
             1.9,
           ),
         };
@@ -941,60 +969,75 @@ router.post('/predictions/generate', async (req, res) => {
       if (strategy === 'ai:lstm') {
         return {
           main: weightedSampleUnique(
-            buildLSTMWeights(1, 50, historyRows, [
-              'n1',
-              'n2',
-              'n3',
-              'n4',
-              'n5',
-            ]),
-            5,
+            buildLSTMWeights(
+              lotteryConfig.mainMin,
+              lotteryConfig.mainMax,
+              historyRows,
+              lotteryConfig.mainKeys,
+            ),
+            lotteryConfig.mainCount,
             1.7,
           ),
           stars: weightedSampleUnique(
-            buildLSTMWeights(1, 12, historyRows, ['s1', 's2']),
-            2,
+            buildLSTMWeights(
+              lotteryConfig.specialMin,
+              lotteryConfig.specialMax,
+              historyRows,
+              lotteryConfig.specialKeys,
+            ),
+            lotteryConfig.specialCount,
             1.6,
           ),
         };
       }
-
       if (strategy === 'ai:ensemble') {
         return {
           main: weightedSampleUnique(
             mergeWeightSets(
-              buildRecencyFrequencyWeights(1, 50, historyRows, [
-                'n1',
-                'n2',
-                'n3',
-                'n4',
-                'n5',
-              ]),
-              buildBayesianWeights(1, 50, historyRows, [
-                'n1',
-                'n2',
-                'n3',
-                'n4',
-                'n5',
-              ]),
-              buildStatisticalWeights(1, 50, historyRows, [
-                'n1',
-                'n2',
-                'n3',
-                'n4',
-                'n5',
-              ]),
+              buildRecencyFrequencyWeights(
+                lotteryConfig.mainMin,
+                lotteryConfig.mainMax,
+                historyRows,
+                lotteryConfig.mainKeys,
+              ),
+              buildBayesianWeights(
+                lotteryConfig.mainMin,
+                lotteryConfig.mainMax,
+                historyRows,
+                lotteryConfig.mainKeys,
+              ),
+              buildStatisticalWeights(
+                lotteryConfig.mainMin,
+                lotteryConfig.mainMax,
+                historyRows,
+                lotteryConfig.mainKeys,
+              ),
             ),
-            5,
+            lotteryConfig.mainCount,
             2.0,
           ),
           stars: weightedSampleUnique(
             mergeWeightSets(
-              buildRecencyFrequencyWeights(1, 12, historyRows, ['s1', 's2']),
-              buildBayesianWeights(1, 12, historyRows, ['s1', 's2']),
-              buildStatisticalWeights(1, 12, historyRows, ['s1', 's2']),
+              buildRecencyFrequencyWeights(
+                lotteryConfig.specialMin,
+                lotteryConfig.specialMax,
+                historyRows,
+                lotteryConfig.specialKeys,
+              ),
+              buildBayesianWeights(
+                lotteryConfig.specialMin,
+                lotteryConfig.specialMax,
+                historyRows,
+                lotteryConfig.specialKeys,
+              ),
+              buildStatisticalWeights(
+                lotteryConfig.specialMin,
+                lotteryConfig.specialMax,
+                historyRows,
+                lotteryConfig.specialKeys,
+              ),
             ),
-            2,
+            lotteryConfig.specialCount,
             1.9,
           ),
         };
@@ -1003,19 +1046,23 @@ router.post('/predictions/generate', async (req, res) => {
       if (strategy === 'ai:meta_learning') {
         return {
           main: weightedSampleUnique(
-            buildMetaLearningWeights(1, 50, historyRows, [
-              'n1',
-              'n2',
-              'n3',
-              'n4',
-              'n5',
-            ]),
-            5,
+            buildMetaLearningWeights(
+              lotteryConfig.mainMin,
+              lotteryConfig.mainMax,
+              historyRows,
+              lotteryConfig.mainKeys,
+            ),
+            lotteryConfig.mainCount,
             2.4,
           ),
           stars: weightedSampleUnique(
-            buildMetaLearningWeights(1, 12, historyRows, ['s1', 's2']),
-            2,
+            buildMetaLearningWeights(
+              lotteryConfig.specialMin,
+              lotteryConfig.specialMax,
+              historyRows,
+              lotteryConfig.specialKeys,
+            ),
+            lotteryConfig.specialCount,
             2.2,
           ),
         };
@@ -1236,7 +1283,7 @@ router.post('/predictions/check', async (req, res) => {
         result_label,
         status
       FROM predictions
-      WHERE lottery IN ('euromillions', 'uk_lotto', 'set_for_life', 'EuroMillions', 'Euromillions')
+      WHERE lower(replace(lottery, ' ', '_')) IN ('euromillions', 'uk_lotto', 'set_for_life')
         AND (
           $2::boolean = false
           OR matched_main IS NULL
@@ -1438,11 +1485,11 @@ router.post('/predictions/check', async (req, res) => {
         await pool.query(
           `
           UPDATE predictions
-          SET matched_main = NULL,
-              matched_stars = NULL,
-              result_label = 'no_draw_for_date',
-              status = 'checked'
-          WHERE id = $1
+SET matched_main = NULL,
+    matched_stars = NULL,
+    result_label = 'no_draw_for_date',
+    status = 'pending'
+WHERE id = $1
           `,
           [p.id],
         );

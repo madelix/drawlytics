@@ -1,7 +1,11 @@
 // client/src/pages/MyPredictionsPage.tsx
 import React, { CSSProperties, useEffect, useMemo, useState } from 'react';
 import { getModelDisplayName } from '../utils/modelDisplay';
-import { getLotteryConfig } from '../config/lotteries';
+import {
+  LOTTERIES,
+  getLotteryConfig,
+  type LotteryKey,
+} from '../config/lotteries';
 import { getMainGroup, getSecondaryGroup } from '../utils/lotteryNumbers';
 
 type PredictionRow = {
@@ -21,14 +25,18 @@ type PredictionRow = {
 
 type DrawRow = {
   id: number;
+  lottery?: string;
   draw_date: string; // "YYYY-MM-DD" or ISO
   n1: number;
   n2: number;
   n3: number;
   n4: number;
   n5: number;
-  s1: number;
-  s2: number;
+  n6?: number | null;
+  s1?: number | null;
+  s2?: number | null;
+  bonus_ball?: number | null;
+  life_ball?: number | null;
 };
 
 type PredictionsResponse = {
@@ -121,6 +129,25 @@ function countHits(
   return { main, stars, total: main + stars };
 }
 
+function normalizeLotteryKey(lottery: string | null | undefined): LotteryKey {
+  const normalized = (lottery ?? 'euromillions')
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+
+  if (normalized === 'uk_lotto') return 'uk_lotto';
+  if (normalized === 'set_for_life') return 'set_for_life';
+  return 'euromillions';
+}
+
+function getDrawLookupKey(
+  lottery: string | null | undefined,
+  dayKey: string | null | undefined,
+): string | null {
+  if (!dayKey || dayKey === 'unknown') return null;
+  return `${normalizeLotteryKey(lottery)}:${dayKey}`;
+}
+
 function bestLabelForGroup(
   dayKey: string,
   items: PredictionRow[],
@@ -128,13 +155,14 @@ function bestLabelForGroup(
 ): string {
   if (dayKey === 'unknown') return '—';
 
-  const draw = drawMap[dayKey];
-  if (!draw) return '—';
-
   let bestMain = 0;
   let bestStars = 0;
 
   for (const p of items) {
+    const lookupKey = getDrawLookupKey(p.lottery, dayKey);
+    const draw = lookupKey ? drawMap[lookupKey] : undefined;
+    if (!draw) continue;
+
     const hits = countHits(p, draw);
     if (!hits) continue;
 
@@ -165,6 +193,10 @@ export default function MyPredictionsPage() {
 
   const [drawMap, setDrawMap] = useState<Record<string, DrawLookup>>({});
   const [isMobile, setIsMobile] = useState(false);
+
+  const [selectedLottery, setSelectedLottery] = useState<LotteryKey | 'all'>(
+    'all',
+  );
 
   const [usage, setUsage] = useState<{
     used: number;
@@ -226,6 +258,15 @@ export default function MyPredictionsPage() {
         throw new Error(data.error || 'Could not load predictions');
       }
 
+      console.log(
+        'Prediction lottery values:',
+        JSON.stringify(
+          [...new Set((data.predictions ?? []).map((p) => p.lottery))],
+          null,
+          2,
+        ),
+      );
+
       setPredictions(data.predictions ?? []);
     } catch (err: any) {
       console.error(err);
@@ -273,22 +314,42 @@ export default function MyPredictionsPage() {
 
   async function loadDrawsForHighlighting() {
     try {
-      const data = await fetchJsonOrThrow<DrawsAllResponse>(
-        '/api/draws/all?limit=200&offset=0',
-      );
-
-      if (!data.ok) return;
+      const lotteryKeys: LotteryKey[] = [
+        'euromillions',
+        'uk_lotto',
+        'set_for_life',
+      ];
 
       const nextMap: Record<string, DrawLookup> = {};
 
-      for (const row of data.draws ?? []) {
-        const dayKey = toDayKey(row.draw_date);
-        if (!dayKey) continue;
+      for (const lotteryKey of lotteryKeys) {
+        const data = await fetchJsonOrThrow<DrawsAllResponse>(
+          `/api/draws/all?lottery=${lotteryKey}&limit=200&offset=0`,
+        );
 
-        nextMap[dayKey] = {
-          main: new Set([row.n1, row.n2, row.n3, row.n4, row.n5]),
-          stars: new Set([row.s1, row.s2]),
-        };
+        if (!data.ok) continue;
+
+        for (const row of data.draws ?? []) {
+          const dayKey = toDayKey(row.draw_date);
+          if (!dayKey) continue;
+
+          const mainNumbers =
+            lotteryKey === 'uk_lotto'
+              ? [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6]
+              : [row.n1, row.n2, row.n3, row.n4, row.n5];
+
+          const specialNumbers =
+            lotteryKey === 'uk_lotto'
+              ? [row.bonus_ball]
+              : lotteryKey === 'set_for_life'
+                ? [row.life_ball]
+                : [row.s1, row.s2];
+
+          nextMap[`${lotteryKey}:${dayKey}`] = {
+            main: new Set(mainNumbers.map(Number).filter(Number.isFinite)),
+            stars: new Set(specialNumbers.map(Number).filter(Number.isFinite)),
+          };
+        }
       }
 
       setDrawMap(nextMap);
@@ -298,14 +359,26 @@ export default function MyPredictionsPage() {
   }
 
   const predictionsSorted = useMemo(() => {
-    const copy = [...predictions];
+    const filtered =
+      selectedLottery === 'all'
+        ? predictions
+        : predictions.filter((p) => {
+            const normalized = p.lottery
+              ?.replace(/([a-z])([A-Z])/g, '$1_$2')
+              .toLowerCase()
+              .replace(/\s+/g, '_');
+
+            return normalized === selectedLottery;
+          });
+
+    const copy = [...filtered];
     copy.sort((a, b) => {
       const da = toDayKey(a.draw_date) ?? a.draw_date;
       const db = toDayKey(b.draw_date) ?? b.draw_date;
       return db.localeCompare(da);
     });
     return copy;
-  }, [predictions]);
+  }, [predictions, selectedLottery]);
 
   const predictionsByDraw = useMemo(() => {
     const map: Record<string, PredictionRow[]> = {};
@@ -467,7 +540,7 @@ export default function MyPredictionsPage() {
       <header className="dl-analysis-header">
         <div
           style={{
-            maxWidth: 960,
+            maxWidth: 1060,
             margin: '0 auto',
             padding: '0 1rem',
             textAlign: 'center',
@@ -475,56 +548,134 @@ export default function MyPredictionsPage() {
         >
           <h1 style={{ margin: 0 }}>My Predictions</h1>
 
-          {usage && (
-            <div
-              style={{
-                marginTop: 10,
-                display: 'flex',
-                justifyContent: 'center',
-              }}
-            >
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '6px 10px',
-                  borderRadius: 999,
-                  border: '1px solid rgba(15,23,42,0.12)',
-                  background: '#ffffff',
-                  fontSize: '0.85rem',
-                  color: '#6b7280',
-                  boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
-                }}
-              >
-                <span
-                  aria-hidden
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 999,
-                    background: usage.limits_disabled ? '#10b981' : '#6366f1',
-                    display: 'inline-block',
-                  }}
-                />
-                {usage.limits_disabled
-                  ? `Predictions saved: ${usage.used} (unlimited – dev mode)`
-                  : `Predictions saved: ${usage.used} / ${usage.limit}`}
-              </span>
-            </div>
-          )}
-
           <p className="dl-section-subtitle" style={{ marginTop: 8 }}>
             View saved predictions across your lotteries. (Generator &amp;
             performance analytics coming next.)
           </p>
 
+          <section
+            style={{
+              width: 'calc(100% + 2rem)',
+              maxWidth: 1060,
+              margin: '16px -1rem 0',
+              padding: 0,
+              boxSizing: 'border-box',
+            }}
+          >
+            <div
+              className="dl-config-card"
+              style={{
+                width: '100%',
+                maxWidth: 'none',
+                padding: '1.25rem',
+                textAlign: 'left',
+                boxSizing: 'border-box',
+              }}
+            >
+              <div className="dl-config-row">
+                <div className="dl-config-item" style={{ width: '100%' }}>
+                  <div className="dl-config-label">Lottery type</div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.5rem',
+                      flexWrap: 'wrap',
+                      marginTop: '0.35rem',
+                      alignItems: 'center',
+                      width: '100%',
+                    }}
+                  >
+                    {[
+                      { key: 'all' as const, label: 'All lotteries' },
+                      ...LOTTERIES.map((lottery) => ({
+                        key: lottery.key,
+                        label: lottery.label,
+                      })),
+                    ].map((lottery) => {
+                      const active = selectedLottery === lottery.key;
+
+                      return (
+                        <button
+                          key={lottery.key}
+                          type="button"
+                          onClick={() => setSelectedLottery(lottery.key)}
+                          style={{
+                            border: active
+                              ? '1px solid #111827'
+                              : '1px solid #d1d5db',
+                            background: active ? '#111827' : '#ffffff',
+                            color: active ? '#ffffff' : '#374151',
+                            borderRadius: 10,
+                            padding: '0.55rem 1rem',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            boxShadow: active
+                              ? '0 4px 10px rgba(15, 23, 42, 0.18)'
+                              : 'none',
+                          }}
+                        >
+                          {lottery.label}
+                        </button>
+                      );
+                    })}
+
+                    {usage && (
+                      <div
+                        style={{
+                          marginLeft: 'auto',
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '0.35rem 0.7rem',
+                            borderRadius: 999,
+                            background: '#f8fafc',
+                            border: '1px solid #e5e7eb',
+                            fontSize: '0.78rem',
+                            color: '#6b7280',
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <span
+                            aria-hidden
+                            style={{
+                              width: 7,
+                              height: 7,
+                              borderRadius: 999,
+                              background: usage.limits_disabled
+                                ? '#10b981'
+                                : '#6366f1',
+                              display: 'inline-block',
+                            }}
+                          />
+
+                          {usage.limits_disabled
+                            ? `${usage.used} saved • unlimited dev mode`
+                            : `${usage.used}/${usage.limit} saved`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <div
             style={{
-              marginTop: 12,
+              marginTop: 14,
               display: 'flex',
               justifyContent: 'center',
-              gap: '0.5rem',
+              gap: '0.45rem',
               flexWrap: 'wrap',
             }}
           >
@@ -533,13 +684,15 @@ export default function MyPredictionsPage() {
               onClick={handleCheckResults}
               disabled={checking || loading}
               style={{
-                border: '1px solid rgba(15,23,42,0.12)',
-                background: checking ? '#f3f4f6' : '#ffffff',
-                borderRadius: 999,
-                padding: '0.5rem 0.85rem',
-                fontSize: '0.85rem',
+                border: '1px solid #e5e7eb',
+                background: '#ffffff',
+                color: '#6b7280',
+                borderRadius: 10,
+                padding: '0.45rem 0.8rem',
+                fontSize: '0.82rem',
+                fontWeight: 600,
                 cursor: checking || loading ? 'not-allowed' : 'pointer',
-                boxShadow: '0 1px 2px rgba(15,23,42,0.05)',
+                transition: 'all 0.15s ease',
               }}
             >
               {checking ? 'Checking…' : 'Check results'}
@@ -554,12 +707,15 @@ export default function MyPredictionsPage() {
               }}
               disabled={loading || checking}
               style={{
-                border: '1px solid rgba(15,23,42,0.12)',
-                background: loading ? '#f3f4f6' : '#ffffff',
-                borderRadius: 999,
-                padding: '0.5rem 0.85rem',
-                fontSize: '0.85rem',
+                border: '1px solid #e5e7eb',
+                background: '#ffffff',
+                color: '#6b7280',
+                borderRadius: 10,
+                padding: '0.45rem 0.8rem',
+                fontSize: '0.82rem',
+                fontWeight: 600,
                 cursor: loading || checking ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s ease',
               }}
             >
               {loading ? 'Loading…' : 'Refresh'}
@@ -579,12 +735,15 @@ export default function MyPredictionsPage() {
               }}
               disabled={loading || checking}
               style={{
-                border: '1px solid rgba(15,23,42,0.12)',
+                border: '1px solid #e5e7eb',
                 background: '#ffffff',
-                borderRadius: 999,
-                padding: '0.5rem 0.85rem',
-                fontSize: '0.85rem',
+                color: '#6b7280',
+                borderRadius: 10,
+                padding: '0.45rem 0.8rem',
+                fontSize: '0.82rem',
+                fontWeight: 600,
                 cursor: loading || checking ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s ease',
               }}
             >
               Open all
@@ -605,12 +764,15 @@ export default function MyPredictionsPage() {
               }}
               disabled={loading || checking}
               style={{
-                border: '1px solid rgba(15,23,42,0.12)',
+                border: '1px solid #e5e7eb',
                 background: '#ffffff',
-                borderRadius: 999,
-                padding: '0.5rem 0.85rem',
-                fontSize: '0.85rem',
+                color: '#6b7280',
+                borderRadius: 10,
+                padding: '0.45rem 0.8rem',
+                fontSize: '0.82rem',
+                fontWeight: 600,
                 cursor: loading || checking ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s ease',
               }}
             >
               Collapse all
@@ -869,15 +1031,20 @@ export default function MyPredictionsPage() {
                     const lotteryConfig = getLotteryConfig(p.lottery);
                     const mainGroup = getMainGroup(p.lottery);
                     const secondaryGroup = getSecondaryGroup(p.lottery);
-                    const draw = predDayKey ? drawMap[predDayKey] : undefined;
+                    const drawKey = getDrawLookupKey(p.lottery, predDayKey);
+                    const draw = drawKey ? drawMap[drawKey] : undefined;
                     const canTogglePlayed = !draw; // lock played when results exist
                     const isPlayed = Boolean(playedMap[p.id]);
 
+                    const hasNoDrawYet = p.result_label === 'no_draw_for_date';
+
                     const statusText = draw
                       ? 'checked'
-                      : isPlayed
-                        ? 'played'
-                        : p.status;
+                      : hasNoDrawYet
+                        ? 'pending'
+                        : isPlayed
+                          ? 'played'
+                          : p.status;
                     const statusKey = String(statusText ?? '')
                       .toLowerCase()
                       .trim();
