@@ -101,6 +101,14 @@ const STRATEGIES = [
   },
 ];
 
+function normalizeStrategyMixKey(modelKey: string): string {
+  if (modelKey.startsWith('ai_')) {
+    return `ai:${modelKey.slice(3)}`;
+  }
+
+  return modelKey;
+}
+
 const STRATEGY_COLORS: Record<string, string> = {
   balanced_hot_cold: '#7C3AED',
   overdue: '#F97316',
@@ -124,8 +132,15 @@ const STRATEGY_COLORS: Record<string, string> = {
 type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
 export function MakeMagicPage() {
-  const [selectedLottery, setSelectedLottery] =
-    useState<LotteryKey>('euromillions');
+  const [selectedLottery, setSelectedLottery] = useState<LotteryKey>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const lottery = params.get('lottery');
+
+    if (lottery === 'uk_lotto') return 'uk_lotto';
+    if (lottery === 'set_for_life') return 'set_for_life';
+
+    return 'euromillions';
+  });
 
   const lotteryConfig = getLotteryConfig(selectedLottery);
   const [strategy, setStrategy] = useState<string>('balanced_hot_cold');
@@ -156,18 +171,21 @@ export function MakeMagicPage() {
   const [multiStatus, setMultiStatus] = useState<SaveStatus>('idle');
   const [allAiStatus, setAllAiStatus] = useState<SaveStatus>('idle');
   const [hasSuggestedMix, setHasSuggestedMix] = useState(false);
+  const [hasAppliedSuggestedMix, setHasAppliedSuggestedMix] = useState(false);
   const [isMobileFooter, setIsMobileFooter] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const selectedStrategy = STRATEGIES.find((s) => s.value === strategy)!;
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('drawlytics_suggested_strategy_mix');
+      const raw = localStorage.getItem(
+        `drawlytics_suggested_strategy_mix_${selectedLottery}`,
+      );
       setHasSuggestedMix(Boolean(raw));
     } catch {
       setHasSuggestedMix(false);
     }
-  }, []);
+  }, [selectedLottery]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 640px)');
@@ -186,10 +204,16 @@ export function MakeMagicPage() {
 
   function applySuggestedMix() {
     try {
-      const raw = localStorage.getItem('drawlytics_suggested_strategy_mix');
+      const raw = localStorage.getItem(
+        `drawlytics_suggested_strategy_mix_${selectedLottery}`,
+      );
       if (!raw) return;
 
-      const mix = JSON.parse(raw) as { model_key: string; weight: number }[];
+      const mix = JSON.parse(raw) as {
+        model_key?: string;
+        key?: string;
+        weight: number;
+      }[];
 
       const next: Record<string, number> = {
         balanced_hot_cold: 0,
@@ -212,13 +236,44 @@ export function MakeMagicPage() {
       };
 
       for (const item of mix) {
-        next[item.model_key] = Math.round(item.weight * 5);
+        const rawKey = item.model_key ?? item.key;
+        if (!rawKey) continue;
+
+        const normalizedKey = normalizeStrategyMixKey(rawKey);
+
+        if (normalizedKey in next) {
+          next[normalizedKey] = Math.max(1, Math.round(item.weight * 5));
+        }
       }
 
       setStrategyLines(next);
+      setHasAppliedSuggestedMix(true);
     } catch {
       setError('Could not apply suggested mix.');
     }
+  }
+
+  function resetToDefaultMix() {
+    setStrategyLines({
+      balanced_hot_cold: 1,
+      overdue: 1,
+      hot_focused: 1,
+      cold_focused: 1,
+      'ai:xgboost': 0,
+      'ai:ensemble': 0,
+      'ai:random_forest': 0,
+      'ai:gradient_boosting': 0,
+      'ai:statistical_analysis': 0,
+      'ai:decision_tree': 0,
+      'ai:q_learning': 0,
+      'ai:neural_network': 0,
+      'ai:lstm': 0,
+      'ai:markov_chain': 0,
+      'ai:bayesian': 0,
+      'ai:meta_learning': 0,
+      pure_random: 1,
+    });
+    setHasAppliedSuggestedMix(false);
   }
 
   async function handleGenerate(
@@ -304,7 +359,9 @@ export function MakeMagicPage() {
             lottery: selectedLottery,
             strategy: strategyKey,
             lines: count,
-            source: 'strategy_mix',
+            source: hasAppliedSuggestedMix
+              ? 'strategy_mix'
+              : 'strategy_builder',
           }),
         });
 
@@ -536,24 +593,24 @@ export function MakeMagicPage() {
                 justifyContent: isMobileFooter ? 'center' : 'flex-end',
               }}
             >
-              {hasSuggestedMix && (
-                <button
-                  type="button"
-                  onClick={applySuggestedMix}
-                  style={{
-                    borderRadius: 14,
-                    border: '1px solid #e5e7eb',
-                    padding: '0.6rem 1rem',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    background: '#fff',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Apply strategy mix
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={applySuggestedMix}
+                disabled={!hasSuggestedMix}
+                style={{
+                  borderRadius: 14,
+                  border: '1px solid #e5e7eb',
+                  padding: '0.6rem 1rem',
+                  fontSize: '0.9rem',
+                  fontWeight: 700,
+                  background: '#fff',
+                  cursor: hasSuggestedMix ? 'pointer' : 'not-allowed',
+                  opacity: hasSuggestedMix ? 1 : 0.5,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Apply strategy mix
+              </button>
 
               <button
                 type="button"

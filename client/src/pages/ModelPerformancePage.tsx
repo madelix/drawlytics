@@ -1003,11 +1003,11 @@ export default function ModelPerformancePage() {
                   }));
 
                   localStorage.setItem(
-                    'drawlytics_suggested_strategy_mix',
+                    `drawlytics_suggested_strategy_mix_${selectedLottery}`,
                     JSON.stringify(mix),
                   );
 
-                  window.location.href = '/make-magic';
+                  window.location.href = `/make-magic?lottery=${selectedLottery}`;
                 }}
                 style={{
                   border: 'none',
@@ -1020,7 +1020,7 @@ export default function ModelPerformancePage() {
                   cursor: 'pointer',
                   textAlign: 'left',
                 }}
-                title="Open Strategy Builder"
+                title="Open in Strategy Builder"
               >
                 {strategyPortfolio
                   .map((model) =>
@@ -1031,6 +1031,7 @@ export default function ModelPerformancePage() {
                       .replace('Pure Random', 'Random'),
                   )
                   .join(' + ')}
+                <span style={{ fontSize: 13, marginLeft: 6 }}>→</span>
               </button>
             ) : (
               '—'
