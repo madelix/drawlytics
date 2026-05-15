@@ -90,7 +90,7 @@ body {
 .dl-nav-link {
   font-size: 0.85rem;
   padding: 0.35rem 0.9rem;
-  border-radius: 999px;
+  border-radius: 5px;
   text-decoration: none;
   color: #4b5563;
   transition:
@@ -116,7 +116,7 @@ body {
   padding: 0;
   width: 32px;
   height: 32px;
-  border-radius: 999px;
+  border-radius: 5px;
   display: none; /* shown on small screens */
   align-items: center;
   justify-content: center;
@@ -127,7 +127,7 @@ body {
   width: 18px;
   height: 2px;
   background: #4b5563;
-  border-radius: 999px;
+  border-radius: 5px;
   position: relative;
 }
 
@@ -139,7 +139,7 @@ body {
   width: 18px;
   height: 2px;
   background: #4b5563;
-  border-radius: 999px;
+  border-radius: 5px;
 }
 
 .dl-nav-toggle-bars::before {
@@ -258,7 +258,7 @@ body {
 
 .dl-cta-btn {
   padding: 14px 42px;
-  border-radius: 999px;
+  border-radius: 5px;
   border: none;
   background: linear-gradient(90deg, var(--dl-blue), var(--dl-purple));
   color: #fff;
@@ -314,7 +314,7 @@ body {
 .dl-status-dot {
   width: 0.55rem;
   height: 0.55rem;
-  border-radius: 999px;
+  border-radius: 5px;
   background: #22c55e;
 }
 
@@ -454,7 +454,7 @@ body {
   display: inline-block;
   min-width: 170px;
   padding: 0.45rem 2rem 0.45rem 0.8rem;
-  border-radius: 999px;
+  border-radius: 5px;
   border: 1px solid #e5e7eb;
   background-color: #f9fafb;
   font-size: 0.85rem;

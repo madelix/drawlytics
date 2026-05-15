@@ -31,7 +31,7 @@ export function LotterySelector({
               border: active ? '1px solid #111827' : '1px solid #d1d5db',
               background: active ? '#111827' : '#ffffff',
               color: active ? '#ffffff' : '#374151',
-              borderRadius: 10,
+              borderRadius: 6,
               padding: '0.55rem 1rem',
               fontSize: '0.9rem',
               fontWeight: 600,
