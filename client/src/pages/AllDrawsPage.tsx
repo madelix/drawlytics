@@ -7,6 +7,7 @@ import {
 } from '../api/draws';
 import { ScrollToTopButton } from '../components/ScrollToTopButton';
 import { LOTTERIES, getLotteryConfig, LotteryKey } from '../config/lotteries';
+import { LotterySelector } from '../components/LotterySelector';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
@@ -130,38 +131,10 @@ export function AllDrawsPage() {
                   marginTop: '0.35rem',
                 }}
               >
-                {LOTTERIES.map((lottery) => {
-                  const active = selectedLottery === lottery.key;
-
-                  return (
-                    <button
-                      key={lottery.key}
-                      type="button"
-                      onClick={() => {
-                        setSelectedLottery(lottery.key);
-                        setOffset(0);
-                      }}
-                      style={{
-                        borderRadius: 8,
-                        border: active
-                          ? '1px solid #111827'
-                          : '1px solid rgba(148, 163, 184, 0.35)',
-                        padding: '0.45rem 0.9rem',
-                        fontSize: '0.82rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 0.18s ease',
-                        background: active ? '#111827' : '#ffffff',
-                        color: active ? '#ffffff' : '#334155',
-                        boxShadow: active
-                          ? '0 4px 10px rgba(15, 23, 42, 0.18)'
-                          : 'none',
-                      }}
-                    >
-                      {lottery.label}
-                    </button>
-                  );
-                })}
+                <LotterySelector
+                  selectedLottery={selectedLottery}
+                  onChange={setSelectedLottery}
+                />
               </div>
             </div>
           </div>
