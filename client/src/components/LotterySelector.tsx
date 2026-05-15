@@ -1,7 +1,7 @@
 import { LOTTERIES, type LotteryKey } from '../config/lotteries';
 
 type LotterySelectorProps = {
-  selectedLottery: LotteryKey;
+  selectedLottery: LotteryKey | null;
   onChange: (lottery: LotteryKey) => void;
 };
 
@@ -15,9 +15,8 @@ export function LotterySelector({
         display: 'flex',
         gap: '0.5rem',
         flexWrap: 'wrap',
-        marginTop: '0.35rem',
         alignItems: 'center',
-        width: '100%',
+        width: 'auto',
       }}
     >
       {LOTTERIES.map((lottery) => {

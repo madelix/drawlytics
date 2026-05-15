@@ -7,6 +7,7 @@ import {
   type LotteryKey,
 } from '../config/lotteries';
 import { getMainGroup, getSecondaryGroup } from '../utils/lotteryNumbers';
+import { LotterySelector } from '../components/LotterySelector';
 
 type PredictionRow = {
   id: number;
@@ -597,41 +598,48 @@ export default function MyPredictionsPage() {
                       width: '100%',
                     }}
                   >
-                    {[
-                      { key: 'all' as const, label: 'All lotteries' },
-                      ...LOTTERIES.map((lottery) => ({
-                        key: lottery.key,
-                        label: lottery.label,
-                      })),
-                    ].map((lottery) => {
-                      const active = selectedLottery === lottery.key;
-
-                      return (
-                        <button
-                          key={lottery.key}
-                          type="button"
-                          onClick={() => setSelectedLottery(lottery.key)}
-                          style={{
-                            border: active
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLottery('all')}
+                        style={{
+                          border:
+                            selectedLottery === 'all'
                               ? '1px solid #111827'
                               : '1px solid #d1d5db',
-                            background: active ? '#111827' : '#ffffff',
-                            color: active ? '#ffffff' : '#374151',
-                            borderRadius: 10,
-                            padding: '0.55rem 1rem',
-                            fontSize: '0.9rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                            boxShadow: active
+                          background:
+                            selectedLottery === 'all' ? '#111827' : '#ffffff',
+                          color:
+                            selectedLottery === 'all' ? '#ffffff' : '#374151',
+                          borderRadius: 10,
+                          padding: '0.55rem 1rem',
+                          fontSize: '0.9rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          boxShadow:
+                            selectedLottery === 'all'
                               ? '0 4px 10px rgba(15, 23, 42, 0.18)'
                               : 'none',
-                          }}
-                        >
-                          {lottery.label}
-                        </button>
-                      );
-                    })}
+                        }}
+                      >
+                        All lotteries
+                      </button>
+
+                      <LotterySelector
+                        selectedLottery={
+                          selectedLottery === 'all' ? null : selectedLottery
+                        }
+                        onChange={setSelectedLottery}
+                      />
+                    </div>
 
                     {usage && (
                       <div
