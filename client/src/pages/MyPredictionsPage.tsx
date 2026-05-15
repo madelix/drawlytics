@@ -380,6 +380,18 @@ export default function MyPredictionsPage() {
     return copy;
   }, [predictions, selectedLottery]);
 
+  const visibleUsage = useMemo(() => {
+    const visibleCount =
+      selectedLottery === 'all' ? predictions.length : predictionsSorted.length;
+
+    return {
+      used: visibleCount,
+      label: usage?.limits_disabled
+        ? `${visibleCount} saved • unlimited dev mode`
+        : `${visibleCount}/${usage?.limit ?? 50} saved`,
+    };
+  }, [predictions.length, predictionsSorted.length, selectedLottery, usage]);
+
   const predictionsByDraw = useMemo(() => {
     const map: Record<string, PredictionRow[]> = {};
     for (const p of predictionsSorted) {
@@ -658,9 +670,7 @@ export default function MyPredictionsPage() {
                             }}
                           />
 
-                          {usage.limits_disabled
-                            ? `${usage.used} saved • unlimited dev mode`
-                            : `${usage.used}/${usage.limit} saved`}
+                          {visibleUsage.label}
                         </span>
                       </div>
                     )}
