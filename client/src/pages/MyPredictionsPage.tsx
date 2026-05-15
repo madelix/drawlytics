@@ -561,8 +561,7 @@ export default function MyPredictionsPage() {
           <h1 style={{ margin: 0 }}>My Predictions</h1>
 
           <p className="dl-section-subtitle" style={{ marginTop: 8 }}>
-            View saved predictions across your lotteries. (Generator &amp;
-            performance analytics coming next.)
+            View saved predictions across your lotteries.
           </p>
 
           <section

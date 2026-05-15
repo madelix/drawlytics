@@ -7,6 +7,7 @@ import {
   type ModelHistoryPoint,
   type ModelPerformanceRow,
 } from '../api/performance';
+import { LOTTERIES, type LotteryKey } from '../config/lotteries';
 
 function toNum(v: unknown, fallback = 0) {
   const n = typeof v === 'number' ? v : Number(v);
@@ -220,6 +221,8 @@ function TopPick({
 export default function ModelPerformancePage() {
   const [lottery, setLottery] = useState('euromillions');
   const [loading, setLoading] = useState(false);
+  const [selectedLottery, setSelectedLottery] =
+    useState<LotteryKey>('euromillions');
   const [error, setError] = useState<string | null>(null);
 
   const [rows, setRows] = useState<ModelPerformanceRow[]>([]);
@@ -262,7 +265,9 @@ export default function ModelPerformancePage() {
     setError(null);
 
     try {
-      const data = await getModelPerformance({ lottery });
+      const data = await getModelPerformance({
+        lottery: selectedLottery,
+      });
       setRows(data.models || []);
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load model performance');
@@ -297,7 +302,7 @@ export default function ModelPerformancePage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedLottery]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 700px)');
@@ -849,6 +854,73 @@ export default function ModelPerformancePage() {
           A simple view: higher bars = more matches on average (main + stars).
         </p>
       </header>
+
+      <section
+        style={{
+          width: '100%',
+          margin: '16px 0 14px',
+          padding: 0,
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          className="dl-config-card"
+          style={{
+            width: '100%',
+            maxWidth: 'none',
+            padding: '1.25rem',
+            textAlign: 'left',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div className="dl-config-row">
+            <div className="dl-config-item" style={{ width: '100%' }}>
+              <div className="dl-config-label">Lottery type</div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
+                  marginTop: '0.35rem',
+                  alignItems: 'center',
+                  width: '100%',
+                }}
+              >
+                {LOTTERIES.map((lottery) => {
+                  const active = selectedLottery === lottery.key;
+
+                  return (
+                    <button
+                      key={lottery.key}
+                      type="button"
+                      onClick={() => setSelectedLottery(lottery.key)}
+                      style={{
+                        border: active
+                          ? '1px solid #111827'
+                          : '1px solid #d1d5db',
+                        background: active ? '#111827' : '#ffffff',
+                        color: active ? '#ffffff' : '#374151',
+                        borderRadius: 10,
+                        padding: '0.55rem 1rem',
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        boxShadow: active
+                          ? '0 4px 10px rgba(15, 23, 42, 0.18)'
+                          : 'none',
+                      }}
+                    >
+                      {lottery.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div
         style={{
