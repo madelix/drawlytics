@@ -841,13 +841,15 @@ export default function MyPredictionsPage() {
               0,
             );
 
-            const hasDraw = dayKey !== 'unknown' && Boolean(drawMap[dayKey]);
+            const lookupKey = getDrawLookupKey(items[0]?.lottery, dayKey);
+            const hasDraw = Boolean(lookupKey && drawMap[lookupKey]);
             const resultsCount = hasDraw ? items.length : 0;
 
             const bestResult = (() => {
-              if (dayKey === 'unknown' || !drawMap[dayKey]) return null;
+              const lookupKey = getDrawLookupKey(items[0]?.lottery, dayKey);
+              if (!lookupKey || !drawMap[lookupKey]) return null;
 
-              const draw = drawMap[dayKey];
+              const draw = drawMap[lookupKey];
 
               let bestMain = 0;
               let bestStars = 0;
@@ -874,9 +876,11 @@ export default function MyPredictionsPage() {
             })();
 
             const bestPlayedResult = (() => {
-              if (dayKey === 'unknown' || !drawMap[dayKey]) return null;
+              const lookupKey = getDrawLookupKey(items[0]?.lottery, dayKey);
 
-              const draw = drawMap[dayKey];
+              if (!lookupKey || !drawMap[lookupKey]) return null;
+
+              const draw = drawMap[lookupKey];
 
               let bestMain = 0;
               let bestStars = 0;
@@ -908,17 +912,34 @@ export default function MyPredictionsPage() {
               };
             })();
 
+            const winningLookupKey = getDrawLookupKey(
+              items[0]?.lottery,
+              dayKey,
+            );
+
             const winning =
-              dayKey !== 'unknown' && drawMap[dayKey]
+              winningLookupKey && drawMap[winningLookupKey]
                 ? (() => {
-                    const d = drawMap[dayKey];
+                    const d = drawMap[winningLookupKey];
+
                     const main = Array.from(d.main)
                       .sort((a, b) => a - b)
                       .join(' ');
-                    const stars = Array.from(d.stars)
+
+                    const special = Array.from(d.stars)
                       .sort((a, b) => a - b)
                       .join(' ');
-                    return `Winning: ${main} ★ ${stars}`;
+
+                    const specialLabel =
+                      items[0]?.lottery === 'uk_lotto'
+                        ? 'Bonus'
+                        : items[0]?.lottery === 'set_for_life'
+                          ? 'Life'
+                          : 'Stars';
+
+                    return special
+                      ? `Winning: ${main} • ${specialLabel}: ${special}`
+                      : `Winning: ${main}`;
                   })()
                 : null;
 
