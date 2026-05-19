@@ -283,7 +283,7 @@ export default function ModelPerformancePage() {
     try {
       const data = await getModelHistory({
         model_key: modelKey,
-        lottery,
+        lottery: selectedLottery,
       });
 
       setHistory(data.history || []);
@@ -1429,7 +1429,7 @@ export default function ModelPerformancePage() {
         </div>
       )}
 
-      {selectedModel && history.length > 0 && (
+      {selectedModel && (
         <div
           style={{
             background: '#fff',
@@ -1552,299 +1552,302 @@ export default function ModelPerformancePage() {
             })()}
           </div>
 
-          <div style={{ height: 235, marginBottom: 22 }}>
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="0 0 400 200"
-              onMouseMove={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const x = ((e.clientX - rect.left) / rect.width) * 400;
-
-                const index = Math.round(
-                  ((x - 10) / 380) * (history.length - 1),
-                );
-
-                if (index < 0 || index >= history.length) return;
-
-                const px = (index / (history.length - 1)) * 380 + 10;
-                const point = history[index];
-
-                if (!point) return;
-
-                const hits = toNum(point.avg_total_hits, 0);
-                const py = 180 - hits * 30;
-
-                setHistoryHover({
-                  drawIndex: index + 1,
-                  x: px,
-                  y: py,
-                });
+          {history.length === 0 && (
+            <div
+              style={{
+                padding: '14px 0',
+                fontSize: 13,
+                color: '#6b7280',
               }}
-              onMouseLeave={() => setHistoryHover(null)}
             >
-              {[0, 1, 2, 3, 4, 5].map((v) => {
-                const y = 180 - v * 30;
+              No historical draw data available yet for this model and lottery.
+            </div>
+          )}
 
-                return (
-                  <g key={v}>
-                    <line
-                      x1={10}
-                      y1={y}
-                      x2={390}
-                      y2={y}
-                      stroke="#eef2f7"
-                      strokeWidth={1}
-                    />
-                    <text x={0} y={y + 4} fontSize={10} fill="#9ca3af">
-                      {v}
-                    </text>
-                  </g>
-                );
-              })}
-              <line
-                x1={10}
-                y1={180}
-                x2={390}
-                y2={180}
-                stroke="#e5e7eb"
-                strokeWidth={1}
-              />
-              {history.map((point, i) => {
-                const x = (i / (history.length - 1)) * 380 + 10;
-                const hits = toNum(point.avg_total_hits, 0);
-                const y = 180 - hits * 30;
+          {history.length > 0 && (
+            <div style={{ height: 235, marginBottom: 22 }}>
+              <svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 400 200"
+                onMouseMove={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = ((e.clientX - rect.left) / rect.width) * 400;
 
-                return (
-                  <circle
-                    key={i}
-                    cx={x}
-                    cy={y}
-                    r={4}
-                    fill={selectedModel?.color ?? '#804198'}
-                    onMouseEnter={() =>
-                      setHistoryHover({
-                        drawIndex: i + 1,
-                        x,
-                        y,
-                      })
-                    }
-                    onMouseLeave={() => setHistoryHover(null)}
-                    style={{ cursor: 'pointer' }}
-                  />
-                );
-              })}
-
-              {comparisonModelKeys.map((modelKey) => {
-                const series =
-                  modelKey === selectedModel?.model_key
-                    ? history
-                    : comparisonHistories[modelKey] || [];
-
-                const color =
-                  modelKey === selectedModel?.model_key
-                    ? selectedModel?.color
-                    : chartRows.find((m) => m.model_key === modelKey)?.color ||
-                      '#9ca3af';
-
-                if (!series || series.length < 2) return null;
-
-                return series.map((point, i) => {
-                  if (i === 0) return null;
-
-                  const prev = series[i - 1];
-
-                  const x1 = ((i - 1) / (series.length - 1)) * 380 + 10;
-                  const y1 = 180 - toNum(prev.avg_total_hits, 0) * 30;
-
-                  const x2 = (i / (series.length - 1)) * 380 + 10;
-                  const y2 = 180 - toNum(point.avg_total_hits, 0) * 30;
-
-                  return (
-                    <line
-                      key={`${modelKey}-${i}`}
-                      x1={x1}
-                      y1={y1}
-                      x2={x2}
-                      y2={y2}
-                      stroke={color}
-                      strokeWidth={2.5}
-                      strokeLinecap="round"
-                      opacity={modelKey === selectedModel?.model_key ? 1 : 0.7}
-                    />
+                  const index = Math.round(
+                    ((x - 10) / 380) * (history.length - 1),
                   );
-                });
-              })}
 
-              {selectedModel?.model_key !== 'pure_random' &&
-                baselineHistory.length > 0 &&
-                baselineHistory.map((point, i) => {
-                  if (i === 0) return null;
+                  if (index < 0 || index >= history.length) return;
 
-                  const prev = baselineHistory[i - 1];
+                  const px = (index / (history.length - 1)) * 380 + 10;
+                  const point = history[index];
 
-                  const x1 =
-                    ((i - 1) / (baselineHistory.length - 1)) * 380 + 10;
-                  const y1 = 180 - toNum(prev.avg_total_hits, 0) * 30;
+                  if (!point) return;
 
-                  const x2 = (i / (baselineHistory.length - 1)) * 380 + 10;
-                  const y2 = 180 - toNum(point.avg_total_hits, 0) * 30;
+                  const hits = toNum(point.avg_total_hits, 0);
+                  const py = 180 - hits * 30;
+
+                  setHistoryHover({
+                    drawIndex: index + 1,
+                    x: px,
+                    y: py,
+                  });
+                }}
+                onMouseLeave={() => setHistoryHover(null)}
+              >
+                {[0, 1, 2, 3, 4, 5].map((v) => {
+                  const y = 180 - v * 30;
 
                   return (
-                    <line
-                      key={`baseline-${i}`}
-                      x1={x1}
-                      y1={y1}
-                      x2={x2}
-                      y2={y2}
-                      stroke="#9ca3af"
-                      strokeWidth={2}
-                      strokeDasharray="4 4"
-                      opacity={0.7}
+                    <g key={v}>
+                      <line
+                        x1={10}
+                        y1={y}
+                        x2={390}
+                        y2={y}
+                        stroke="#eef2f7"
+                        strokeWidth={1}
+                      />
+                      <text x={0} y={y + 4} fontSize={10} fill="#9ca3af">
+                        {v}
+                      </text>
+                    </g>
+                  );
+                })}
+                <line
+                  x1={10}
+                  y1={180}
+                  x2={390}
+                  y2={180}
+                  stroke="#e5e7eb"
+                  strokeWidth={1}
+                />
+                {history.map((point, i) => {
+                  const x = (i / (history.length - 1)) * 380 + 10;
+                  const hits = toNum(point.avg_total_hits, 0);
+                  const y = 180 - hits * 30;
+
+                  return (
+                    <circle
+                      key={i}
+                      cx={x}
+                      cy={y}
+                      r={4}
+                      fill={selectedModel?.color ?? '#804198'}
+                      onMouseEnter={() =>
+                        setHistoryHover({
+                          drawIndex: i + 1,
+                          x,
+                          y,
+                        })
+                      }
+                      onMouseLeave={() => setHistoryHover(null)}
+                      style={{ cursor: 'pointer' }}
                     />
                   );
                 })}
-              {historyHover &&
-                (() => {
-                  const tooltipWidth = 145;
-                  const rowHeight = 14;
 
-                  const rows = comparisonModelKeys
-                    .map((modelKey) => {
-                      const model = chartRows.find(
-                        (m) => m.model_key === modelKey,
-                      );
-                      const series =
-                        modelKey === selectedModel?.model_key
-                          ? history
-                          : comparisonHistories[modelKey] || [];
+                {comparisonModelKeys.map((modelKey) => {
+                  const series =
+                    modelKey === selectedModel?.model_key
+                      ? history
+                      : comparisonHistories[modelKey] || [];
 
-                      const point = series[historyHover.drawIndex - 1];
+                  const color =
+                    modelKey === selectedModel?.model_key
+                      ? selectedModel?.color
+                      : chartRows.find((m) => m.model_key === modelKey)
+                          ?.color || '#9ca3af';
 
-                      if (!model || !point) return null;
+                  if (!series || series.length < 2) return null;
 
-                      return {
-                        name: model.model_display_name,
-                        color: model.color,
-                        hits: toNum(point.avg_total_hits, 0),
-                      };
-                    })
-                    .filter(Boolean) as {
-                    name: string;
-                    color: string;
-                    hits: number;
-                  }[];
+                  return series.map((point, i) => {
+                    if (i === 0) return null;
 
-                  const baselinePoint =
-                    baselineHistory[historyHover.drawIndex - 1];
+                    const prev = series[i - 1];
 
-                  if (
-                    baselinePoint &&
-                    selectedModel?.model_key !== 'pure_random'
-                  ) {
-                    rows.push({
-                      name: 'Pure Random',
-                      color: '#9ca3af',
-                      hits: toNum(baselinePoint.avg_total_hits, 0),
-                    });
-                  }
-                  rows.sort((a, b) => b.hits - a.hits);
+                    const x1 = ((i - 1) / (series.length - 1)) * 380 + 10;
+                    const y1 = 180 - toNum(prev.avg_total_hits, 0) * 30;
 
-                  const tooltipHeight = 24 + rows.length * rowHeight;
+                    const x2 = (i / (series.length - 1)) * 380 + 10;
+                    const y2 = 180 - toNum(point.avg_total_hits, 0) * 30;
 
-                  const tx = Math.max(
-                    8,
-                    Math.min(
-                      historyHover.x - tooltipWidth / 2,
-                      400 - tooltipWidth - 8,
-                    ),
-                  );
-
-                  const ty = Math.max(8, historyHover.y - tooltipHeight - 6);
-
-                  return (
-                    <g>
+                    return (
                       <line
-                        x1={historyHover.x}
-                        y1={0}
-                        x2={historyHover.x}
-                        y2={180}
+                        key={`${modelKey}-${i}`}
+                        x1={x1}
+                        y1={y1}
+                        x2={x2}
+                        y2={y2}
+                        stroke={color}
+                        strokeWidth={2.5}
+                        strokeLinecap="round"
+                        opacity={
+                          modelKey === selectedModel?.model_key ? 1 : 0.7
+                        }
+                      />
+                    );
+                  });
+                })}
+
+                {selectedModel?.model_key !== 'pure_random' &&
+                  baselineHistory.length > 0 &&
+                  baselineHistory.map((point, i) => {
+                    if (i === 0) return null;
+
+                    const prev = baselineHistory[i - 1];
+
+                    const x1 =
+                      ((i - 1) / (baselineHistory.length - 1)) * 380 + 10;
+                    const y1 = 180 - toNum(prev.avg_total_hits, 0) * 30;
+
+                    const x2 = (i / (baselineHistory.length - 1)) * 380 + 10;
+                    const y2 = 180 - toNum(point.avg_total_hits, 0) * 30;
+
+                    return (
+                      <line
+                        key={`baseline-${i}`}
+                        x1={x1}
+                        y1={y1}
+                        x2={x2}
+                        y2={y2}
                         stroke="#9ca3af"
-                        strokeWidth={1}
+                        strokeWidth={2}
                         strokeDasharray="4 4"
-                        opacity={0.45}
+                        opacity={0.7}
                       />
-                      <rect
-                        x={tx}
-                        y={ty}
-                        width={tooltipWidth}
-                        height={tooltipHeight}
-                        rx={6}
-                        fill="#111827"
-                        opacity={0.94}
-                      />
+                    );
+                  })}
+                {historyHover &&
+                  (() => {
+                    const tooltipWidth = 145;
+                    const rowHeight = 14;
 
-                      <text
-                        x={tx + 8}
-                        y={ty + 14}
-                        fontSize={10}
-                        fill="#fff"
-                        fontWeight={800}
-                      >
-                        Draw {historyHover.drawIndex}
-                      </text>
+                    const rows = comparisonModelKeys
+                      .map((modelKey) => {
+                        const model = chartRows.find(
+                          (m) => m.model_key === modelKey,
+                        );
+                        const series =
+                          modelKey === selectedModel?.model_key
+                            ? history
+                            : comparisonHistories[modelKey] || [];
 
-                      {rows.map((row, index) => (
-                        <g key={row.name}>
-                          <circle
-                            cx={tx + 10}
-                            cy={ty + 28 + index * rowHeight}
-                            r={3}
-                            fill={row.color}
-                          />
-                          <text
-                            x={tx + 18}
-                            y={ty + 31 + index * rowHeight}
-                            fontSize={10}
-                            fill={index === 0 ? '#fff' : '#9ca3af'}
-                            fontWeight={index === 0 ? 800 : 500}
-                          >
-                            {row.name}
-                          </text>
+                        const point = series[historyHover.drawIndex - 1];
 
-                          <text
-                            x={tx + tooltipWidth - 8}
-                            y={ty + 31 + index * rowHeight}
-                            fontSize={10}
-                            fill={index === 0 ? '#fff' : '#9ca3af'}
-                            fontWeight={index === 0 ? 800 : 500}
-                            textAnchor="end"
-                          >
-                            {formatNum(row.hits, 2)}
-                          </text>
-                        </g>
-                      ))}
-                    </g>
-                  );
-                })()}
-            </svg>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                gap: 16,
-                marginTop: 8,
-                fontSize: 12,
-                color: '#6b7280',
-                flexWrap: 'wrap',
-                textAlign: 'center',
-              }}
-            >
+                        if (!model || !point) return null;
+
+                        return {
+                          name: model.model_display_name,
+                          color: model.color,
+                          hits: toNum(point.avg_total_hits, 0),
+                        };
+                      })
+                      .filter(Boolean) as {
+                      name: string;
+                      color: string;
+                      hits: number;
+                    }[];
+
+                    const baselinePoint =
+                      baselineHistory[historyHover.drawIndex - 1];
+
+                    if (
+                      baselinePoint &&
+                      selectedModel?.model_key !== 'pure_random'
+                    ) {
+                      rows.push({
+                        name: 'Pure Random',
+                        color: '#9ca3af',
+                        hits: toNum(baselinePoint.avg_total_hits, 0),
+                      });
+                    }
+                    rows.sort((a, b) => b.hits - a.hits);
+
+                    const tooltipHeight = 24 + rows.length * rowHeight;
+
+                    const tx = Math.max(
+                      8,
+                      Math.min(
+                        historyHover.x - tooltipWidth / 2,
+                        400 - tooltipWidth - 8,
+                      ),
+                    );
+
+                    const ty = Math.max(8, historyHover.y - tooltipHeight - 6);
+
+                    return (
+                      <g>
+                        <line
+                          x1={historyHover.x}
+                          y1={0}
+                          x2={historyHover.x}
+                          y2={180}
+                          stroke="#9ca3af"
+                          strokeWidth={1}
+                          strokeDasharray="4 4"
+                          opacity={0.45}
+                        />
+                        <rect
+                          x={tx}
+                          y={ty}
+                          width={tooltipWidth}
+                          height={tooltipHeight}
+                          rx={6}
+                          fill="#111827"
+                          opacity={0.94}
+                        />
+
+                        <text
+                          x={tx + 8}
+                          y={ty + 14}
+                          fontSize={10}
+                          fill="#fff"
+                          fontWeight={800}
+                        >
+                          Draw {historyHover.drawIndex}
+                        </text>
+
+                        {rows.map((row, index) => (
+                          <g key={row.name}>
+                            <circle
+                              cx={tx + 10}
+                              cy={ty + 28 + index * rowHeight}
+                              r={3}
+                              fill={row.color}
+                            />
+                            <text
+                              x={tx + 18}
+                              y={ty + 31 + index * rowHeight}
+                              fontSize={10}
+                              fill={index === 0 ? '#fff' : '#9ca3af'}
+                              fontWeight={index === 0 ? 800 : 500}
+                            >
+                              {row.name}
+                            </text>
+
+                            <text
+                              x={tx + tooltipWidth - 8}
+                              y={ty + 31 + index * rowHeight}
+                              fontSize={10}
+                              fill={index === 0 ? '#fff' : '#9ca3af'}
+                              fontWeight={index === 0 ? 800 : 500}
+                              textAnchor="end"
+                            >
+                              {formatNum(row.hits, 2)}
+                            </text>
+                          </g>
+                        ))}
+                      </g>
+                    );
+                  })()}
+              </svg>
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'center',
-                  gap: 12,
+                  gap: 16,
                   marginTop: 8,
                   fontSize: 12,
                   color: '#6b7280',
@@ -1852,42 +1855,63 @@ export default function ModelPerformancePage() {
                   textAlign: 'center',
                 }}
               >
-                {comparisonModelKeys.map((modelKey) => {
-                  const model = chartRows.find((m) => m.model_key === modelKey);
-                  if (!model) return null;
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: 12,
+                    marginTop: 8,
+                    fontSize: 12,
+                    color: '#6b7280',
+                    flexWrap: 'wrap',
+                    textAlign: 'center',
+                  }}
+                >
+                  {comparisonModelKeys.map((modelKey) => {
+                    const model = chartRows.find(
+                      (m) => m.model_key === modelKey,
+                    );
+                    if (!model) return null;
 
-                  return (
-                    <div
-                      key={modelKey}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                    >
-                      <span
+                    return (
+                      <div
+                        key={modelKey}
                         style={{
-                          width: 14,
-                          height: 2,
-                          background: model.color,
-                          display: 'inline-block',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
                         }}
-                      />
-                      {model.model_display_name}
-                    </div>
-                  );
-                })}
+                      >
+                        <span
+                          style={{
+                            width: 14,
+                            height: 2,
+                            background: model.color,
+                            display: 'inline-block',
+                          }}
+                        />
+                        {model.model_display_name}
+                      </div>
+                    );
+                  })}
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span
-                    style={{
-                      width: 14,
-                      height: 2,
-                      borderTop: '2px dashed #9ca3af',
-                      display: 'inline-block',
-                    }}
-                  />
-                  Pure Random baseline
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <span
+                      style={{
+                        width: 14,
+                        height: 2,
+                        borderTop: '2px dashed #9ca3af',
+                        display: 'inline-block',
+                      }}
+                    />
+                    Pure Random baseline
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
