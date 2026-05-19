@@ -220,7 +220,6 @@ function TopPick({
 }
 
 export default function ModelPerformancePage() {
-  const [lottery, setLottery] = useState('euromillions');
   const [loading, setLoading] = useState(false);
   const [selectedLottery, setSelectedLottery] =
     useState<LotteryKey>('euromillions');
@@ -240,7 +239,7 @@ export default function ModelPerformancePage() {
     x: number;
     y: number;
   } | null>(null);
-  const [historyLoading, setHistoryLoading] = useState(false);
+
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [minChecked, setMinChecked] = useState(0);
   const [rankingMode, setRankingMode] = useState<
@@ -277,7 +276,6 @@ export default function ModelPerformancePage() {
     }
   }
   async function loadHistory(modelKey: string) {
-    setHistoryLoading(true);
     setHistoryError(null);
 
     try {
@@ -295,8 +293,6 @@ export default function ModelPerformancePage() {
     } catch (e: any) {
       setHistory([]);
       setHistoryError(e?.message ?? 'Failed to load model history');
-    } finally {
-      setHistoryLoading(false);
     }
   }
 
@@ -697,7 +693,7 @@ export default function ModelPerformancePage() {
 
     setComparisonModelKeys([selectedModelKey]);
     loadHistory(selectedModelKey);
-  }, [selectedModelKey, lottery]);
+  }, [selectedModelKey, selectedLottery]);
 
   const recommendedModel = useMemo(() => {
     return (
@@ -907,44 +903,7 @@ export default function ModelPerformancePage() {
           flexWrap: 'wrap',
           marginBottom: 14,
         }}
-      >
-        <label
-          style={{
-            fontSize: 14,
-            color: '#6b7280',
-            width: isMobile ? '100%' : 'auto',
-          }}
-        >
-          Lottery&nbsp;
-          <input
-            value={lottery}
-            onChange={(e) => setLottery(e.target.value)}
-            style={{
-              padding: '8px 10px',
-              borderRadius: 10,
-              border: '1px solid #e5e7eb',
-              background: '#fff',
-              width: isMobile ? '100%' : undefined,
-              marginTop: 4,
-            }}
-          />
-        </label>
-
-        <button
-          onClick={load}
-          disabled={loading}
-          style={{
-            padding: '8px 14px',
-            borderRadius: 999,
-            border: '1px solid #e5e7eb',
-            background: '#fff',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            fontWeight: 600,
-          }}
-        >
-          {loading ? 'Loading…' : 'Refresh'}
-        </button>
-      </div>
+      ></div>
 
       <div style={{ textAlign: 'center', color: '#6b7280', marginBottom: 14 }}>
         Models: {filtered.length} (of {rows.length}) · Total predictions:{' '}
