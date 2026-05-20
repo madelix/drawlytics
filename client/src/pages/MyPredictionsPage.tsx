@@ -188,6 +188,9 @@ export default function MyPredictionsPage() {
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [selectedPredictionIds, setSelectedPredictionIds] = useState<
+    Set<number>
+  >(() => new Set());
 
   const [playedMap, setPlayedMap] = useState<Record<number, boolean>>({});
   const [playingId, setPlayingId] = useState<number | null>(null);
@@ -476,6 +479,55 @@ export default function MyPredictionsPage() {
     } finally {
       setDeletingId(null);
     }
+  }
+
+  async function handleDeleteSelected(ids: number[]) {
+    if (ids.length === 0) return;
+
+    const ok = window.confirm(
+      `Delete ${ids.length} selected prediction${ids.length === 1 ? '' : 's'}? This action cannot be undone.`,
+    );
+
+    if (!ok) return;
+
+    try {
+      for (const id of ids) {
+        await fetchJsonOrThrow(`/api/predictions/${id}`, { method: 'DELETE' });
+      }
+
+      setPredictions((prev) => prev.filter((p) => !ids.includes(p.id)));
+
+      setPlayedMap((prev) => {
+        const next = { ...prev };
+        for (const id of ids) {
+          delete next[id];
+        }
+        return next;
+      });
+
+      setSelectedPredictionIds(new Set());
+
+      void loadUsage();
+    } catch (err) {
+      console.error('Delete selected predictions failed:', err);
+      alert(
+        'Could not delete selected predictions. Check console/logs for details.',
+      );
+    }
+  }
+
+  function togglePredictionSelected(id: number) {
+    setSelectedPredictionIds((prev) => {
+      const next = new Set(prev);
+
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
   }
 
   async function handleCheckResults() {
@@ -836,6 +888,10 @@ export default function MyPredictionsPage() {
 
             const isOpen = openDraws[dayKey] ?? true;
 
+            const selectedInGroup = items.filter((p) =>
+              selectedPredictionIds.has(p.id),
+            );
+
             const playedCount = items.reduce(
               (acc, p) => acc + (playedMap[p.id] ? 1 : 0),
               0,
@@ -1063,6 +1119,65 @@ export default function MyPredictionsPage() {
                   </div>
                 </button>
 
+                {selectedInGroup.length > 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      gap: '0.5rem',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      padding: '0 0.25rem',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '0.85rem',
+                        color: '#6b7280',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {selectedInGroup.length} selected
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPredictionIds(new Set())}
+                      style={{
+                        border: '1px solid #e5e7eb',
+                        background: '#ffffff',
+                        color: '#6b7280',
+                        borderRadius: 10,
+                        padding: '0.45rem 0.8rem',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Clear selection
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleDeleteSelected(selectedInGroup.map((p) => p.id))
+                      }
+                      style={{
+                        border: '1px solid #fecaca',
+                        background: '#ffffff',
+                        color: '#b91c1c',
+                        borderRadius: 10,
+                        padding: '0.45rem 0.8rem',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Delete selected
+                    </button>
+                  </div>
+                )}
+
                 {isOpen &&
                   items.map((p) => {
                     const predDayKey = toDayKey(p.draw_date);
@@ -1091,9 +1206,12 @@ export default function MyPredictionsPage() {
                     const mainHitCount = hits ? hits.main : null;
                     const starHitCount = hits ? hits.stars : null;
 
+                    const isSelected = selectedPredictionIds.has(p.id);
+
                     return (
                       <article
                         key={p.id}
+                        onClick={() => togglePredictionSelected(p.id)}
                         style={{
                           background:
                             p.source === 'strategy_mix'
@@ -1103,10 +1221,15 @@ export default function MyPredictionsPage() {
                                 : '#ffffff',
                           borderRadius: isMobile ? '22px' : '18px',
                           padding: isMobile ? '1rem' : '1rem 1.25rem',
-                          boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
-                          border: isPlayed
-                            ? '1px solid #e5e7eb'
-                            : '1px solid transparent',
+                          border: isSelected
+                            ? '2px solid #804198'
+                            : isPlayed
+                              ? '1px solid #e5e7eb'
+                              : '1px solid transparent',
+                          boxShadow: isSelected
+                            ? '0 0 0 4px rgba(128, 65, 152, 0.12)'
+                            : '0 1px 3px rgba(15,23,42,0.06)',
+                          cursor: 'pointer',
                         }}
                       >
                         <div
