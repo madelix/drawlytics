@@ -202,6 +202,10 @@ export default function MyPredictionsPage() {
     'all',
   );
 
+  const [deleteConfirmIds, setDeleteConfirmIds] = useState<number[] | null>(
+    null,
+  );
+
   const [usage, setUsage] = useState<{
     used: number;
     limit: number | null;
@@ -481,14 +485,8 @@ export default function MyPredictionsPage() {
     }
   }
 
-  async function handleDeleteSelected(ids: number[]) {
+  async function confirmDeleteSelected(ids: number[]) {
     if (ids.length === 0) return;
-
-    const ok = window.confirm(
-      `Delete ${ids.length} selected prediction${ids.length === 1 ? '' : 's'}? This action cannot be undone.`,
-    );
-
-    if (!ok) return;
 
     try {
       for (const id of ids) {
@@ -1160,7 +1158,7 @@ export default function MyPredictionsPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        handleDeleteSelected(selectedInGroup.map((p) => p.id))
+                        setDeleteConfirmIds(selectedInGroup.map((p) => p.id))
                       }
                       style={{
                         border: '1px solid #fecaca',
@@ -1546,6 +1544,87 @@ export default function MyPredictionsPage() {
             );
           })}
         </section>
+      )}
+      {deleteConfirmIds && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            background: 'rgba(15, 23, 42, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              background: '#ffffff',
+              borderRadius: 16,
+              padding: '1.25rem',
+              boxShadow: '0 20px 50px rgba(15, 23, 42, 0.25)',
+              border: '1px solid #e5e7eb',
+            }}
+          >
+            <h2 style={{ margin: 0, fontSize: '1.1rem' }}>
+              Delete selected predictions?
+            </h2>
+
+            <p style={{ color: '#6b7280', lineHeight: 1.5 }}>
+              This will permanently delete {deleteConfirmIds.length} selected
+              prediction{deleteConfirmIds.length === 1 ? '' : 's'}.
+            </p>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '0.5rem',
+                marginTop: '1rem',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmIds(null)}
+                style={{
+                  border: '1px solid #e5e7eb',
+                  background: '#ffffff',
+                  color: '#374151',
+                  borderRadius: 10,
+                  padding: '0.55rem 0.9rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  await confirmDeleteSelected(deleteConfirmIds);
+                  setDeleteConfirmIds(null);
+                }}
+                style={{
+                  border: '1px solid #b91c1c',
+                  background: '#b91c1c',
+                  color: '#ffffff',
+                  borderRadius: 10,
+                  padding: '0.55rem 0.9rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
