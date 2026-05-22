@@ -114,6 +114,9 @@ export const played_predictions = pgTable(
     prediction_id: integer('prediction_id')
       .notNull()
       .references(() => predictions.id, { onDelete: 'cascade' }),
+
+    model_name: varchar('model_name', { length: 120 }).notNull(),
+
     played_at: timestamp('played_at', { withTimezone: true })
       .defaultNow()
       .notNull(),

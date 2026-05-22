@@ -460,10 +460,8 @@ export default function MyPredictionsPage() {
   }, [drawGroups]);
 
   async function handleDelete(id: number) {
-    const ok = window.confirm(
-      'Delete this prediction? This action cannot be undone.',
-    );
-    if (!ok) return;
+    setDeleteConfirmIds([id]);
+    return;
 
     try {
       setDeletingId(id);
@@ -511,6 +509,60 @@ export default function MyPredictionsPage() {
       alert(
         'Could not delete selected predictions. Check console/logs for details.',
       );
+    }
+  }
+
+  async function markSelectedAsPlayed(ids: number[]) {
+    if (ids.length === 0) return;
+
+    try {
+      for (const id of ids) {
+        try {
+          await markPlayed(id);
+        } catch (err) {
+          console.warn(`Prediction ${id} could not be marked as played`, err);
+        }
+      }
+
+      setPlayedMap((prev) => {
+        const next = { ...prev };
+
+        for (const id of ids) {
+          next[id] = true;
+        }
+
+        return next;
+      });
+
+      setSelectedPredictionIds(new Set());
+    } catch (err) {
+      console.error('Mark selected as played failed:', err);
+      alert('Could not mark selected predictions as played.');
+    }
+  }
+
+  async function unmarkSelectedAsPlayed(ids: number[]) {
+    if (ids.length === 0) return;
+
+    try {
+      for (const id of ids) {
+        await unmarkPlayed(id);
+      }
+
+      setPlayedMap((prev) => {
+        const next = { ...prev };
+
+        for (const id of ids) {
+          delete next[id];
+        }
+
+        return next;
+      });
+
+      setSelectedPredictionIds(new Set());
+    } catch (err) {
+      console.error('Unmark selected as played failed:', err);
+      alert('Could not unmark selected predictions as played.');
     }
   }
 
@@ -1153,6 +1205,44 @@ export default function MyPredictionsPage() {
                       }}
                     >
                       Clear selection
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        markSelectedAsPlayed(selectedInGroup.map((p) => p.id))
+                      }
+                      style={{
+                        border: '1px solid #d1fae5',
+                        background: '#ffffff',
+                        color: '#047857',
+                        borderRadius: 10,
+                        padding: '0.45rem 0.8rem',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Mark played
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        unmarkSelectedAsPlayed(selectedInGroup.map((p) => p.id))
+                      }
+                      style={{
+                        border: '1px solid #e0e7ff',
+                        background: '#ffffff',
+                        color: '#3730a3',
+                        borderRadius: 10,
+                        padding: '0.45rem 0.8rem',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Unmark played
                     </button>
 
                     <button

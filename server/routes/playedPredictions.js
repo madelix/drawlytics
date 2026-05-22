@@ -81,29 +81,21 @@ router.post('/played-predictions', async (req, res) => {
     }
 
     // 3) Insert played record
-    const [inserted] = await db
-      .insert(played_predictions)
-      .values({
-        lottery: p.lottery,
-        draw_date: p.draw_date,
-        prediction_id: p.id,
-        model_name: modelName, // ✅ never undefined / empty
-        notes,
-      })
-      .returning({
-        id: played_predictions.id,
-        played_at: played_predictions.played_at,
-        notes: played_predictions.notes,
-        prediction_id: played_predictions.prediction_id,
-        lottery: played_predictions.lottery,
-        draw_date: played_predictions.draw_date,
-        model_name: played_predictions.model_name,
-      });
+    await db.insert(played_predictions).values({
+      lottery: p.lottery,
+      draw_date: p.draw_date,
+      prediction_id: p.id,
+      model_name: modelName,
+      notes,
+    });
 
     return res.json({
       ok: true,
       played: {
-        ...inserted,
+        prediction_id: p.id,
+        lottery: p.lottery,
+        draw_date: p.draw_date,
+        model_name: modelName,
         main_numbers: p.main_numbers,
         star_numbers: p.star_numbers,
         confidence: p.confidence,
