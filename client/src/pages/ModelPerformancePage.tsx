@@ -822,6 +822,42 @@ export default function ModelPerformancePage() {
     return { label: 'Below baseline', color: '#b91c1c' };
   }, [baselineWinRate]);
 
+  const historyChartMeta = useMemo(() => {
+    const activeSeries = comparisonModelKeys
+      .map((modelKey) =>
+        modelKey === selectedModel?.model_key
+          ? history
+          : comparisonHistories[modelKey] || [],
+      )
+      .filter((series) => series.length > 0);
+
+    const allValues = [
+      ...activeSeries.flatMap((series) =>
+        series.map((point) => toNum(point.avg_total_hits, 0)),
+      ),
+      ...baselineHistory.map((point) => toNum(point.avg_total_hits, 0)),
+    ];
+
+    const maxValue = Math.max(...allValues, 1);
+    const yMax = Math.max(1, Math.ceil(maxValue));
+    const yTicks = Array.from({ length: yMax + 1 }, (_, index) => index);
+
+    return {
+      yMax,
+      yTicks,
+      chartLeft: 28,
+      chartRight: 390,
+      chartTop: 16,
+      chartBottom: 172,
+    };
+  }, [
+    baselineHistory,
+    comparisonHistories,
+    comparisonModelKeys,
+    history,
+    selectedModel?.model_key,
+  ]);
+
   return (
     <div
       style={{
@@ -1534,18 +1570,29 @@ export default function ModelPerformancePage() {
                   const x = ((e.clientX - rect.left) / rect.width) * 400;
 
                   const index = Math.round(
-                    ((x - 10) / 380) * (history.length - 1),
+                    ((x - historyChartMeta.chartLeft) /
+                      (historyChartMeta.chartRight -
+                        historyChartMeta.chartLeft)) *
+                      (history.length - 1),
                   );
 
                   if (index < 0 || index >= history.length) return;
 
-                  const px = (index / (history.length - 1)) * 380 + 10;
+                  const px =
+                    (index / Math.max(history.length - 1, 1)) *
+                      (historyChartMeta.chartRight -
+                        historyChartMeta.chartLeft) +
+                    historyChartMeta.chartLeft;
                   const point = history[index];
 
                   if (!point) return;
 
                   const hits = toNum(point.avg_total_hits, 0);
-                  const py = 180 - hits * 30;
+                  const py =
+                    historyChartMeta.chartBottom -
+                    (hits / historyChartMeta.yMax) *
+                      (historyChartMeta.chartBottom -
+                        historyChartMeta.chartTop);
 
                   setHistoryHover({
                     drawIndex: index + 1,
@@ -1555,15 +1602,19 @@ export default function ModelPerformancePage() {
                 }}
                 onMouseLeave={() => setHistoryHover(null)}
               >
-                {[0, 1, 2, 3, 4, 5].map((v) => {
-                  const y = 180 - v * 30;
+                {historyChartMeta.yTicks.map((v) => {
+                  const y =
+                    historyChartMeta.chartBottom -
+                    (v / historyChartMeta.yMax) *
+                      (historyChartMeta.chartBottom -
+                        historyChartMeta.chartTop);
 
                   return (
                     <g key={v}>
                       <line
-                        x1={10}
+                        x1={historyChartMeta.chartLeft}
                         y1={y}
-                        x2={390}
+                        x2={historyChartMeta.chartRight}
                         y2={y}
                         stroke="#eef2f7"
                         strokeWidth={1}
@@ -1575,17 +1626,27 @@ export default function ModelPerformancePage() {
                   );
                 })}
                 <line
-                  x1={10}
-                  y1={180}
-                  x2={390}
-                  y2={180}
+                  x1={historyChartMeta.chartLeft}
+                  y1={historyChartMeta.chartBottom}
+                  x2={historyChartMeta.chartRight}
+                  y2={historyChartMeta.chartBottom}
                   stroke="#e5e7eb"
                   strokeWidth={1}
                 />
                 {history.map((point, i) => {
-                  const x = (i / (history.length - 1)) * 380 + 10;
+                  const x =
+                    (i / Math.max(history.length - 1, 1)) *
+                      (historyChartMeta.chartRight -
+                        historyChartMeta.chartLeft) +
+                    historyChartMeta.chartLeft;
+
                   const hits = toNum(point.avg_total_hits, 0);
-                  const y = 180 - hits * 30;
+
+                  const y =
+                    historyChartMeta.chartBottom -
+                    (hits / historyChartMeta.yMax) *
+                      (historyChartMeta.chartBottom -
+                        historyChartMeta.chartTop);
 
                   return (
                     <circle
@@ -1626,11 +1687,29 @@ export default function ModelPerformancePage() {
 
                     const prev = series[i - 1];
 
-                    const x1 = ((i - 1) / (series.length - 1)) * 380 + 10;
-                    const y1 = 180 - toNum(prev.avg_total_hits, 0) * 30;
+                    const x1 =
+                      ((i - 1) / Math.max(series.length - 1, 1)) *
+                        (historyChartMeta.chartRight -
+                          historyChartMeta.chartLeft) +
+                      historyChartMeta.chartLeft;
 
-                    const x2 = (i / (series.length - 1)) * 380 + 10;
-                    const y2 = 180 - toNum(point.avg_total_hits, 0) * 30;
+                    const y1 =
+                      historyChartMeta.chartBottom -
+                      (toNum(prev.avg_total_hits, 0) / historyChartMeta.yMax) *
+                        (historyChartMeta.chartBottom -
+                          historyChartMeta.chartTop);
+
+                    const x2 =
+                      (i / Math.max(series.length - 1, 1)) *
+                        (historyChartMeta.chartRight -
+                          historyChartMeta.chartLeft) +
+                      historyChartMeta.chartLeft;
+
+                    const y2 =
+                      historyChartMeta.chartBottom -
+                      (toNum(point.avg_total_hits, 0) / historyChartMeta.yMax) *
+                        (historyChartMeta.chartBottom -
+                          historyChartMeta.chartTop);
 
                     return (
                       <line
@@ -1658,11 +1737,28 @@ export default function ModelPerformancePage() {
                     const prev = baselineHistory[i - 1];
 
                     const x1 =
-                      ((i - 1) / (baselineHistory.length - 1)) * 380 + 10;
-                    const y1 = 180 - toNum(prev.avg_total_hits, 0) * 30;
+                      ((i - 1) / Math.max(baselineHistory.length - 1, 1)) *
+                        (historyChartMeta.chartRight -
+                          historyChartMeta.chartLeft) +
+                      historyChartMeta.chartLeft;
 
-                    const x2 = (i / (baselineHistory.length - 1)) * 380 + 10;
-                    const y2 = 180 - toNum(point.avg_total_hits, 0) * 30;
+                    const y1 =
+                      historyChartMeta.chartBottom -
+                      (toNum(prev.avg_total_hits, 0) / historyChartMeta.yMax) *
+                        (historyChartMeta.chartBottom -
+                          historyChartMeta.chartTop);
+
+                    const x2 =
+                      (i / Math.max(baselineHistory.length - 1, 1)) *
+                        (historyChartMeta.chartRight -
+                          historyChartMeta.chartLeft) +
+                      historyChartMeta.chartLeft;
+
+                    const y2 =
+                      historyChartMeta.chartBottom -
+                      (toNum(point.avg_total_hits, 0) / historyChartMeta.yMax) *
+                        (historyChartMeta.chartBottom -
+                          historyChartMeta.chartTop);
 
                     return (
                       <line
@@ -1740,9 +1836,9 @@ export default function ModelPerformancePage() {
                       <g>
                         <line
                           x1={historyHover.x}
-                          y1={0}
+                          y1={historyChartMeta.chartTop}
                           x2={historyHover.x}
-                          y2={180}
+                          y2={historyChartMeta.chartBottom}
                           stroke="#9ca3af"
                           strokeWidth={1}
                           strokeDasharray="4 4"
