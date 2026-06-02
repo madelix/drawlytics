@@ -26,6 +26,29 @@ function formatNum(n: number, decimals = 2) {
   return n.toFixed(decimals);
 }
 
+function formatShortDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return '—';
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+  });
+}
+
+function formatLongDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return '—';
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 function scoreLabel(
   score: number,
   type: 'consistency' | 'confidence' | 'upside',
@@ -82,6 +105,45 @@ function hashString(str: string) {
   }
   return h >>> 0;
 }
+
+function buildHistoryPath(
+  series: ModelHistoryPoint[],
+  yMax: number,
+  chartLeft: number,
+  chartRight: number,
+  chartTop: number,
+  chartBottom: number,
+) {
+  if (series.length === 0) return '';
+
+  const points = series.map((point, index) => {
+    const x =
+      (index / Math.max(series.length - 1, 1)) * (chartRight - chartLeft) +
+      chartLeft;
+
+    const hits = toNum(point.avg_total_hits, 0);
+
+    const y = chartBottom - (hits / yMax) * (chartBottom - chartTop);
+
+    return { x, y };
+  });
+
+  if (points.length === 1) {
+    return `M ${points[0].x} ${points[0].y}`;
+  }
+
+  return points
+    .map((point, index) => {
+      if (index === 0) return `M ${point.x} ${point.y}`;
+
+      const previous = points[index - 1];
+      const controlX = (previous.x + point.x) / 2;
+
+      return `C ${controlX} ${previous.y}, ${controlX} ${point.y}, ${point.x} ${point.y}`;
+    })
+    .join(' ');
+}
+
 function modelColor(stableKey: string) {
   const h = hashString(stableKey);
   const hue = 220 + (h % 90); // 220..309
@@ -236,6 +298,9 @@ export default function ModelPerformancePage() {
   >({});
   const [historyHover, setHistoryHover] = useState<{
     drawIndex: number;
+    date: string;
+    predictionCount?: number;
+    modelValue: number;
     x: number;
     y: number;
   } | null>(null);
@@ -268,6 +333,7 @@ export default function ModelPerformancePage() {
       const data = await getModelPerformance({
         lottery: selectedLottery,
       });
+
       setRows(data.models || []);
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load model performance');
@@ -275,6 +341,7 @@ export default function ModelPerformancePage() {
       setLoading(false);
     }
   }
+
   async function loadHistory(modelKey: string) {
     setHistoryError(null);
 
@@ -821,6 +888,37 @@ export default function ModelPerformancePage() {
 
     return { label: 'Below baseline', color: '#b91c1c' };
   }, [baselineWinRate]);
+
+  const realityCheck = useMemo(() => {
+    const candidates = chartRows.filter(
+      (model) =>
+        model.model_key !== 'pure_random' && model.baseline_compared >= 10,
+    );
+
+    if (candidates.length === 0) return null;
+
+    const best = [...candidates].sort(
+      (a, b) => b.baseline_win_rate_global - a.baseline_win_rate_global,
+    )[0];
+
+    let verdict = 'Not statistically convincing yet';
+
+    if (best.baseline_compared < 10) {
+      verdict = 'Too early to tell';
+    } else if (
+      best.baseline_win_rate_global >= 0.65 &&
+      best.baseline_compared >= 25
+    ) {
+      verdict = 'Consistently outperforming random';
+    } else if (best.baseline_win_rate_global >= 0.55) {
+      verdict = 'Showing a measurable edge';
+    }
+
+    return {
+      model: best,
+      verdict,
+    };
+  }, [chartRows]);
 
   const historyChartMeta = useMemo(() => {
     const activeSeries = comparisonModelKeys
@@ -1596,6 +1694,9 @@ export default function ModelPerformancePage() {
 
                   setHistoryHover({
                     drawIndex: index + 1,
+                    date: point.draw_date,
+                    predictionCount: point.prediction_count,
+                    modelValue: hits,
                     x: px,
                     y: py,
                   });
@@ -1633,6 +1734,36 @@ export default function ModelPerformancePage() {
                   stroke="#e5e7eb"
                   strokeWidth={1}
                 />
+
+                {history.length > 1 &&
+                  [0, Math.floor(history.length / 2), history.length - 1].map(
+                    (index) => {
+                      const point = history[index];
+
+                      if (!point) return null;
+
+                      const x =
+                        (index / Math.max(history.length - 1, 1)) *
+                          (historyChartMeta.chartRight -
+                            historyChartMeta.chartLeft) +
+                        historyChartMeta.chartLeft;
+
+                      return (
+                        <g key={`date-${index}`}>
+                          <text
+                            x={x}
+                            y={190}
+                            fontSize={10}
+                            fill="#9ca3af"
+                            textAnchor="middle"
+                          >
+                            {formatShortDate(point.draw_date)}
+                          </text>
+                        </g>
+                      );
+                    },
+                  )}
+
                 {history.map((point, i) => {
                   const x =
                     (i / Math.max(history.length - 1, 1)) *
@@ -1658,6 +1789,9 @@ export default function ModelPerformancePage() {
                       onMouseEnter={() =>
                         setHistoryHover({
                           drawIndex: i + 1,
+                          date: point.draw_date,
+                          predictionCount: point.prediction_count,
+                          modelValue: hits,
                           x,
                           y,
                         })
@@ -1682,101 +1816,49 @@ export default function ModelPerformancePage() {
 
                   if (!series || series.length < 2) return null;
 
-                  return series.map((point, i) => {
-                    if (i === 0) return null;
-
-                    const prev = series[i - 1];
-
-                    const x1 =
-                      ((i - 1) / Math.max(series.length - 1, 1)) *
-                        (historyChartMeta.chartRight -
-                          historyChartMeta.chartLeft) +
-                      historyChartMeta.chartLeft;
-
-                    const y1 =
-                      historyChartMeta.chartBottom -
-                      (toNum(prev.avg_total_hits, 0) / historyChartMeta.yMax) *
-                        (historyChartMeta.chartBottom -
-                          historyChartMeta.chartTop);
-
-                    const x2 =
-                      (i / Math.max(series.length - 1, 1)) *
-                        (historyChartMeta.chartRight -
-                          historyChartMeta.chartLeft) +
-                      historyChartMeta.chartLeft;
-
-                    const y2 =
-                      historyChartMeta.chartBottom -
-                      (toNum(point.avg_total_hits, 0) / historyChartMeta.yMax) *
-                        (historyChartMeta.chartBottom -
-                          historyChartMeta.chartTop);
-
-                    return (
-                      <line
-                        key={`${modelKey}-${i}`}
-                        x1={x1}
-                        y1={y1}
-                        x2={x2}
-                        y2={y2}
-                        stroke={color}
-                        strokeWidth={2.5}
-                        strokeLinecap="round"
-                        opacity={
-                          modelKey === selectedModel?.model_key ? 1 : 0.7
-                        }
-                      />
-                    );
-                  });
+                  return (
+                    <path
+                      key={modelKey}
+                      d={buildHistoryPath(
+                        series,
+                        historyChartMeta.yMax,
+                        historyChartMeta.chartLeft,
+                        historyChartMeta.chartRight,
+                        historyChartMeta.chartTop,
+                        historyChartMeta.chartBottom,
+                      )}
+                      fill="none"
+                      stroke={color}
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      opacity={modelKey === selectedModel?.model_key ? 1 : 0.7}
+                    />
+                  );
                 })}
 
                 {selectedModel?.model_key !== 'pure_random' &&
-                  baselineHistory.length > 0 &&
-                  baselineHistory.map((point, i) => {
-                    if (i === 0) return null;
-
-                    const prev = baselineHistory[i - 1];
-
-                    const x1 =
-                      ((i - 1) / Math.max(baselineHistory.length - 1, 1)) *
-                        (historyChartMeta.chartRight -
-                          historyChartMeta.chartLeft) +
-                      historyChartMeta.chartLeft;
-
-                    const y1 =
-                      historyChartMeta.chartBottom -
-                      (toNum(prev.avg_total_hits, 0) / historyChartMeta.yMax) *
-                        (historyChartMeta.chartBottom -
-                          historyChartMeta.chartTop);
-
-                    const x2 =
-                      (i / Math.max(baselineHistory.length - 1, 1)) *
-                        (historyChartMeta.chartRight -
-                          historyChartMeta.chartLeft) +
-                      historyChartMeta.chartLeft;
-
-                    const y2 =
-                      historyChartMeta.chartBottom -
-                      (toNum(point.avg_total_hits, 0) / historyChartMeta.yMax) *
-                        (historyChartMeta.chartBottom -
-                          historyChartMeta.chartTop);
-
-                    return (
-                      <line
-                        key={`baseline-${i}`}
-                        x1={x1}
-                        y1={y1}
-                        x2={x2}
-                        y2={y2}
-                        stroke="#9ca3af"
-                        strokeWidth={2}
-                        strokeDasharray="4 4"
-                        opacity={0.7}
-                      />
-                    );
-                  })}
+                  baselineHistory.length > 1 && (
+                    <path
+                      d={buildHistoryPath(
+                        baselineHistory,
+                        historyChartMeta.yMax,
+                        historyChartMeta.chartLeft,
+                        historyChartMeta.chartRight,
+                        historyChartMeta.chartTop,
+                        historyChartMeta.chartBottom,
+                      )}
+                      fill="none"
+                      stroke="#9ca3af"
+                      strokeWidth={2}
+                      strokeDasharray="4 4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      opacity={0.7}
+                    />
+                  )}
                 {historyHover &&
                   (() => {
-                    const tooltipWidth = 145;
                     const rowHeight = 14;
 
                     const rows = comparisonModelKeys
@@ -1797,12 +1879,14 @@ export default function ModelPerformancePage() {
                           name: model.model_display_name,
                           color: model.color,
                           hits: toNum(point.avg_total_hits, 0),
+                          predictionCount: point.prediction_count ?? 0,
                         };
                       })
                       .filter(Boolean) as {
                       name: string;
                       color: string;
                       hits: number;
+                      predictionCount: number;
                     }[];
 
                     const baselinePoint =
@@ -1816,9 +1900,24 @@ export default function ModelPerformancePage() {
                         name: 'Pure Random',
                         color: '#9ca3af',
                         hits: toNum(baselinePoint.avg_total_hits, 0),
+                        predictionCount: baselinePoint.prediction_count ?? 0,
                       });
                     }
                     rows.sort((a, b) => b.hits - a.hits);
+
+                    const longestTextLength = Math.max(
+                      formatLongDate(historyHover.date).length,
+                      ...rows.map(
+                        (row) =>
+                          `${row.name} • Average hits: ${formatNum(row.hits, 2)} • Predictions: ${row.predictionCount}`
+                            .length,
+                      ),
+                    );
+
+                    const tooltipWidth = Math.max(
+                      220,
+                      Math.min(390, longestTextLength * 6.4 + 28),
+                    );
 
                     const tooltipHeight = 24 + rows.length * rowHeight;
 
@@ -1861,7 +1960,7 @@ export default function ModelPerformancePage() {
                           fill="#fff"
                           fontWeight={800}
                         >
-                          Draw {historyHover.drawIndex}
+                          {formatLongDate(historyHover.date)}
                         </text>
 
                         {rows.map((row, index) => (
@@ -1879,18 +1978,9 @@ export default function ModelPerformancePage() {
                               fill={index === 0 ? '#fff' : '#9ca3af'}
                               fontWeight={index === 0 ? 800 : 500}
                             >
-                              {row.name}
-                            </text>
-
-                            <text
-                              x={tx + tooltipWidth - 8}
-                              y={ty + 31 + index * rowHeight}
-                              fontSize={10}
-                              fill={index === 0 ? '#fff' : '#9ca3af'}
-                              fontWeight={index === 0 ? 800 : 500}
-                              textAnchor="end"
-                            >
-                              {formatNum(row.hits, 2)}
+                              {row.name} • Average hits:{' '}
+                              {formatNum(row.hits, 2)} • Predictions:{' '}
+                              {row.predictionCount}
                             </text>
                           </g>
                         ))}
@@ -1985,6 +2075,75 @@ export default function ModelPerformancePage() {
         (10–24),
         <span style={{ color: '#166534', fontWeight: 600 }}> strong</span> (25+)
       </div>
+
+      {realityCheck && (
+        <div
+          style={{
+            background: '#fff',
+            border: '1px solid #eef2f7',
+            borderRadius: 16,
+            padding: '14px 16px',
+            margin: '16px auto',
+            maxWidth: 980,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#6b7280',
+              marginBottom: 8,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            Reality Check
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 18,
+              alignItems: 'center',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>Best model</div>
+              <div style={{ fontWeight: 800 }}>
+                {realityCheck.model.model_display_name}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>
+                Win rate vs random
+              </div>
+              <div style={{ fontWeight: 800 }}>
+                {formatNum(
+                  realityCheck.model.baseline_win_rate_global * 100,
+                  0,
+                )}
+                %
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>
+                Draws compared
+              </div>
+              <div style={{ fontWeight: 800 }}>
+                {realityCheck.model.baseline_compared}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>Verdict</div>
+              <div style={{ fontWeight: 800 }}>{realityCheck.verdict}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div
         style={{

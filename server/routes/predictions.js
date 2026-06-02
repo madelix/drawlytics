@@ -1270,6 +1270,11 @@ router.post('/predictions/check', async (req, res) => {
 
     const onlyUnchecked = req.body?.onlyUnchecked !== false;
 
+    const lotteryRaw = req.body?.lottery ? String(req.body.lottery) : null;
+    const lotteryFilter = lotteryRaw
+      ? getPredictionLotteryConfig(lotteryRaw).key
+      : null;
+
     const { rows: preds } = await pool.query(
       `
       SELECT
@@ -1283,8 +1288,12 @@ router.post('/predictions/check', async (req, res) => {
         result_label,
         status
       FROM predictions
-      WHERE lower(replace(lottery, ' ', '_')) IN ('euromillions', 'uk_lotto', 'set_for_life')
-        AND (
+WHERE lower(replace(lottery, ' ', '_')) IN ('euromillions', 'uk_lotto', 'set_for_life')
+  AND (
+    $3::text IS NULL
+    OR lower(replace(lottery, ' ', '_')) = $3::text
+  )
+  AND (
           $2::boolean = false
           OR matched_main IS NULL
           OR matched_stars IS NULL
@@ -1297,7 +1306,7 @@ router.post('/predictions/check', async (req, res) => {
       ORDER BY created_at DESC
       LIMIT $1
       `,
-      [limit, onlyUnchecked],
+      [limit, onlyUnchecked, lotteryFilter],
     );
 
     let predictionsToCheck = preds;

@@ -1,5 +1,5 @@
 // client/src/api/performance.ts
-import { apiGetJson } from './apiClient';
+import { apiGetJson, apiSendJson } from './apiClient';
 
 export type ModelPerformanceRow = {
   // ✅ new backend fields
@@ -46,7 +46,8 @@ export async function getModelPerformance(params?: {
 
 export type ModelHistoryPoint = {
   draw_date: string;
-  avg_total_hits: number;
+  avg_total_hits: number | string;
+  prediction_count?: number;
 };
 
 export type ModelHistoryResponse = {
@@ -70,4 +71,24 @@ export async function getModelHistory(params: {
   return apiGetJson<ModelHistoryResponse>(
     `/api/performance/model-history?${qs.toString()}`,
   );
+}
+
+export type CheckPredictionsResponse = {
+  ok: boolean;
+  checked: number;
+  updated: number;
+  skipped: number;
+};
+
+export async function checkPredictionsBeforePerformance(
+  lottery: string,
+): Promise<CheckPredictionsResponse> {
+  return apiSendJson<CheckPredictionsResponse>('/api/predictions/check', {
+    method: 'POST',
+    body: {
+      lottery,
+      limit: 500,
+      onlyUnchecked: true,
+    },
+  });
 }

@@ -265,10 +265,12 @@ WHEN model_name_lc LIKE 'ai:meta_learning%' THEN 'ai_meta_learning'
       SELECT
   draw_date,
   model_key,
-  total_hits::numeric AS avg_total_hits
+  AVG(total_hits)::numeric AS avg_total_hits,
+  COUNT(*)::int AS prediction_count
 FROM normalized
 WHERE model_key = $2
    OR model_key = 'pure_random'
+GROUP BY draw_date, model_key
 ORDER BY draw_date ASC;
       `,
       [lottery, modelKey],
