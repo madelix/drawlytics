@@ -410,11 +410,6 @@ async function fetchLatestUkLottoFromFeed() {
 
   const parsed = parser.parse(xml);
 
-  console.log(
-    'UK Lotto feed parsed preview:',
-    JSON.stringify(parsed, null, 2).slice(0, 2500),
-  );
-
   const game = parsed?.['draw-results']?.game;
   const drawDateRaw = game?.draw?.['draw-date'];
   const balls = game?.balls;
