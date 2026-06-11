@@ -151,7 +151,9 @@ export function AllDrawsPage() {
           <>
             <div className="dl-draws-list">
               {draws.map((d: LotteryDraw) => {
-                const dateLabel = new Date(d.draw_date).toLocaleDateString();
+                const dateLabel = new Date(d.draw_date).toLocaleDateString(
+                  'en-GB',
+                );
 
                 const numbers = [d.n1, d.n2, d.n3, d.n4, d.n5, d.n6].filter(
                   (value): value is number => typeof value === 'number',

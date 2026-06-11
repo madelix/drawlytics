@@ -412,7 +412,13 @@ async function fetchLatestUkLottoFromFeed() {
 
   const game = parsed?.['draw-results']?.game;
   const drawDateRaw = game?.draw?.['draw-date'];
-  const balls = game?.balls;
+  const ballsGroups = Array.isArray(game?.balls)
+    ? game.balls
+    : game?.balls
+      ? [game.balls]
+      : [];
+
+  const balls = ballsGroups[0] ?? null;
 
   const ballNodes = Array.isArray(balls?.ball)
     ? balls.ball
