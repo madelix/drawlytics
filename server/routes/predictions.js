@@ -1,6 +1,7 @@
 // server/routes/predictions.js
 import express from 'express';
 import { pool } from '../db.js';
+import { checkPredictions } from '../services/checkPredictions.js';
 
 const router = express.Router();
 
@@ -1261,6 +1262,15 @@ router.get('/predictions/debug-draws', async (req, res) => {
  */
 router.post('/predictions/check', async (req, res) => {
   try {
+    const result = await checkPredictions({
+      userId: 1,
+      lottery: req.body?.lottery ?? null,
+      limit: req.body?.limit ?? 200,
+      onlyUnchecked: req.body?.onlyUnchecked !== false,
+    });
+
+    return res.json(result);
+
     const debug = String(req.query.debug ?? '') === '1';
 
     const limitRaw = Number(req.body?.limit ?? 200);

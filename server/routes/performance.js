@@ -3,6 +3,7 @@ import express from 'express';
 import { pool } from '../db.js';
 import { MODEL_DISPLAY_NAMES, getModelDisplayName } from '../modelMetadata.js';
 import { normalizeModelKey } from '../modelNormalization.js';
+import { checkPredictions } from '../services/checkPredictions.js';
 
 const router = express.Router();
 
