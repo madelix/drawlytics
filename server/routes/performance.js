@@ -1,8 +1,10 @@
 // server/routes/performance.js
 import express from 'express';
 import { pool } from '../db.js';
-import { MODEL_DISPLAY_NAMES, getModelDisplayName } from '../modelMetadata.js';
-import { normalizeModelKey } from '../modelNormalization.js';
+import {
+  normalizeModelKey,
+  getModelDisplayName,
+} from '../modelNormalization.js';
 import { checkPredictions } from '../services/checkPredictions.js';
 
 const router = express.Router();
@@ -287,6 +289,129 @@ ORDER BY draw_date ASC;
   } catch (err) {
     console.error('GET /performance/model-history failed:', err);
     res.status(500).json({ ok: false, error: 'model_history_failed' });
+  }
+});
+
+router.get('/performance/honesty-summary', async (req, res) => {
+  try {
+    const lottery = String(req.query.lottery || 'euromillions');
+
+    const { rows } = await pool.query(
+      `
+            WITH raw_predictions AS (
+        SELECT
+          CASE
+            WHEN source = 'strategy_mix' THEN 'strategy_mix'
+            WHEN LOWER(model_name) LIKE 'make_magic:cold_focused%' THEN 'cold_focused'
+            WHEN LOWER(model_name) LIKE 'make_magic:hot_focused%' THEN 'hot_focused'
+            WHEN LOWER(model_name) LIKE 'make_magic:balanced_hot_cold%' THEN 'balanced_hot_cold'
+            WHEN LOWER(model_name) LIKE 'make_magic:pure_random%' THEN 'pure_random'
+            WHEN LOWER(model_name) LIKE 'make_magic:overdue%' THEN 'overdue'
+            ELSE LOWER(
+  REPLACE(
+    REPLACE(
+      REPLACE(
+        REPLACE(model_name, 'make_magic:', ''),
+        'ai:',
+        'ai_'
+      ),
+      ' generator',
+      ''
+    ),
+    '-focused',
+    ''
+  )
+)
+          END AS model_key,
+          status,
+          matched_main,
+          matched_stars
+        FROM predictions
+        WHERE LOWER(lottery) = LOWER($1)
+      ),
+      model_stats AS (
+        SELECT
+          model_key,
+          COUNT(*) FILTER (WHERE LOWER(TRIM(status)) = 'checked')::int AS checked_predictions,
+          AVG(
+            CASE
+              WHEN LOWER(TRIM(status)) = 'checked'
+              THEN COALESCE(matched_main, 0) + COALESCE(matched_stars, 0)
+              ELSE NULL
+            END
+          )::numeric AS avg_total_hits
+        FROM raw_predictions
+        GROUP BY model_key
+      )
+      SELECT
+        COUNT(*) FILTER (WHERE checked_predictions > 0)::int AS models_analysed,
+        COALESCE(SUM(checked_predictions), 0)::int AS checked_predictions,
+        (
+          SELECT model_key
+          FROM model_stats
+          WHERE checked_predictions > 0
+          ORDER BY avg_total_hits DESC NULLS LAST
+          LIMIT 1
+        ) AS current_leader,
+        (
+          SELECT avg_total_hits
+          FROM model_stats
+          WHERE checked_predictions > 0
+          ORDER BY avg_total_hits DESC NULLS LAST
+          LIMIT 1
+        ) AS leader_avg_total_hits
+      FROM model_stats;
+      `,
+      [lottery],
+    );
+
+    const summaryRow = rows[0] ?? {};
+
+    const checkedPredictions = Number(summaryRow.checked_predictions ?? 0);
+    const modelsAnalysed = Number(summaryRow.models_analysed ?? 0);
+
+    const currentLeaderKey = summaryRow.current_leader ?? null;
+
+    const currentLeaderDisplayName = currentLeaderKey
+      ? getModelDisplayName(currentLeaderKey)
+      : null;
+
+    let evidenceLevel = 'Low';
+
+    if (checkedPredictions >= 250 && modelsAnalysed >= 5) {
+      evidenceLevel = 'High';
+    } else if (checkedPredictions >= 100 && modelsAnalysed >= 3) {
+      evidenceLevel = 'Moderate';
+    } else if (checkedPredictions >= 25) {
+      evidenceLevel = 'Building';
+    }
+
+    const headline =
+      currentLeaderDisplayName === null
+        ? 'There is not enough checked prediction history to assess model honesty yet.'
+        : currentLeaderKey === 'pure_random'
+          ? 'Current evidence shows Pure Random is leading, so no Drawlytics model has yet demonstrated a consistent advantage.'
+          : `Current evidence shows ${currentLeaderDisplayName} is leading, but this does not yet prove a statistically significant advantage over random.`;
+
+    res.json({
+      ok: true,
+      lottery,
+      summary: {
+        headline,
+        current_leader: currentLeaderDisplayName,
+        current_leader_key: currentLeaderKey,
+        evidence_level: evidenceLevel,
+        checked_predictions: checkedPredictions,
+        models_analysed: 18,
+        leader_avg_total_hits:
+          summaryRow.leader_avg_total_hits === null
+            ? null
+            : Number(summaryRow.leader_avg_total_hits),
+      },
+    });
+  } catch (err) {
+    console.error('GET /performance/honesty-summary failed:', err);
+    res.status(500).json({ ok: false, error: 'honesty_summary_failed' });
   }
 });
 

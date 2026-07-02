@@ -30,3 +30,36 @@ export function normalizeModelKey(rawModelName, source = null) {
     .replace(/\s+/g, '_')
     .trim();
 }
+
+export function getModelDisplayName(modelKey) {
+  const key = String(modelKey ?? '').trim();
+
+  const names = {
+    strategy_mix: 'Strategy Mix',
+    cold_focused: 'Cold Focused',
+    hot_focused: 'Hot Focused',
+    balanced_hot_cold: 'Balanced Hot/Cold',
+    pure_random: 'Pure Random',
+    overdue: 'Overdue',
+    ai_ensemble: 'AI Ensemble',
+    ai_statistical_analysis: 'AI Statistical Analysis',
+    ai_random_forest: 'AI Random Forest',
+    ai_decision_tree: 'AI Decision Tree',
+    ai_gradient_boosting: 'AI Gradient Boosting',
+    ai_xgboost: 'AI XGBoost',
+    ai_q_learning: 'AI Q-Learning',
+    ai_advanced_analysis: 'AI Advanced Analysis',
+    ai_markov_chain: 'AI Markov Chain',
+    ai_meta_learning: 'AI Meta Learning',
+    ai_lstm: 'AI LSTM',
+    ai_bayesian: 'AI Bayesian',
+  };
+
+  return (
+    names[key] ??
+    key
+      .replace(/^make_magic_/, '')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase())
+  );
+}

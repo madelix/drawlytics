@@ -9,6 +9,7 @@ import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
 import MyPredictionsPage from './pages/MyPredictionsPage';
 import { MakeMagicPage } from './pages/MakeMagicPage';
 import ModelPerformancePage from './pages/ModelPerformancePage';
+import HonestyDashboardPage from './pages/HonestyDashboardPage';
 
 // --- Lazy-loaded pages ---
 const AnalysisPage = lazy(() =>
@@ -112,6 +113,15 @@ function AppHeader() {
           </NavLink>
 
           <NavLink
+            to="/honesty"
+            className={({ isActive }) =>
+              `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
+            }
+          >
+            Model Honesty
+          </NavLink>
+
+          <NavLink
             to="/predictions"
             className={({ isActive }) =>
               `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
@@ -190,6 +200,17 @@ function AppHeader() {
           </NavLink>
 
           <NavLink
+            to="/honesty"
+            className={({ isActive }) =>
+              `dl-nav-link dl-nav-link--mobile ${
+                isActive ? 'dl-nav-link--active' : ''
+              }`
+            }
+          >
+            Model Honesty
+          </NavLink>
+
+          <NavLink
             to="/predictions"
             className={({ isActive }) =>
               `dl-nav-link dl-nav-link--mobile ${
@@ -231,6 +252,7 @@ export default function App() {
           <Route path="/draws" element={<AllDrawsPage />} />
           <Route path="/make-magic" element={<MakeMagicPage />} />
           <Route path="/performance" element={<ModelPerformancePage />} />
+          <Route path="/honesty" element={<HonestyDashboardPage />} />
           <Route path="/predictions" element={<MyPredictionsPage />} />
         </Routes>
       </Suspense>
