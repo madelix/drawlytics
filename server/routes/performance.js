@@ -415,4 +415,96 @@ router.get('/performance/honesty-summary', async (req, res) => {
   }
 });
 
+router.get('/performance/random-comparison', async (req, res) => {
+  try {
+    const lottery = String(req.query.lottery || 'euromillions');
+
+    const { rows } = await pool.query(
+      `
+  SELECT
+  model_name,
+  source,
+  COALESCE(matched_main, 0) + COALESCE(matched_stars, 0) AS total_hits
+FROM predictions
+WHERE LOWER(lottery) = LOWER($1)
+  AND LOWER(TRIM(status)) = 'checked';
+  `,
+      [lottery],
+    );
+
+    const normalizedRows = rows.map((row) => ({
+      model_key: normalizeModelKey(row.model_name),
+      total_hits: row.total_hits,
+    }));
+
+    const totalsByModel = new Map();
+
+    for (const row of normalizedRows) {
+      const current = totalsByModel.get(row.model_key) ?? {
+        totalHits: 0,
+        predictionCount: 0,
+      };
+
+      current.totalHits += Number(row.total_hits);
+      current.predictionCount += 1;
+
+      totalsByModel.set(row.model_key, current);
+    }
+
+    const modelStats = [...totalsByModel.entries()].map(
+      ([model_key, stats]) => ({
+        model_key,
+        avg_total_hits: stats.totalHits / stats.predictionCount,
+        checked_predictions: stats.predictionCount,
+      }),
+    );
+
+    const strongestModel = modelStats
+      .filter((model) => model.model_key !== 'pure_random')
+      .reduce(
+        (best, model) =>
+          !best || model.avg_total_hits > best.avg_total_hits ? model : best,
+        null,
+      );
+
+    const pureRandom = modelStats.find(
+      (model) => model.model_key === 'pure_random',
+    );
+
+    const difference =
+      strongestModel && pureRandom
+        ? strongestModel.avg_total_hits - pureRandom.avg_total_hits
+        : null;
+
+    const percentageDifference =
+      strongestModel && pureRandom && pureRandom.avg_total_hits > 0
+        ? (difference / pureRandom.avg_total_hits) * 100
+        : null;
+
+    res.json({
+      ok: true,
+      lottery,
+      comparison:
+        strongestModel && pureRandom
+          ? {
+              strongest_model_key: strongestModel.model_key,
+              strongest_model_name: getModelDisplayName(
+                strongestModel.model_key,
+              ),
+              strongest_model_avg_hits: strongestModel.avg_total_hits,
+              pure_random_avg_hits: pureRandom.avg_total_hits,
+              difference,
+              percentage_difference: percentageDifference,
+            }
+          : null,
+    });
+  } catch (err) {
+    console.error('GET /performance/random-comparison failed:', err);
+    res.status(500).json({
+      ok: false,
+      error: 'random_comparison_failed',
+    });
+  }
+});
+
 export default router;
