@@ -424,10 +424,6 @@ export default function HonestyDashboardPage() {
         <div style={{ fontWeight: 900, marginBottom: 6 }}>
           How honesty is measured
         </div>
-        <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
-          Coming soon: a transparent explanation of baseline comparison, sample
-          size, variance, trend and trust scoring.
-        </div>
       </section>
     </div>
   );
