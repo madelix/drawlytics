@@ -1,0 +1,122 @@
+import { pool } from '../db.js';
+import { normalizeModelKey } from '../modelNormalization.js';
+
+export async function buildLeaderboardHistory(lottery) {
+  const { rows } = await pool.query(
+    `
+    SELECT
+      draw_date,
+      model_name,
+      matched_main,
+      matched_stars
+    FROM predictions
+    WHERE LOWER(lottery) = LOWER($1)
+      AND LOWER(TRIM(status)) = 'checked'
+    ORDER BY draw_date ASC;
+    `,
+    [lottery],
+  );
+
+  const predictionsByDraw = new Map();
+
+  for (const row of rows) {
+    const drawDate = new Date(row.draw_date).toISOString().slice(0, 10);
+    const modelKey = normalizeModelKey(row.model_name);
+    const totalHits =
+      Number(row.matched_main ?? 0) + Number(row.matched_stars ?? 0);
+
+    const drawPredictions = predictionsByDraw.get(drawDate) ?? [];
+
+    drawPredictions.push({
+      model_key: modelKey,
+      total_hits: totalHits,
+    });
+
+    predictionsByDraw.set(drawDate, drawPredictions);
+  }
+
+  const cumulativeStats = new Map();
+  const history = [];
+
+  for (const [drawDate, drawPredictions] of predictionsByDraw.entries()) {
+    for (const prediction of drawPredictions) {
+      const current = cumulativeStats.get(prediction.model_key) ?? {
+        totalHits: 0,
+        predictionCount: 0,
+      };
+
+      current.totalHits += prediction.total_hits;
+      current.predictionCount += 1;
+
+      cumulativeStats.set(prediction.model_key, current);
+    }
+
+    const rankedModels = [...cumulativeStats.entries()]
+      .map(([modelKey, stats]) => ({
+        model_key: modelKey,
+        avg_total_hits: stats.totalHits / stats.predictionCount,
+        checked_predictions: stats.predictionCount,
+      }))
+      .sort(
+        (a, b) =>
+          b.avg_total_hits - a.avg_total_hits ||
+          b.checked_predictions - a.checked_predictions ||
+          a.model_key.localeCompare(b.model_key),
+      );
+
+    const leader = rankedModels[0];
+
+    if (leader) {
+      history.push({
+        draw_date: drawDate,
+        leader_model_key: leader.model_key,
+        leader_avg_total_hits: leader.avg_total_hits,
+        leader_checked_predictions: leader.checked_predictions,
+      });
+    }
+  }
+
+  return history;
+}
+
+export function analyseLeaderStability(history) {
+  if (!history.length) {
+    return {
+      current_leader_key: null,
+      consecutive_draws: 0,
+      leader_changes_last_20: 0,
+      evaluated_draws: 0,
+    };
+  }
+
+  const currentLeaderKey = history[history.length - 1].leader_model_key;
+
+  let consecutiveDraws = 0;
+
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    if (history[index].leader_model_key !== currentLeaderKey) {
+      break;
+    }
+
+    consecutiveDraws += 1;
+  }
+
+  const recentHistory = history.slice(-20);
+  let leaderChangesLast20 = 0;
+
+  for (let index = 1; index < recentHistory.length; index += 1) {
+    if (
+      recentHistory[index].leader_model_key !==
+      recentHistory[index - 1].leader_model_key
+    ) {
+      leaderChangesLast20 += 1;
+    }
+  }
+
+  return {
+    current_leader_key: currentLeaderKey,
+    consecutive_draws: consecutiveDraws,
+    leader_changes_last_20: leaderChangesLast20,
+    evaluated_draws: history.length,
+  };
+}

@@ -6,8 +6,21 @@ import {
   getModelDisplayName,
 } from '../modelNormalization.js';
 import { checkPredictions } from '../services/checkPredictions.js';
+import {
+  analyseLeaderStability,
+  buildLeaderboardHistory,
+} from '../services/leaderboardHistory.js';
 
 const router = express.Router();
+
+const FINDING_PRIORITIES = {
+  SAMPLE_SIZE: 100,
+  STATISTICAL_SIGNIFICANCE: 95,
+  BASELINE_COMPETITIVENESS: 90,
+  LEADER_STABILITY: 85,
+  MODEL_CLUSTER: 70,
+  MILESTONE: 40,
+};
 
 /**
  * GET /api/performance/models?lottery=euromillions
@@ -295,77 +308,88 @@ ORDER BY draw_date ASC;
 router.get('/performance/honesty-summary', async (req, res) => {
   try {
     const lottery = String(req.query.lottery || 'euromillions');
+    const leaderboardHistory = await buildLeaderboardHistory(lottery);
+    const leaderStability = analyseLeaderStability(leaderboardHistory);
 
     const { rows } = await pool.query(
       `
-            WITH raw_predictions AS (
-        SELECT
-          CASE
-            WHEN source = 'strategy_mix' THEN 'strategy_mix'
-            WHEN LOWER(model_name) LIKE 'make_magic:cold_focused%' THEN 'cold_focused'
-            WHEN LOWER(model_name) LIKE 'make_magic:hot_focused%' THEN 'hot_focused'
-            WHEN LOWER(model_name) LIKE 'make_magic:balanced_hot_cold%' THEN 'balanced_hot_cold'
-            WHEN LOWER(model_name) LIKE 'make_magic:pure_random%' THEN 'pure_random'
-            WHEN LOWER(model_name) LIKE 'make_magic:overdue%' THEN 'overdue'
-            ELSE LOWER(
-  REPLACE(
-    REPLACE(
-      REPLACE(
-        REPLACE(model_name, 'make_magic:', ''),
-        'ai:',
-        'ai_'
-      ),
-      ' generator',
-      ''
-    ),
-    '-focused',
-    ''
-  )
-)
-          END AS model_key,
-          status,
-          matched_main,
-          matched_stars
-        FROM predictions
-        WHERE LOWER(lottery) = LOWER($1)
-      ),
-      model_stats AS (
-        SELECT
-          model_key,
-          COUNT(*) FILTER (WHERE LOWER(TRIM(status)) = 'checked')::int AS checked_predictions,
-          AVG(
-            CASE
-              WHEN LOWER(TRIM(status)) = 'checked'
-              THEN COALESCE(matched_main, 0) + COALESCE(matched_stars, 0)
-              ELSE NULL
-            END
-          )::numeric AS avg_total_hits
-        FROM raw_predictions
-        GROUP BY model_key
-      )
-      SELECT
-        COUNT(*) FILTER (WHERE checked_predictions > 0)::int AS models_analysed,
-        COALESCE(SUM(checked_predictions), 0)::int AS checked_predictions,
-        (
-          SELECT model_key
-          FROM model_stats
-          WHERE checked_predictions > 0
-          ORDER BY avg_total_hits DESC NULLS LAST
-          LIMIT 1
-        ) AS current_leader,
-        (
-          SELECT avg_total_hits
-          FROM model_stats
-          WHERE checked_predictions > 0
-          ORDER BY avg_total_hits DESC NULLS LAST
-          LIMIT 1
-        ) AS leader_avg_total_hits
-      FROM model_stats;
+            SELECT
+  model_name,
+  source,
+  status,
+  matched_main,
+  matched_stars
+FROM predictions
+WHERE LOWER(lottery) = LOWER($1);
       `,
       [lottery],
     );
 
-    const summaryRow = rows[0] ?? {};
+    const checkedRows = rows
+      .filter((row) => String(row.status).trim().toLowerCase() === 'checked')
+      .map((row) => ({
+        model_key: normalizeModelKey(row.model_name),
+        total_hits:
+          Number(row.matched_main ?? 0) + Number(row.matched_stars ?? 0),
+      }));
+
+    const totalsByModel = new Map();
+
+    for (const row of checkedRows) {
+      const current = totalsByModel.get(row.model_key) ?? {
+        totalHits: 0,
+        predictionCount: 0,
+      };
+
+      current.totalHits += row.total_hits;
+      current.predictionCount += 1;
+
+      totalsByModel.set(row.model_key, current);
+    }
+
+    const modelStats = [...totalsByModel.entries()].map(
+      ([model_key, stats]) => ({
+        model_key,
+        avg_total_hits: stats.totalHits / stats.predictionCount,
+        checked_predictions: stats.predictionCount,
+      }),
+    );
+
+    const rankedModels = [...modelStats].sort(
+      (a, b) => b.avg_total_hits - a.avg_total_hits,
+    );
+
+    const pureRandomRank =
+      rankedModels.findIndex((model) => model.model_key === 'pure_random') + 1;
+
+    const topThreeModels = rankedModels
+      .filter((model) => model.model_key !== 'pure_random')
+      .slice(0, 3);
+
+    const pureRandom = modelStats.find(
+      (model) => model.model_key === 'pure_random',
+    );
+
+    const currentLeader = modelStats.reduce(
+      (best, model) =>
+        !best || model.avg_total_hits > best.avg_total_hits ? model : best,
+      null,
+    );
+
+    const strongestNonRandom = modelStats
+      .filter((model) => model.model_key !== 'pure_random')
+      .reduce(
+        (best, model) =>
+          !best || model.avg_total_hits > best.avg_total_hits ? model : best,
+        null,
+      );
+
+    const summaryRow = {
+      checked_predictions: checkedRows.length,
+      models_analysed: modelStats.length,
+      current_leader: currentLeader?.model_key ?? null,
+      leader_avg_total_hits: currentLeader?.avg_total_hits ?? null,
+    };
 
     const checkedPredictions = Number(summaryRow.checked_predictions ?? 0);
     const modelsAnalysed = Number(summaryRow.models_analysed ?? 0);
@@ -393,6 +417,94 @@ router.get('/performance/honesty-summary', async (req, res) => {
           ? 'Current evidence shows Pure Random is leading, so no Drawlytics model has yet demonstrated a consistent advantage.'
           : `Current evidence shows ${currentLeaderDisplayName} is leading, but this does not yet prove a statistically significant advantage over random.`;
 
+    const findings = [];
+
+    if (strongestNonRandom) {
+      const leaderSampleSize = strongestNonRandom.checked_predictions;
+
+      findings.push({
+        id: 'leader-sample-size',
+        type: leaderSampleSize < 25 ? 'warning' : 'info',
+        category: 'Sample size',
+        priority: FINDING_PRIORITIES.SAMPLE_SIZE,
+        title:
+          leaderSampleSize < 25
+            ? `${getModelDisplayName(strongestNonRandom.model_key)} currently leads, but its result is based on only ${leaderSampleSize} checked predictions.`
+            : `${getModelDisplayName(strongestNonRandom.model_key)} is supported by ${leaderSampleSize} checked predictions.`,
+      });
+    }
+
+    if (strongestNonRandom && pureRandom) {
+      const difference =
+        strongestNonRandom.avg_total_hits - pureRandom.avg_total_hits;
+
+      const percentageDifference =
+        pureRandom.avg_total_hits > 0
+          ? (difference / pureRandom.avg_total_hits) * 100
+          : null;
+
+      findings.push({
+        id: 'performance-gap',
+        type: Math.abs(percentageDifference ?? 0) < 10 ? 'warning' : 'info',
+        category: 'Performance gap',
+        priority: FINDING_PRIORITIES.STATISTICAL_SIGNIFICANCE,
+        title:
+          percentageDifference === null
+            ? `${getModelDisplayName(strongestNonRandom.model_key)} cannot yet be compared reliably with Pure Random.`
+            : Math.abs(percentageDifference) < 10
+              ? 'The observed performance gap remains small and may change as more predictions are checked.'
+              : 'The current performance gap is notable, but it is still based on a limited model-specific sample.',
+      });
+    }
+
+    if (pureRandomRank > 0) {
+      const modelsBelowRandom = modelStats.length - pureRandomRank;
+      const modelsAboveRandom = pureRandomRank - 1;
+
+      findings.push({
+        id: 'pure-random-competitiveness',
+        type: pureRandomRank <= 3 ? 'warning' : 'info',
+        category: 'Random baseline',
+        priority: FINDING_PRIORITIES.BASELINE_COMPETITIVENESS,
+        title:
+          pureRandomRank <= 3
+            ? `Only ${modelsAboveRandom} of the ${modelStats.length} evaluated model${modelStats.length === 1 ? '' : 's'} currently outperform Pure Random.`
+            : `Pure Random currently outperforms ${modelsBelowRandom} of the ${modelStats.length} evaluated models.`,
+      });
+    }
+
+    if (topThreeModels.length === 3) {
+      const topRange =
+        topThreeModels[0].avg_total_hits - topThreeModels[2].avg_total_hits;
+
+      if (topRange <= 0.1) {
+        findings.push({
+          id: 'top-model-cluster',
+          type: 'info',
+          category: 'Model cluster',
+          priority: FINDING_PRIORITIES.MODEL_CLUSTER,
+          title: `The top three models are separated by only ${topRange.toFixed(2)} average hits, so the current ranking remains tightly clustered.`,
+        });
+      }
+    }
+
+    if (leaderStability.evaluated_draws > 1) {
+      findings.push({
+        id: 'leader-stability',
+        type: leaderStability.leader_changes_last_20 >= 5 ? 'warning' : 'info',
+        category: 'Leader stability',
+        priority: FINDING_PRIORITIES.LEADER_STABILITY,
+        title:
+          leaderStability.leader_changes_last_20 >= 5
+            ? `The leading model has changed ${leaderStability.leader_changes_last_20} times during the latest 20 evaluated draws, indicating that rankings remain volatile.`
+            : `${getModelDisplayName(leaderStability.current_leader_key)} has remained the leading model for ${leaderStability.consecutive_draws} consecutive evaluated draw${leaderStability.consecutive_draws === 1 ? '' : 's'}.`,
+      });
+    }
+
+    const selectedFindings = findings
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, 4);
+
     res.json({
       ok: true,
       lottery,
@@ -402,11 +514,12 @@ router.get('/performance/honesty-summary', async (req, res) => {
         current_leader_key: currentLeaderKey,
         evidence_level: evidenceLevel,
         checked_predictions: checkedPredictions,
-        models_analysed: 18,
+        models_analysed: modelStats.length,
         leader_avg_total_hits:
           summaryRow.leader_avg_total_hits === null
             ? null
             : Number(summaryRow.leader_avg_total_hits),
+        findings: selectedFindings,
       },
     });
   } catch (err) {
@@ -503,6 +616,27 @@ WHERE LOWER(lottery) = LOWER($1)
     res.status(500).json({
       ok: false,
       error: 'random_comparison_failed',
+    });
+  }
+});
+
+router.get('/performance/leaderboard-history', async (req, res) => {
+  try {
+    const lottery = String(req.query.lottery || 'euromillions');
+    const history = await buildLeaderboardHistory(lottery);
+    const stability = analyseLeaderStability(history);
+
+    res.json({
+      ok: true,
+      lottery,
+      history,
+      stability,
+    });
+  } catch (err) {
+    console.error('GET /performance/leaderboard-history failed:', err);
+    res.status(500).json({
+      ok: false,
+      error: 'leaderboard_history_failed',
     });
   }
 });

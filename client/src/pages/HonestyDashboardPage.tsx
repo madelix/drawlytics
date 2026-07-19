@@ -1,10 +1,27 @@
 import { useEffect, useState } from 'react';
-import { getHonestySummary, type HonestySummary } from '../api/honesty';
+import {
+  BarChart3,
+  Database,
+  Scale,
+  ShieldCheck,
+  Users,
+  CircleAlert,
+  CircleCheck,
+  Info,
+} from 'lucide-react';
+import {
+  getHonestySummary,
+  getRandomComparison,
+  type HonestySummary,
+  type RandomComparison,
+} from '../api/honesty';
 import { type LotteryKey } from '../config/lotteries';
 import { LotterySelector } from '../components/LotterySelector';
 
 export default function HonestyDashboardPage() {
   const [summary, setSummary] = useState<HonestySummary | null>(null);
+  const [randomComparison, setRandomComparison] =
+    useState<RandomComparison | null>(null);
   const [selectedLottery, setSelectedLottery] =
     useState<LotteryKey>('euromillions');
   const [loading, setLoading] = useState(false);
@@ -16,11 +33,17 @@ export default function HonestyDashboardPage() {
       setError(null);
 
       try {
-        const response = await getHonestySummary({
-          lottery: selectedLottery,
-        });
+        const [summaryResponse, comparisonResponse] = await Promise.all([
+          getHonestySummary({
+            lottery: selectedLottery,
+          }),
+          getRandomComparison({
+            lottery: selectedLottery,
+          }),
+        ]);
 
-        setSummary(response.summary);
+        setSummary(summaryResponse.summary);
+        setRandomComparison(comparisonResponse.comparison);
       } catch (e: any) {
         setError(e?.message ?? 'Failed to load honesty summary');
       } finally {
@@ -258,7 +281,20 @@ export default function HonestyDashboardPage() {
               minHeight: 132,
             }}
           >
-            <div style={{ fontSize: 20, marginBottom: 12 }}>🛡️</div>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                background: '#f4efff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
+              }}
+            >
+              <ShieldCheck size={20} strokeWidth={2} color="#804198" />
+            </div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>Trust score</div>
             <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>—</div>
             <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
@@ -275,7 +311,20 @@ export default function HonestyDashboardPage() {
               minHeight: 132,
             }}
           >
-            <div style={{ fontSize: 20, marginBottom: 12 }}>📊</div>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                background: '#f4efff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
+              }}
+            >
+              <BarChart3 size={20} strokeWidth={2} color="#804198" />
+            </div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>Evidence level</div>
             <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>
               {summary?.evidence_level ?? '—'}
@@ -294,7 +343,20 @@ export default function HonestyDashboardPage() {
               minHeight: 132,
             }}
           >
-            <div style={{ fontSize: 20, marginBottom: 12 }}>🗄️</div>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                background: '#f4efff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
+              }}
+            >
+              <Database size={20} strokeWidth={2} color="#804198" />
+            </div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>
               Checked predictions
             </div>
@@ -315,7 +377,20 @@ export default function HonestyDashboardPage() {
               minHeight: 132,
             }}
           >
-            <div style={{ fontSize: 20, marginBottom: 12 }}>👥</div>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                background: '#f4efff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
+              }}
+            >
+              <Users size={20} strokeWidth={2} color="#804198" />
+            </div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>
               Models analysed
             </div>
@@ -342,27 +417,26 @@ export default function HonestyDashboardPage() {
         <div
           style={{
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             gap: 12,
-            marginBottom: 6,
           }}
         >
           <div
             style={{
-              width: 42,
-              height: 42,
+              width: 40,
+              height: 40,
               borderRadius: '50%',
               background: '#f4efff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 20,
+              flexShrink: 0,
             }}
           >
-            ⚖️
+            <Scale size={20} strokeWidth={2} color="#804198" />
           </div>
 
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 900 }}>Performance vs Pure Random</div>
 
             <div
@@ -374,23 +448,160 @@ export default function HonestyDashboardPage() {
             >
               See whether the current strongest model is genuinely outperforming
               the Pure Random baseline.
+            </div>
+
+            <div
+              style={{
+                marginTop: 18,
+                borderTop: '1px solid #eef2f7',
+                paddingTop: 18,
+              }}
+            >
               <div
                 style={{
-                  marginTop: 18,
-                  borderTop: '1px solid #eef2f7',
-                  paddingTop: 18,
-                  textAlign: 'center',
-                  color: '#6b7280',
-                  fontSize: 14,
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                  gap: 14,
                 }}
               >
-                Comparison chart will appear here.
+                <div
+                  style={{
+                    border: '1px solid #eef2f7',
+                    borderRadius: 14,
+                    padding: 20,
+                    background: '#fff',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      fontWeight: 700,
+                      color: '#6b7280',
+                    }}
+                  >
+                    Current strongest model
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 900,
+                      color: '#111827',
+                      lineHeight: 1.2,
+                      marginTop: 4,
+                    }}
+                  >
+                    {randomComparison?.strongest_model_name ?? '—'}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: '#6b7280',
+                      marginTop: 8,
+                    }}
+                  >
+                    {randomComparison
+                      ? `${randomComparison.strongest_model_avg_hits.toFixed(2)} average hits`
+                      : '—'}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    border: '1px solid #eef2f7',
+                    borderRadius: 14,
+                    padding: 20,
+                    background: '#fff',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      fontWeight: 700,
+                      color: '#6b7280',
+                    }}
+                  >
+                    Pure Random baseline
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 28,
+                      fontWeight: 900,
+                      color: '#111827',
+                      lineHeight: 1.1,
+                      marginTop: 4,
+                    }}
+                  >
+                    {randomComparison
+                      ? randomComparison.pure_random_avg_hits.toFixed(2)
+                      : '—'}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: '#6b7280',
+                      marginTop: 8,
+                    }}
+                  >
+                    Average hits per prediction
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    border: '1px solid #dcfce7',
+                    borderRadius: 14,
+                    padding: 20,
+                    background: '#f0fdf4',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      fontWeight: 700,
+                      color: '#166534',
+                    }}
+                  >
+                    Observed advantage
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 28,
+                      fontWeight: 900,
+                      color: '#16a34a',
+                      lineHeight: 1.1,
+                      marginTop: 4,
+                    }}
+                  >
+                    {randomComparison?.percentage_difference !== null &&
+                    randomComparison?.percentage_difference !== undefined
+                      ? `${randomComparison.percentage_difference >= 0 ? '+' : ''}${randomComparison.percentage_difference.toFixed(1)}%`
+                      : '—'}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: '#166534',
+                      marginTop: 8,
+                    }}
+                  >
+                    Compared with Pure Random
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <div style={{ fontSize: 13, color: '#6b7280' }}>
-          Coming soon: models ranked by evidence quality, not just average hits.
         </div>
       </section>
 
@@ -399,15 +610,119 @@ export default function HonestyDashboardPage() {
           background: '#fff',
           border: '1px solid #eef2f7',
           borderRadius: 16,
-          padding: '14px 16px',
+          padding: '18px 20px',
           margin: '0 auto 14px',
           maxWidth: 980,
         }}
       >
-        <div style={{ fontWeight: 900, marginBottom: 6 }}>Current findings</div>
-        <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
-          Coming soon: key observations about random, AI models, consistency,
-          trend and sample reliability.
+        <div
+          style={{
+            fontWeight: 900,
+            marginBottom: 6,
+          }}
+        >
+          Current Findings
+        </div>
+
+        <div
+          style={{
+            fontSize: 13,
+            color: '#6b7280',
+            marginBottom: 18,
+          }}
+        >
+          Evidence-based observations generated from the current prediction
+          history.
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
+          {(summary?.findings ?? []).map((finding, index) => (
+            <div
+              key={index}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 12,
+                padding: '14px 16px',
+                borderRadius: 12,
+                border:
+                  finding.type === 'positive'
+                    ? '1px solid #bbf7d0'
+                    : finding.type === 'warning'
+                      ? '1px solid #fde68a'
+                      : '1px solid #e5e7eb',
+                background:
+                  finding.type === 'positive'
+                    ? '#f0fdf4'
+                    : finding.type === 'warning'
+                      ? '#fffbeb'
+                      : '#f9fafb',
+              }}
+            >
+              <div
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  background:
+                    finding.type === 'positive'
+                      ? '#dcfce7'
+                      : finding.type === 'warning'
+                        ? '#fef3c7'
+                        : '#f4efff',
+                  color:
+                    finding.type === 'positive'
+                      ? '#16a34a'
+                      : finding.type === 'warning'
+                        ? '#b45309'
+                        : '#804198',
+                }}
+              >
+                {finding.type === 'positive' ? (
+                  <CircleCheck size={18} strokeWidth={2} />
+                ) : finding.type === 'warning' ? (
+                  <CircleAlert size={18} strokeWidth={2} />
+                ) : (
+                  <Info size={18} strokeWidth={2} />
+                )}
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#6b7280',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    marginBottom: 4,
+                  }}
+                >
+                  {finding.category}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 14,
+                    color: '#374151',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {finding.title}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -423,6 +738,10 @@ export default function HonestyDashboardPage() {
       >
         <div style={{ fontWeight: 900, marginBottom: 6 }}>
           How honesty is measured
+        </div>
+        <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
+          Coming soon: a transparent explanation of baseline comparison, sample
+          size, variance, trend and trust scoring.
         </div>
       </section>
     </div>

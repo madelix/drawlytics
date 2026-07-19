@@ -253,7 +253,9 @@ router.post('/predictions/generate', async (req, res) => {
       });
     }
 
-    const lotteryConfig = getPredictionLotteryConfig(lotteryRaw);
+    const canonicalLottery = getPredictionLotteryConfig(lotteryRaw).key;
+
+    const lotteryConfig = getPredictionLotteryConfig(canonicalLottery);
 
     const lines = Number.isFinite(linesRaw) ? Math.floor(linesRaw) : 1;
     if (lines < 1 || lines > 5) {
