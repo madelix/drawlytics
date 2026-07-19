@@ -296,10 +296,76 @@ export default function HonestyDashboardPage() {
               <ShieldCheck size={20} strokeWidth={2} color="#804198" />
             </div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>Trust score</div>
-            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>—</div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
-              Calculating as evidence grows.
+            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>
+              {summary?.evidence?.score ?? '—'}
+              {summary?.evidence ? '/100' : ''}
             </div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+              {summary?.evidence
+                ? `${summary.evidence.level} · ${summary.evidence.status}`
+                : 'Calculating as evidence grows.'}
+            </div>
+            {summary?.evidence && (
+              <div
+                style={{
+                  marginTop: 14,
+                  paddingTop: 14,
+                  borderTop: '1px solid #eef2f7',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                {[
+                  {
+                    label: 'Sample size',
+                    value: summary.evidence.components.sample_size,
+                  },
+                  {
+                    label: 'Performance gap',
+                    value: summary.evidence.components.performance_gap,
+                  },
+                  {
+                    label: 'Leader stability',
+                    value: summary.evidence.components.leader_stability,
+                  },
+                ].map((component) => (
+                  <div key={component.label}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        fontSize: 11,
+                        color: '#6b7280',
+                        marginBottom: 5,
+                      }}
+                    >
+                      <span>{component.label}</span>
+                      <span>{component.value}</span>
+                    </div>
+
+                    <div
+                      style={{
+                        height: 6,
+                        borderRadius: 999,
+                        background: '#eef2f7',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${component.value}%`,
+                          height: '100%',
+                          borderRadius: 999,
+                          background: '#804198',
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div

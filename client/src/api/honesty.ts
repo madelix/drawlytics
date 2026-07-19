@@ -8,6 +8,17 @@ export type HonestySummary = {
   models_analysed: number;
   leader_avg_total_hits: number | null;
 
+  evidence: {
+    score: number;
+    level: string;
+    status: 'provisional' | 'validated';
+    components: {
+      sample_size: number;
+      performance_gap: number;
+      leader_stability: number;
+    };
+  };
+
   findings: {
     id: string;
     type: 'info' | 'positive' | 'warning';

@@ -10,6 +10,10 @@ import {
   analyseLeaderStability,
   buildLeaderboardHistory,
 } from '../services/leaderboardHistory.js';
+import {
+  calculateBootstrapConfidence,
+  calculateEvidenceScore,
+} from '../services/evidenceEngine.js';
 
 const router = express.Router();
 
@@ -333,6 +337,14 @@ WHERE LOWER(lottery) = LOWER($1);
           Number(row.matched_main ?? 0) + Number(row.matched_stars ?? 0),
       }));
 
+    const hitsByModel = new Map();
+
+    for (const row of checkedRows) {
+      const hits = hitsByModel.get(row.model_key) ?? [];
+      hits.push(row.total_hits);
+      hitsByModel.set(row.model_key, hits);
+    }
+
     const totalsByModel = new Map();
 
     for (const row of checkedRows) {
@@ -434,11 +446,12 @@ WHERE LOWER(lottery) = LOWER($1);
       });
     }
 
+    let percentageDifference = null;
     if (strongestNonRandom && pureRandom) {
       const difference =
         strongestNonRandom.avg_total_hits - pureRandom.avg_total_hits;
 
-      const percentageDifference =
+      percentageDifference = percentageDifference =
         pureRandom.avg_total_hits > 0
           ? (difference / pureRandom.avg_total_hits) * 100
           : null;
@@ -501,6 +514,20 @@ WHERE LOWER(lottery) = LOWER($1);
       });
     }
 
+    const bootstrapConfidence =
+      strongestNonRandom && pureRandom
+        ? calculateBootstrapConfidence({
+            modelHits: hitsByModel.get(strongestNonRandom.model_key) ?? [],
+            pureRandomHits: hitsByModel.get('pure_random') ?? [],
+          })
+        : null;
+
+    const evidenceScore = calculateEvidenceScore({
+      leaderSampleSize: strongestNonRandom?.checked_predictions ?? 0,
+      percentageDifference,
+      leaderChangesLast20: leaderStability.leader_changes_last_20,
+    });
+
     const selectedFindings = findings
       .sort((a, b) => b.priority - a.priority)
       .slice(0, 4);
@@ -519,6 +546,8 @@ WHERE LOWER(lottery) = LOWER($1);
           summaryRow.leader_avg_total_hits === null
             ? null
             : Number(summaryRow.leader_avg_total_hits),
+        evidence: evidenceScore,
+        bootstrap: bootstrapConfidence,
         findings: selectedFindings,
       },
     });
