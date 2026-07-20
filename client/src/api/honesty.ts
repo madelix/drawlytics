@@ -16,7 +16,23 @@ export type HonestySummary = {
       sample_size: number;
       performance_gap: number;
       leader_stability: number;
+      bootstrap: number;
     };
+    bootstrap: {
+      status: 'calculated' | 'insufficient_data';
+      iterations: number;
+      confidence: number | null;
+      observed_difference: number | null;
+      confidence_interval: {
+        low: number | null;
+        high: number | null;
+      };
+      interpretation?: {
+        level: 'insufficient' | 'strong';
+        title: string;
+        explanation: string;
+      };
+    } | null;
   };
 
   findings: {

@@ -8,6 +8,8 @@ import {
   CircleAlert,
   CircleCheck,
   Info,
+  TriangleAlert,
+  BadgeCheck,
 } from 'lucide-react';
 import {
   getHonestySummary,
@@ -204,17 +206,10 @@ export default function HonestyDashboardPage() {
                 >
                   <div
                     style={{
-                      width:
-                        summary?.evidence_level === 'High'
-                          ? '82%'
-                          : summary?.evidence_level === 'Moderate'
-                            ? '62%'
-                            : summary?.evidence_level === 'Building'
-                              ? '42%'
-                              : '24%',
+                      width: `${summary?.evidence?.score ?? 0}%`,
                       height: '100%',
                       borderRadius: 999,
-                      background: '#16a34a',
+                      background: '#804198',
                     }}
                   />
                 </div>
@@ -227,7 +222,7 @@ export default function HonestyDashboardPage() {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {summary?.evidence_level ?? 'Building'} confidence
+                  {summary?.evidence?.level ?? 'Building'} evidence
                 </div>
               </div>
             </div>
@@ -305,6 +300,7 @@ export default function HonestyDashboardPage() {
                 ? `${summary.evidence.level} · ${summary.evidence.status}`
                 : 'Calculating as evidence grows.'}
             </div>
+
             {summary?.evidence && (
               <div
                 style={{
@@ -328,6 +324,10 @@ export default function HonestyDashboardPage() {
                   {
                     label: 'Leader stability',
                     value: summary.evidence.components.leader_stability,
+                  },
+                  {
+                    label: 'Bootstrap support',
+                    value: summary.evidence.components.bootstrap,
                   },
                 ].map((component) => (
                   <div key={component.label}>
@@ -391,12 +391,14 @@ export default function HonestyDashboardPage() {
             >
               <BarChart3 size={20} strokeWidth={2} color="#804198" />
             </div>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>Evidence level</div>
+            <div style={{ fontSize: 12, color: '#6b7280' }}>
+              Evidence status
+            </div>
             <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>
-              {summary?.evidence_level ?? '—'}
+              {summary?.evidence?.level ?? '—'}
             </div>
             <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
-              Current confidence in the evidence.
+              Current maturity of the available evidence.
             </div>
           </div>
 
@@ -468,6 +470,271 @@ export default function HonestyDashboardPage() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section
+        style={{
+          background: '#fff',
+          border: '1px solid #eef2f7',
+          borderRadius: 16,
+          padding: '18px 20px',
+          margin: '0 auto 14px',
+          maxWidth: 980,
+        }}
+      >
+        <div
+          style={{
+            fontWeight: 900,
+            marginBottom: 6,
+          }}
+        >
+          Statistical evidence
+        </div>
+
+        <div
+          style={{
+            fontSize: 13,
+            color: '#6b7280',
+            marginBottom: 16,
+          }}
+        >
+          Bootstrap analysis of the current strongest model against Pure Random.
+        </div>
+
+        {summary?.evidence?.bootstrap?.status === 'calculated' ? (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: 14,
+            }}
+          >
+            <div
+              style={{
+                border: '1px solid #eef2f7',
+                borderRadius: 14,
+                padding: 18,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: '#6b7280',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Bootstrap support
+              </div>
+
+              <div
+                style={{
+                  fontSize: 28,
+                  fontWeight: 900,
+                  color: '#111827',
+                  marginTop: 6,
+                }}
+              >
+                {summary.evidence.bootstrap.confidence?.toFixed(1)}%
+              </div>
+
+              <div
+                style={{
+                  fontSize: 12,
+                  color: '#6b7280',
+                  marginTop: 6,
+                }}
+              >
+                Based on{' '}
+                {summary.evidence.bootstrap.iterations.toLocaleString()}{' '}
+                resamples
+              </div>
+              <div
+                style={{
+                  marginTop: 14,
+                  paddingTop: 12,
+                  borderTop: '1px solid #eef2f7',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#6b7280',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Observed difference
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 900,
+                    color: '#111827',
+                    marginTop: 5,
+                  }}
+                >
+                  {summary.evidence.bootstrap.observed_difference !== null
+                    ? `${summary.evidence.bootstrap.observed_difference >= 0 ? '+' : ''}${summary.evidence.bootstrap.observed_difference.toFixed(2)} hits`
+                    : '—'}
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                border: '1px solid #eef2f7',
+                borderRadius: 14,
+                padding: 18,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: '#6b7280',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                95% confidence interval
+              </div>
+
+              <div
+                style={{
+                  fontSize: 22,
+                  fontWeight: 900,
+                  color: '#111827',
+                  marginTop: 8,
+                }}
+              >
+                {summary.evidence.bootstrap.confidence_interval.low?.toFixed(2)}
+                {' → '}
+                {summary.evidence.bootstrap.confidence_interval.high?.toFixed(
+                  2,
+                )}
+              </div>
+
+              <div
+                style={{
+                  fontSize: 12,
+                  color: '#6b7280',
+                  marginTop: 6,
+                }}
+              >
+                Difference in average hits
+              </div>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginTop: 12,
+                  color:
+                    summary.evidence.bootstrap.interpretation?.level ===
+                    'strong'
+                      ? '#166534'
+                      : '#92400e',
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                {summary.evidence.bootstrap.interpretation?.level ===
+                'strong' ? (
+                  <BadgeCheck size={15} strokeWidth={2} />
+                ) : (
+                  <TriangleAlert size={15} strokeWidth={2} />
+                )}
+
+                {summary.evidence.bootstrap.interpretation?.level === 'strong'
+                  ? 'Interval excludes zero'
+                  : 'Interval crosses zero'}
+              </div>
+            </div>
+
+            <div
+              style={{
+                border:
+                  summary.evidence.bootstrap.interpretation?.level === 'strong'
+                    ? '1px solid #bbf7d0'
+                    : '1px solid #fde68a',
+                borderRadius: 14,
+                padding: 18,
+                background:
+                  summary.evidence.bootstrap.interpretation?.level === 'strong'
+                    ? '#f0fdf4'
+                    : '#fffbeb',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  color:
+                    summary.evidence.bootstrap.interpretation?.level ===
+                    'strong'
+                      ? '#166534'
+                      : '#92400e',
+                }}
+              >
+                {summary.evidence.bootstrap.interpretation?.level ===
+                'strong' ? (
+                  <BadgeCheck size={18} strokeWidth={2} />
+                ) : (
+                  <TriangleAlert size={18} strokeWidth={2} />
+                )}
+
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {summary.evidence.bootstrap.interpretation?.level === 'strong'
+                    ? 'Strong evidence'
+                    : 'Insufficient evidence'}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  fontSize: 14,
+                  color: '#374151',
+                  lineHeight: 1.6,
+                  marginTop: 8,
+                }}
+              >
+                {summary.evidence.bootstrap.interpretation?.title}
+              </div>
+
+              <div
+                style={{
+                  fontSize: 12,
+                  color: '#6b7280',
+                  lineHeight: 1.6,
+                  marginTop: 8,
+                }}
+              >
+                {summary.evidence.bootstrap.interpretation?.explanation}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              fontSize: 13,
+              color: '#6b7280',
+            }}
+          >
+            Not enough checked predictions are available for bootstrap analysis.
+          </div>
+        )}
       </section>
 
       <section
@@ -663,6 +930,27 @@ export default function HonestyDashboardPage() {
                     }}
                   >
                     Compared with Pure Random
+                  </div>
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      marginTop: 10,
+                      padding: '5px 8px',
+                      borderRadius: 999,
+                      background: '#fffbeb',
+                      border: '1px solid #fde68a',
+                      color: '#92400e',
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
+                    <TriangleAlert size={14} strokeWidth={2} />
+                    {summary?.evidence?.bootstrap?.interpretation?.level ===
+                    'strong'
+                      ? 'Statistically supported'
+                      : 'Not statistically confirmed'}
                   </div>
                 </div>
               </div>

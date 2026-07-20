@@ -19,6 +19,7 @@ const router = express.Router();
 
 const FINDING_PRIORITIES = {
   SAMPLE_SIZE: 100,
+  BOOTSTRAP_SIGNIFICANCE: 98,
   STATISTICAL_SIGNIFICANCE: 95,
   BASELINE_COMPETITIVENESS: 90,
   LEADER_STABILITY: 85,
@@ -522,10 +523,30 @@ WHERE LOWER(lottery) = LOWER($1);
           })
         : null;
 
+    if (
+      bootstrapConfidence?.status === 'calculated' &&
+      bootstrapConfidence.interpretation
+    ) {
+      findings.push({
+        id: 'bootstrap-significance',
+        type:
+          bootstrapConfidence.interpretation.level === 'strong'
+            ? 'positive'
+            : 'warning',
+        category: 'Statistical evidence',
+        priority: FINDING_PRIORITIES.BOOTSTRAP_SIGNIFICANCE,
+        title:
+          bootstrapConfidence.interpretation.level === 'strong'
+            ? `Bootstrap analysis indicates strong evidence that ${currentLeaderDisplayName} currently outperforms Pure Random.`
+            : `Current bootstrap analysis does not provide strong evidence that ${currentLeaderDisplayName} outperforms Pure Random.`,
+      });
+    }
+
     const evidenceScore = calculateEvidenceScore({
       leaderSampleSize: strongestNonRandom?.checked_predictions ?? 0,
       percentageDifference,
       leaderChangesLast20: leaderStability.leader_changes_last_20,
+      bootstrapResult: bootstrapConfidence,
     });
 
     const selectedFindings = findings
@@ -546,8 +567,10 @@ WHERE LOWER(lottery) = LOWER($1);
           summaryRow.leader_avg_total_hits === null
             ? null
             : Number(summaryRow.leader_avg_total_hits),
-        evidence: evidenceScore,
-        bootstrap: bootstrapConfidence,
+        evidence: {
+          ...evidenceScore,
+          bootstrap: bootstrapConfidence,
+        },
         findings: selectedFindings,
       },
     });

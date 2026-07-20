@@ -1,7 +1,8 @@
 const EVIDENCE_WEIGHTS = {
-  SAMPLE_SIZE: 40,
-  PERFORMANCE_GAP: 30,
-  LEADER_STABILITY: 30,
+  SAMPLE_SIZE: 30,
+  PERFORMANCE_GAP: 25,
+  LEADER_STABILITY: 20,
+  BOOTSTRAP: 25,
 };
 
 function clamp(value, minimum = 0, maximum = 100) {
@@ -28,21 +29,39 @@ function calculateLeaderStabilityScore(leaderChangesLast20) {
   return clamp(100 - leaderChangesLast20 * 10);
 }
 
+function calculateBootstrapScore(bootstrapResult) {
+  if (
+    bootstrapResult?.status !== 'calculated' ||
+    !Number.isFinite(bootstrapResult.confidence)
+  ) {
+    return 0;
+  }
+
+  if (bootstrapResult.interpretation?.level !== 'strong') {
+    return clamp(bootstrapResult.confidence * 0.5, 0, 50);
+  }
+
+  return clamp(bootstrapResult.confidence);
+}
+
 export function calculateEvidenceScore({
   leaderSampleSize,
   percentageDifference,
   leaderChangesLast20,
+  bootstrapResult,
 }) {
   const components = {
     sample_size: calculateSampleSizeScore(leaderSampleSize),
     performance_gap: calculatePerformanceGapScore(percentageDifference),
     leader_stability: calculateLeaderStabilityScore(leaderChangesLast20),
+    bootstrap: calculateBootstrapScore(bootstrapResult),
   };
 
   const score =
     (components.sample_size * EVIDENCE_WEIGHTS.SAMPLE_SIZE +
       components.performance_gap * EVIDENCE_WEIGHTS.PERFORMANCE_GAP +
-      components.leader_stability * EVIDENCE_WEIGHTS.LEADER_STABILITY) /
+      components.leader_stability * EVIDENCE_WEIGHTS.LEADER_STABILITY +
+      components.bootstrap * EVIDENCE_WEIGHTS.BOOTSTRAP) /
     100;
 
   const roundedScore = Math.round(score);
@@ -64,6 +83,7 @@ export function calculateEvidenceScore({
       sample_size: Math.round(components.sample_size),
       performance_gap: Math.round(components.performance_gap),
       leader_stability: Math.round(components.leader_stability),
+      bootstrap: Math.round(components.bootstrap),
     },
   };
 }
@@ -161,15 +181,36 @@ export function calculateBootstrapConfidence({
 
   differences.sort((a, b) => a - b);
 
+  const confidenceInterval = {
+    low: calculatePercentile(differences, 0.025),
+    high: calculatePercentile(differences, 0.975),
+  };
+
+  const intervalCrossesZero =
+    confidenceInterval.low <= 0 && confidenceInterval.high >= 0;
+
+  const interpretation = intervalCrossesZero
+    ? {
+        level: 'insufficient',
+        title:
+          'Current bootstrap analysis does not provide strong evidence that the leading model outperforms Pure Random.',
+        explanation:
+          'The confidence interval still includes zero, so the observed advantage could be explained by normal statistical variation.',
+      }
+    : {
+        level: 'strong',
+        title:
+          'Bootstrap analysis indicates strong evidence that the leading model outperforms Pure Random.',
+        explanation: 'The confidence interval no longer includes zero.',
+      };
+
   return {
     status: 'calculated',
     iterations,
     confidence: (modelAheadCount / iterations) * 100,
     observed_difference:
       calculateMean(modelHits) - calculateMean(pureRandomHits),
-    confidence_interval: {
-      low: calculatePercentile(differences, 0.025),
-      high: calculatePercentile(differences, 0.975),
-    },
+    confidence_interval: confidenceInterval,
+    interpretation,
   };
 }
