@@ -10,6 +10,7 @@ import MyPredictionsPage from './pages/MyPredictionsPage';
 import { MakeMagicPage } from './pages/MakeMagicPage';
 import ModelPerformancePage from './pages/ModelPerformancePage';
 import HonestyDashboardPage from './pages/HonestyDashboardPage';
+import ModelRegistryPage from './pages/ModelRegistryPage';
 
 // --- Lazy-loaded pages ---
 const AnalysisPage = lazy(() =>
@@ -91,7 +92,7 @@ function AppHeader() {
               `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
             }
           >
-            All draws
+            Draws
           </NavLink>
 
           <NavLink
@@ -101,6 +102,15 @@ function AppHeader() {
             }
           >
             Strategy
+          </NavLink>
+
+          <NavLink
+            to="/models"
+            className={({ isActive }) =>
+              `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
+            }
+          >
+            Models
           </NavLink>
 
           <NavLink
@@ -118,7 +128,7 @@ function AppHeader() {
               `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
             }
           >
-            Model Honesty
+            Honesty
           </NavLink>
 
           <NavLink
@@ -174,7 +184,7 @@ function AppHeader() {
               }`
             }
           >
-            All draws
+            Draws
           </NavLink>
 
           <NavLink
@@ -186,6 +196,17 @@ function AppHeader() {
             }
           >
             Strategy
+          </NavLink>
+
+          <NavLink
+            to="/models"
+            className={({ isActive }) =>
+              `dl-nav-link dl-nav-link--mobile ${
+                isActive ? 'dl-nav-link--active' : ''
+              }`
+            }
+          >
+            Models
           </NavLink>
 
           <NavLink
@@ -207,7 +228,7 @@ function AppHeader() {
               }`
             }
           >
-            Model Honesty
+            Honesty
           </NavLink>
 
           <NavLink
@@ -251,6 +272,7 @@ export default function App() {
           <Route path="/gaps" element={<GapsPage />} />
           <Route path="/draws" element={<AllDrawsPage />} />
           <Route path="/make-magic" element={<MakeMagicPage />} />
+          <Route path="/models" element={<ModelRegistryPage />} />
           <Route path="/performance" element={<ModelPerformancePage />} />
           <Route path="/honesty" element={<HonestyDashboardPage />} />
           <Route path="/predictions" element={<MyPredictionsPage />} />

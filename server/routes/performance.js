@@ -14,6 +14,7 @@ import {
   calculateBootstrapConfidence,
   calculateEvidenceScore,
 } from '../services/evidenceEngine.js';
+import { getModelProfile, MODEL_REGISTRY } from '../modelRegistry.js';
 
 const router = express.Router();
 
@@ -689,6 +690,46 @@ router.get('/performance/leaderboard-history', async (req, res) => {
     res.status(500).json({
       ok: false,
       error: 'leaderboard_history_failed',
+    });
+  }
+});
+
+router.get('/performance/model-registry', async (_req, res) => {
+  try {
+    res.json({
+      ok: true,
+      models: MODEL_REGISTRY,
+    });
+  } catch (err) {
+    console.error('GET /performance/model-registry failed:', err);
+    res.status(500).json({
+      ok: false,
+      error: 'model_registry_failed',
+    });
+  }
+});
+
+router.get('/performance/model-registry/:modelKey', async (req, res) => {
+  try {
+    const modelKey = String(req.params.modelKey || '').trim();
+    const model = getModelProfile(modelKey);
+
+    if (!model) {
+      return res.status(404).json({
+        ok: false,
+        error: 'model_not_found',
+      });
+    }
+
+    res.json({
+      ok: true,
+      model,
+    });
+  } catch (err) {
+    console.error('GET /performance/model-registry/:modelKey failed:', err);
+    res.status(500).json({
+      ok: false,
+      error: 'model_registry_detail_failed',
     });
   }
 });
