@@ -546,7 +546,7 @@ export default function ModelProfilePage() {
             style={{
               fontSize: 13,
               color: '#6b7280',
-              marginBottom: 16,
+              marginBottom: 18,
             }}
           >
             How strongly the current checked predictions support this model’s
@@ -556,8 +556,9 @@ export default function ModelProfilePage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-              gap: 14,
+              gridTemplateColumns: 'minmax(0, 0.9fr) minmax(0, 1.1fr)',
+              gap: 16,
+              alignItems: 'stretch',
             }}
           >
             <div
@@ -581,7 +582,7 @@ export default function ModelProfilePage() {
 
               <div
                 style={{
-                  fontSize: 28,
+                  fontSize: 34,
                   fontWeight: 900,
                   marginTop: 6,
                 }}
@@ -598,165 +599,238 @@ export default function ModelProfilePage() {
               >
                 {performance.evidence.level} · {performance.evidence.status}
               </div>
-            </div>
-
-            <div
-              style={{
-                border: '1px solid #eef2f7',
-                borderRadius: 14,
-                padding: 18,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 11,
-                  color: '#6b7280',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                }}
-              >
-                Bootstrap support
-              </div>
 
               <div
                 style={{
-                  fontSize: 28,
-                  fontWeight: 900,
-                  marginTop: 6,
+                  marginTop: 18,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 14,
                 }}
               >
-                {performance.evidence.bootstrap.confidence !== null
-                  ? `${performance.evidence.bootstrap.confidence.toFixed(1)}%`
-                  : '—'}
-              </div>
-
-              <div
-                style={{
-                  fontSize: 12,
-                  color: '#6b7280',
-                  marginTop: 6,
-                }}
-              >
-                Based on{' '}
-                {performance.evidence.bootstrap.iterations.toLocaleString()}{' '}
-                resamples
-              </div>
-            </div>
-
-            <div
-              style={{
-                border:
-                  performance.evidence.bootstrap.interpretation?.level ===
-                  'strong'
-                    ? '1px solid #bbf7d0'
-                    : '1px solid #fde68a',
-                borderRadius: 14,
-                padding: 18,
-                background:
-                  performance.evidence.bootstrap.interpretation?.level ===
-                  'strong'
-                    ? '#f0fdf4'
-                    : '#fffbeb',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 11,
-                  color:
-                    performance.evidence.bootstrap.interpretation?.level ===
-                    'strong'
-                      ? '#166534'
-                      : '#92400e',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                }}
-              >
-                Interpretation
-              </div>
-
-              <div
-                style={{
-                  fontSize: 14,
-                  color: '#374151',
-                  lineHeight: 1.6,
-                  marginTop: 8,
-                }}
-              >
-                {performance.evidence.bootstrap.interpretation?.title ??
-                  'No interpretation is available yet.'}
-              </div>
-
-              <div
-                style={{
-                  fontSize: 12,
-                  color: '#6b7280',
-                  lineHeight: 1.6,
-                  marginTop: 8,
-                }}
-              >
-                {performance.evidence.bootstrap.interpretation?.explanation}
-              </div>
-            </div>
-            <div
-              style={{
-                marginTop: 18,
-                paddingTop: 18,
-                borderTop: '1px solid #eef2f7',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                gap: 18,
-              }}
-            >
-              {[
-                {
-                  label: 'Sample size',
-                  value: performance.evidence.components.sample_size,
-                },
-                {
-                  label: 'Performance gap',
-                  value: performance.evidence.components.performance_gap,
-                },
-                {
-                  label: 'Bootstrap support',
-                  value: performance.evidence.components.bootstrap_support,
-                },
-              ].map((component) => (
-                <div key={component.label}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 12,
-                      fontSize: 12,
-                      color: '#6b7280',
-                      marginBottom: 7,
-                    }}
-                  >
-                    <span>{component.label}</span>
-                    <span style={{ fontWeight: 700 }}>{component.value}</span>
-                  </div>
-
-                  <div
-                    style={{
-                      height: 7,
-                      borderRadius: 999,
-                      background: '#eef2f7',
-                      overflow: 'hidden',
-                    }}
-                  >
+                {[
+                  {
+                    label: 'Sample size',
+                    value: performance.evidence.components.sample_size,
+                  },
+                  {
+                    label: 'Performance gap',
+                    value: performance.evidence.components.performance_gap,
+                  },
+                  {
+                    label: 'Bootstrap support',
+                    value: performance.evidence.components.bootstrap_support,
+                  },
+                ].map((component) => (
+                  <div key={component.label}>
                     <div
                       style={{
-                        width: `${component.value}%`,
-                        height: '100%',
-                        borderRadius: 999,
-                        background: '#804198',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        fontSize: 12,
+                        color: '#6b7280',
+                        marginBottom: 7,
                       }}
-                    />
+                    >
+                      <span>{component.label}</span>
+                      <span style={{ fontWeight: 700, color: '#111827' }}>
+                        {component.value}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        height: 7,
+                        borderRadius: 999,
+                        background: '#eef2f7',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${component.value}%`,
+                          height: '100%',
+                          borderRadius: 999,
+                          background: '#804198',
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14,
+              }}
+            >
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                  gap: 14,
+                }}
+              >
+                <div
+                  style={{
+                    border: '1px solid #eef2f7',
+                    borderRadius: 14,
+                    padding: 18,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: '#6b7280',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                    }}
+                  >
+                    Bootstrap support
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 28,
+                      fontWeight: 900,
+                      marginTop: 6,
+                    }}
+                  >
+                    {performance.evidence.bootstrap.confidence !== null
+                      ? `${performance.evidence.bootstrap.confidence.toFixed(1)}%`
+                      : '—'}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: '#6b7280',
+                      marginTop: 6,
+                    }}
+                  >
+                    Based on{' '}
+                    {performance.evidence.bootstrap.iterations.toLocaleString()}{' '}
+                    resamples
                   </div>
                 </div>
-              ))}
+
+                <div
+                  style={{
+                    border: '1px solid #eef2f7',
+                    borderRadius: 14,
+                    padding: 18,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: '#6b7280',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                    }}
+                  >
+                    95% confidence interval
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 22,
+                      fontWeight: 900,
+                      marginTop: 8,
+                    }}
+                  >
+                    {performance.evidence.bootstrap.confidence_interval.low !==
+                    null
+                      ? performance.evidence.bootstrap.confidence_interval.low.toFixed(
+                          2,
+                        )
+                      : '—'}
+                    {' → '}
+                    {performance.evidence.bootstrap.confidence_interval.high !==
+                    null
+                      ? performance.evidence.bootstrap.confidence_interval.high.toFixed(
+                          2,
+                        )
+                      : '—'}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: '#6b7280',
+                      marginTop: 6,
+                    }}
+                  >
+                    Difference in average hits
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  border:
+                    performance.evidence.bootstrap.interpretation?.level ===
+                    'strong'
+                      ? '1px solid #bbf7d0'
+                      : '1px solid #fde68a',
+                  borderRadius: 14,
+                  padding: 18,
+                  background:
+                    performance.evidence.bootstrap.interpretation?.level ===
+                    'strong'
+                      ? '#f0fdf4'
+                      : '#fffbeb',
+                  flex: 1,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    color:
+                      performance.evidence.bootstrap.interpretation?.level ===
+                      'strong'
+                        ? '#166534'
+                        : '#92400e',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                  }}
+                >
+                  {performance.evidence.bootstrap.interpretation?.level ===
+                  'strong'
+                    ? 'Strong evidence'
+                    : 'Insufficient evidence'}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 14,
+                    color: '#374151',
+                    lineHeight: 1.6,
+                    marginTop: 8,
+                  }}
+                >
+                  {performance.evidence.bootstrap.interpretation?.title ??
+                    'No interpretation is available yet.'}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: '#6b7280',
+                    lineHeight: 1.6,
+                    marginTop: 8,
+                  }}
+                >
+                  {performance.evidence.bootstrap.interpretation?.explanation}
+                </div>
+              </div>
             </div>
           </div>
         </section>
