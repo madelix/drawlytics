@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 type ModelProfile = {
   model_key: string;
@@ -63,13 +64,17 @@ export default function ModelRegistryPage() {
           }}
         >
           {models.map((model) => (
-            <div
+            <Link
               key={model.model_key}
+              to={`/models/${model.model_key}`}
               style={{
                 border: '1px solid #eef2f7',
                 borderRadius: 16,
                 padding: 18,
                 background: '#fff',
+                textDecoration: 'none',
+                color: 'inherit',
+                display: 'block',
               }}
             >
               <div
@@ -119,7 +124,7 @@ export default function ModelRegistryPage() {
 
                 <span className="pill-chip">v{model.version}</span>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

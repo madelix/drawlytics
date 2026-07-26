@@ -11,6 +11,7 @@ import { MakeMagicPage } from './pages/MakeMagicPage';
 import ModelPerformancePage from './pages/ModelPerformancePage';
 import HonestyDashboardPage from './pages/HonestyDashboardPage';
 import ModelRegistryPage from './pages/ModelRegistryPage';
+import ModelProfilePage from './pages/ModelProfilePage';
 
 // --- Lazy-loaded pages ---
 const AnalysisPage = lazy(() =>
@@ -273,6 +274,7 @@ export default function App() {
           <Route path="/draws" element={<AllDrawsPage />} />
           <Route path="/make-magic" element={<MakeMagicPage />} />
           <Route path="/models" element={<ModelRegistryPage />} />
+          <Route path="/models/:modelKey" element={<ModelProfilePage />} />
           <Route path="/performance" element={<ModelPerformancePage />} />
           <Route path="/honesty" element={<HonestyDashboardPage />} />
           <Route path="/predictions" element={<MyPredictionsPage />} />

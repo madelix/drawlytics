@@ -214,3 +214,40 @@ export function calculateBootstrapConfidence({
     interpretation,
   };
 }
+
+export function calculateModelEvidenceScore({
+  modelSampleSize,
+  percentageDifference,
+  bootstrapResult,
+}) {
+  const sampleSizeScore = calculateSampleSizeScore(modelSampleSize);
+  const performanceGapScore =
+    calculatePerformanceGapScore(percentageDifference);
+  const bootstrapScore = calculateBootstrapScore(bootstrapResult);
+
+  const score =
+    sampleSizeScore * 0.35 + performanceGapScore * 0.25 + bootstrapScore * 0.4;
+
+  const roundedScore = Math.round(score);
+
+  const level =
+    roundedScore >= 75
+      ? 'High'
+      : roundedScore >= 50
+        ? 'Moderate'
+        : roundedScore >= 25
+          ? 'Building'
+          : 'Low';
+
+  return {
+    score: roundedScore,
+    level,
+    status: 'provisional',
+    components: {
+      sample_size: Math.round(sampleSizeScore),
+      performance_gap: Math.round(performanceGapScore),
+      bootstrap_support: Math.round(bootstrapScore),
+    },
+    bootstrap: bootstrapResult,
+  };
+}

@@ -13,6 +13,7 @@ import {
 import {
   calculateBootstrapConfidence,
   calculateEvidenceScore,
+  calculateModelEvidenceScore,
 } from '../services/evidenceEngine.js';
 import { getModelProfile, MODEL_REGISTRY } from '../modelRegistry.js';
 
@@ -733,5 +734,150 @@ router.get('/performance/model-registry/:modelKey', async (req, res) => {
     });
   }
 });
+
+router.get(
+  '/performance/model-registry/:modelKey/performance',
+  async (req, res) => {
+    try {
+      const modelKey = String(req.params.modelKey || '').trim();
+      const lottery = String(req.query.lottery || 'euromillions');
+
+      const { rows } = await pool.query(
+        `
+      SELECT
+        model_name,
+        matched_main,
+        matched_stars,
+        status
+      FROM predictions
+      WHERE LOWER(lottery) = LOWER($1)
+        AND LOWER(TRIM(status)) = 'checked';
+      `,
+        [lottery],
+      );
+
+      const checkedRows = rows.map((row) => ({
+        model_key: normalizeModelKey(row.model_name),
+        total_hits:
+          Number(row.matched_main ?? 0) + Number(row.matched_stars ?? 0),
+      }));
+
+      const statsByModel = new Map();
+
+      for (const row of checkedRows) {
+        const current = statsByModel.get(row.model_key) ?? {
+          total_hits: 0,
+          checked_predictions: 0,
+        };
+
+        current.total_hits += row.total_hits;
+        current.checked_predictions += 1;
+
+        statsByModel.set(row.model_key, current);
+      }
+
+      const rankedModels = [...statsByModel.entries()]
+        .map(([key, stats]) => ({
+          model_key: key,
+          avg_total_hits:
+            stats.checked_predictions > 0
+              ? stats.total_hits / stats.checked_predictions
+              : 0,
+          checked_predictions: stats.checked_predictions,
+        }))
+        .sort(
+          (a, b) =>
+            b.avg_total_hits - a.avg_total_hits ||
+            b.checked_predictions - a.checked_predictions ||
+            a.model_key.localeCompare(b.model_key),
+        );
+
+      const modelIndex = rankedModels.findIndex(
+        (model) => model.model_key === modelKey,
+      );
+
+      if (modelIndex === -1) {
+        return res.status(404).json({
+          ok: false,
+          error: 'model_performance_not_found',
+        });
+      }
+
+      const model = rankedModels[modelIndex];
+      const pureRandom = rankedModels.find(
+        (entry) => entry.model_key === 'pure_random',
+      );
+
+      const difference = pureRandom
+        ? model.avg_total_hits - pureRandom.avg_total_hits
+        : null;
+
+      const percentageDifference =
+        pureRandom && pureRandom.avg_total_hits > 0
+          ? (difference / pureRandom.avg_total_hits) * 100
+          : null;
+
+      const modelHits = checkedRows
+        .filter((row) => row.model_key === modelKey)
+        .map((row) => row.total_hits);
+
+      const pureRandomHits = checkedRows
+        .filter((row) => row.model_key === 'pure_random')
+        .map((row) => row.total_hits);
+
+      const bootstrapResult = calculateBootstrapConfidence({
+        modelHits,
+        pureRandomHits,
+      });
+
+      const modelDisplayName = getModelDisplayName(modelKey);
+
+      const modelBootstrapResult = bootstrapResult.interpretation
+        ? {
+            ...bootstrapResult,
+            interpretation: {
+              ...bootstrapResult.interpretation,
+              title:
+                bootstrapResult.interpretation.level === 'strong'
+                  ? `Bootstrap analysis indicates strong evidence that ${modelDisplayName} outperforms Pure Random.`
+                  : `Current bootstrap analysis does not provide strong evidence that ${modelDisplayName} outperforms Pure Random.`,
+            },
+          }
+        : bootstrapResult;
+
+      const evidence = calculateModelEvidenceScore({
+        modelSampleSize: model.checked_predictions,
+        percentageDifference: percentageDifference ?? 0,
+        bootstrapResult: modelBootstrapResult,
+      });
+
+      res.json({
+        ok: true,
+        lottery,
+        performance: {
+          rank: modelIndex + 1,
+          models_analysed: rankedModels.length,
+          avg_total_hits: model.avg_total_hits,
+          checked_predictions: model.checked_predictions,
+          pure_random_avg_hits: pureRandom?.avg_total_hits ?? null,
+          difference,
+          percentage_difference: percentageDifference,
+          beats_pure_random: difference === null ? null : difference > 0,
+          evidence,
+        },
+      });
+    } catch (err) {
+      console.error(
+        'GET /performance/model-registry/:modelKey/performance failed:',
+        err,
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: 'model_registry_performance_failed',
+      });
+    }
+  },
+);
 
 export default router;
