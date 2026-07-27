@@ -1,6 +1,6 @@
 // server/routes/draws.js
 import express from 'express';
-import { desc, eq, sql, lt, gt, asc } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
 import { db } from '../db.js';
 import * as schema from '../drizzle/schema.js';
 import { XMLParser } from 'fast-xml-parser';
@@ -118,7 +118,17 @@ async function upsertEuroMillionsDraw(payload) {
 }
 
 async function upsertUkLottoDraw(payload) {
-  const { draw_date, n1, n2, n3, n4, n5, n6, bonus_ball } = payload ?? {};
+  const {
+    draw_date,
+    draw_sequence = 1,
+    n1,
+    n2,
+    n3,
+    n4,
+    n5,
+    n6,
+    bonus_ball,
+  } = payload ?? {};
 
   const day = normalizeDayString(draw_date);
   if (!day) {
@@ -148,6 +158,7 @@ async function upsertUkLottoDraw(payload) {
     .insert(uk_lotto_draws)
     .values({
       draw_date: day,
+      draw_sequence,
       n1,
       n2,
       n3,
@@ -157,7 +168,7 @@ async function upsertUkLottoDraw(payload) {
       bonus_ball,
     })
     .onConflictDoUpdate({
-      target: uk_lotto_draws.draw_date,
+      target: [uk_lotto_draws.draw_date, uk_lotto_draws.draw_sequence],
       set: {
         n1,
         n2,
@@ -172,7 +183,12 @@ async function upsertUkLottoDraw(payload) {
   const rows = await db
     .select()
     .from(uk_lotto_draws)
-    .where(eq(uk_lotto_draws.draw_date, day))
+    .where(
+      and(
+        eq(uk_lotto_draws.draw_date, day),
+        eq(uk_lotto_draws.draw_sequence, draw_sequence),
+      ),
+    )
     .limit(1);
 
   return {
@@ -418,6 +434,27 @@ async function fetchLatestUkLottoFromFeed() {
       ? [game.balls]
       : [];
 
+  console.log('UK Lotto feed groups:', {
+    draw: game?.draw ?? null,
+    balls_group_count: ballsGroups.length,
+  });
+
+  console.log(
+    'UK Lotto balls groups:',
+    ballsGroups.map((group, index) => ({
+      index,
+      balls: (Array.isArray(group?.ball)
+        ? group.ball
+        : group?.ball
+          ? [group.ball]
+          : []
+      ).map((ball) => Number(ball?.['#text'] ?? ball)),
+      bonus_ball: Number(
+        group?.['bonus-ball']?.['#text'] ?? group?.['bonus-ball'] ?? null,
+      ),
+    })),
+  );
+
   const balls = ballsGroups[0] ?? null;
 
   const ballNodes = Array.isArray(balls?.ball)
@@ -637,10 +674,15 @@ router.get('/draws/all', async (req, res) => {
       table = euromillions_draws;
     }
 
+    const orderByColumns =
+      lottery === 'uk_lotto'
+        ? [desc(uk_lotto_draws.draw_date), desc(uk_lotto_draws.draw_sequence)]
+        : [desc(table.draw_date)];
+
     const draws = await db
       .select()
       .from(table)
-      .orderBy(desc(table.draw_date))
+      .orderBy(...orderByColumns)
       .limit(limit)
       .offset(offset);
 
@@ -845,7 +887,12 @@ router.post('/draws/uk-lotto/fetch-latest', requireAdmin, async (_req, res) => {
     const existingRows = await db
       .select()
       .from(uk_lotto_draws)
-      .where(eq(uk_lotto_draws.draw_date, draw_date))
+      .where(
+        and(
+          eq(uk_lotto_draws.draw_date, draw_date),
+          eq(uk_lotto_draws.draw_sequence, payload.draw_sequence ?? 1),
+        ),
+      )
       .limit(1);
 
     const existing = existingRows[0] ?? null;
@@ -1041,7 +1088,12 @@ router.post('/cron/uk-lotto/sync', requireAdmin, async (_req, res) => {
     const existingRows = await db
       .select()
       .from(uk_lotto_draws)
-      .where(eq(uk_lotto_draws.draw_date, draw_date))
+      .where(
+        and(
+          eq(uk_lotto_draws.draw_date, draw_date),
+          eq(uk_lotto_draws.draw_sequence, payload.draw_sequence ?? 1),
+        ),
+      )
       .limit(1);
 
     const existing = existingRows[0] ?? null;

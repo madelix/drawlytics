@@ -57,6 +57,13 @@
       "when": 1778256292908,
       "tag": "0007_sharp_dakota_north",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785187128559,
+      "tag": "0008_dashing_shockwave",
+      "breakpoints": true
     }
   ]
 }

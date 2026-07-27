@@ -21,6 +21,7 @@ export async function getLatestDraw(): Promise<LatestDrawResponse> {
 export type LotteryDraw = {
   id: number;
   draw_date: string;
+  draw_sequence?: number;
   n1: number;
   n2: number;
   n3: number;

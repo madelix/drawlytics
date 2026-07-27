@@ -155,6 +155,11 @@ export function AllDrawsPage() {
                   'en-GB',
                 );
 
+                const drawSequenceLabel =
+                  selectedLottery === 'uk_lotto' && (d.draw_sequence ?? 1) > 1
+                    ? ` · Draw ${d.draw_sequence}`
+                    : '';
+
                 const numbers = [d.n1, d.n2, d.n3, d.n4, d.n5, d.n6].filter(
                   (value): value is number => typeof value === 'number',
                 );
@@ -172,7 +177,10 @@ export function AllDrawsPage() {
                       {lotteryConfig.label.toUpperCase()}
                     </div>
 
-                    <div className="dl-draw-card-header">Draw {dateLabel}</div>
+                    <div className="dl-draw-card-header">
+                      Draw {dateLabel}
+                      {drawSequenceLabel}
+                    </div>
 
                     <div className="dl-draw-card-content">
                       <div className="dl-draw-card-section">

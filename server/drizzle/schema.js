@@ -40,6 +40,10 @@ export const uk_lotto_draws = pgTable(
     id: serial('id').primaryKey(),
     draw_date: date('draw_date').notNull(),
 
+    // Distinguishes multiple UK Lotto draws on the same calendar date.
+    // Existing historical draws use sequence 1.
+    draw_sequence: smallint('draw_sequence').default(1).notNull(),
+
     n1: smallint('n1').notNull(),
     n2: smallint('n2').notNull(),
     n3: smallint('n3').notNull(),
@@ -52,9 +56,9 @@ export const uk_lotto_draws = pgTable(
     created_at: timestamp('created_at').defaultNow().notNull(),
   },
   (t) => ({
-    uk_lotto_draw_date_unique: uniqueIndex(
-      'uk_lotto_draws_draw_date_unique',
-    ).on(t.draw_date),
+    uk_lotto_draw_identity_unique: uniqueIndex(
+      'uk_lotto_draws_draw_identity_unique',
+    ).on(t.draw_date, t.draw_sequence),
   }),
 );
 
