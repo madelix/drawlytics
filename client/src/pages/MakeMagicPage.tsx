@@ -3,103 +3,50 @@ import { useEffect, useState } from 'react';
 import { apiUrl } from '../api/apiClient';
 import { LOTTERIES, getLotteryConfig, LotteryKey } from '../config/lotteries';
 import { LotterySelector } from '../components/LotterySelector';
+import { getModelColour } from '../config/modelPresentation';
 
-// Canonical strategy keys + labels + descriptions.
-// These keys must match what the server understands.
-const STRATEGIES = [
-  {
-    value: 'balanced_hot_cold',
-    label: 'Balanced hot/cold',
-    description: 'Mix of frequently and infrequently drawn numbers.',
-  },
+// Strategy Builder models are loaded from the canonical backend registry.
+// This list only controls which registered models the generator currently supports.
+type RegistryModel = {
+  model_key: string;
+  display_name: string;
+  category: string;
+  implementation_type: string;
+  learning_status: string;
+  version: string;
+  status: string;
+  summary: string;
+};
 
-  {
-    value: 'hot_focused',
-    label: 'Hot-focused',
-    description: 'Leans towards recently frequent numbers.',
-  },
-  {
-    value: 'cold_focused',
-    label: 'Cold-focused',
-    description: 'Leans towards less frequent / “ignored” numbers.',
-  },
-  {
-    value: 'overdue',
-    label: 'Overdue',
-    description: 'Prioritises numbers with long gaps.',
-  },
-  {
-    value: 'ai:xgboost',
-    label: 'AI XGBoost',
-    description: 'AI-style boosted model for pattern-weighted predictions.',
-  },
-  {
-    value: 'ai:ensemble',
-    label: 'AI Ensemble',
-    description: 'Combines multiple AI-style model signals into one line.',
-  },
-  {
-    value: 'ai:random_forest',
-    label: 'AI Random Forest',
-    description: 'Tree-based AI-style model using repeated pattern sampling.',
-  },
-  {
-    value: 'ai:gradient_boosting',
-    label: 'AI Gradient Boosting',
-    description: 'Boosted AI-style model focused on stronger weighted signals.',
-  },
-  {
-    value: 'ai:statistical_analysis',
-    label: 'AI Statistical Analysis',
-    description: 'AI-assisted statistical weighting using historical patterns.',
-  },
-  {
-    value: 'ai:decision_tree',
-    label: 'AI Decision Tree',
-    description: 'Rule-based AI-style model using branching pattern logic.',
-  },
-  {
-    value: 'ai:q_learning',
-    label: 'AI Q-Learning',
-    description:
-      'Reinforcement-style model for testing reward-based selection.',
-  },
-  {
-    value: 'ai:neural_network',
-    label: 'AI Neural Network',
-    description:
-      'Neural-style weighted pattern model trained on historical draws.',
-  },
-  {
-    value: 'ai:lstm',
-    label: 'AI LSTM',
-    description:
-      'Sequence-focused AI model attempting temporal draw pattern learning.',
-  },
-  {
-    value: 'ai:markov_chain',
-    label: 'AI Markov Chain',
-    description:
-      'Transition-based model using historical sequence probabilities.',
-  },
-  {
-    value: 'ai:bayesian',
-    label: 'AI Bayesian',
-    description:
-      'Probability-driven AI model updating likelihoods from past outcomes.',
-  },
-  {
-    value: 'ai:meta_learning',
-    label: 'AI Meta Learning',
-    description:
-      'Adaptive AI model designed to learn which strategies perform best over time.',
-  },
-  {
-    value: 'pure_random',
-    label: 'Pure random',
-    description: 'Uniform random within valid ranges.',
-  },
-];
+type StrategyOption = RegistryModel & {
+  value: string;
+  label: string;
+  description: string;
+};
+
+const STRATEGY_MODEL_KEYS = [
+  'balanced_hot_cold',
+  'hot_focused',
+  'cold_focused',
+  'overdue',
+  'ai_xgboost',
+  'ai_ensemble',
+  'ai_random_forest',
+  'ai_gradient_boosting',
+  'ai_statistical_analysis',
+  'ai_decision_tree',
+  'ai_q_learning',
+  'ai_neural_network',
+  'ai_lstm',
+  'ai_markov_chain',
+  'ai_bayesian',
+  'ai_meta_learning',
+  'pure_random',
+] as const;
+
+function toGeneratorStrategyKey(modelKey: string): string {
+  return modelKey.startsWith('ai_') ? `ai:${modelKey.slice(3)}` : modelKey;
+}
 
 function normalizeStrategyMixKey(modelKey: string): string {
   if (modelKey.startsWith('ai_')) {
@@ -108,26 +55,6 @@ function normalizeStrategyMixKey(modelKey: string): string {
 
   return modelKey;
 }
-
-const STRATEGY_COLORS: Record<string, string> = {
-  balanced_hot_cold: '#7C3AED',
-  overdue: '#F97316',
-  hot_focused: '#EF4444',
-  cold_focused: '#2563EB',
-  'ai:xgboost': '#06B6D4',
-  'ai:ensemble': '#14B8A6',
-  'ai:random_forest': '#0EA5E9',
-  'ai:gradient_boosting': '#8B5CF6',
-  'ai:statistical_analysis': '#6366F1',
-  'ai:decision_tree': '#10B981',
-  'ai:q_learning': '#EC4899',
-  'ai:neural_network': '#7C3AED',
-  'ai:lstm': '#2563EB',
-  'ai:markov_chain': '#84CC16',
-  'ai:bayesian': '#F59E0B',
-  'ai:meta_learning': '#A855F7',
-  pure_random: '#22C55E',
-};
 
 type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
@@ -142,7 +69,23 @@ export function MakeMagicPage() {
     return 'euromillions';
   });
 
+  const [registryModels, setRegistryModels] = useState<RegistryModel[]>([]);
+
+  const [registryLoading, setRegistryLoading] = useState(true);
+
   const lotteryConfig = getLotteryConfig(selectedLottery);
+  const strategies: StrategyOption[] = registryModels
+    .filter((model) =>
+      STRATEGY_MODEL_KEYS.includes(
+        model.model_key as (typeof STRATEGY_MODEL_KEYS)[number],
+      ),
+    )
+    .map((model) => ({
+      ...model,
+      value: toGeneratorStrategyKey(model.model_key),
+      label: model.display_name,
+      description: model.summary,
+    }));
   const [strategy, setStrategy] = useState<string>('balanced_hot_cold');
   const [lines, setLines] = useState<number>(5);
   const [strategyLines, setStrategyLines] = useState<Record<string, number>>({
@@ -175,7 +118,42 @@ export function MakeMagicPage() {
   const [isMobileFooter, setIsMobileFooter] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedStrategy = STRATEGIES.find((s) => s.value === strategy)!;
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadModelRegistry() {
+      try {
+        const response = await fetch('/api/performance/model-registry');
+
+        if (!response.ok) {
+          throw new Error('Failed to load model registry');
+        }
+
+        const data = await response.json();
+
+        if (!cancelled) {
+          setRegistryModels(data.models ?? []);
+        }
+      } catch (error) {
+        console.error('Could not load model registry:', error);
+
+        if (!cancelled) {
+          setError('Could not load the available prediction strategies.');
+        }
+      } finally {
+        if (!cancelled) {
+          setRegistryLoading(false);
+        }
+      }
+    }
+
+    void loadModelRegistry();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(
@@ -384,7 +362,7 @@ export function MakeMagicPage() {
       setAllAiStatus('saving');
       setError(null);
 
-      const aiStrategies = STRATEGIES.filter((s) => s.value.startsWith('ai:'));
+      const aiStrategies = strategies.filter((s) => s.value.startsWith('ai:'));
 
       for (const s of aiStrategies) {
         const res = await fetch(apiUrl('/api/predictions/generate'), {
@@ -465,97 +443,110 @@ export function MakeMagicPage() {
                   width: '100%',
                 }}
               >
-                {STRATEGIES.map((s) => (
+                {registryLoading ? (
                   <div
-                    key={s.value}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 12,
-                      padding: '14px 14px',
-                      borderRadius: 10,
-                      border: '1px solid #e5e7eb',
-                      borderLeft: `4px solid ${STRATEGY_COLORS[s.value]}`,
-                      overflow: 'hidden',
-                      background: '#fafafa',
+                      padding: 24,
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: 14,
                     }}
                   >
-                    {/* LEFT: name + description */}
-                    <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontWeight: 800,
-                          fontSize: 14,
-                          color: '#111827',
-                        }}
-                      >
-                        {s.label}
-                      </div>
-                      <div style={{ fontSize: 12, color: '#6b7280' }}>
-                        {s.description}
-                      </div>
-                    </div>
-
-                    {/* RIGHT: lines + save */}
+                    Loading available strategies...
+                  </div>
+                ) : (
+                  strategies.map((s) => (
                     <div
+                      key={s.value}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 8,
-                        flexShrink: 0,
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        padding: '14px 14px',
+                        borderRadius: 10,
+                        border: '1px solid #e5e7eb',
+                        borderLeft: `4px solid ${getModelColour(s.value)}`,
+                        overflow: 'hidden',
+                        background: '#fafafa',
                       }}
                     >
-                      <input
-                        type="number"
-                        min={0}
-                        max={5}
-                        value={strategyLines[s.value]}
-                        onChange={(e) => {
-                          const v = Number(e.target.value);
-                          if (!Number.isNaN(v)) {
-                            setStrategyLines((prev) => ({
-                              ...prev,
-                              [s.value]: Math.min(Math.max(v, 0), 5),
-                            }));
-                          }
-                        }}
-                        style={{
-                          width: 50,
-                          padding: '4px 6px',
-                          borderRadius: 6,
-                          border: '1px solid #e5e7eb',
-                        }}
-                      />
+                      {/* LEFT: name + description */}
+                      <div style={{ flex: 1 }}>
+                        <div
+                          style={{
+                            fontWeight: 800,
+                            fontSize: 14,
+                            color: '#111827',
+                          }}
+                        >
+                          {s.label}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>
+                          {s.description}
+                        </div>
+                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleGenerate(s.value, strategyLines[s.value])
-                        }
-                        disabled={generatingStrategy === s.value}
+                      {/* RIGHT: lines + save */}
+                      <div
                         style={{
-                          padding: '6px 10px',
-                          borderRadius: 6,
-                          background: '#111827',
-                          color: '#fff',
-                          border: 'none',
-                          cursor:
-                            generatingStrategy === s.value
-                              ? 'default'
-                              : 'pointer',
-                          opacity: generatingStrategy === s.value ? 0.7 : 1,
-                          fontSize: 12,
-                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          flexShrink: 0,
                         }}
                       >
-                        {generatingStrategy === s.value
-                          ? 'Generating…'
-                          : 'Generate'}
-                      </button>
+                        <input
+                          type="number"
+                          min={0}
+                          max={5}
+                          value={strategyLines[s.value]}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            if (!Number.isNaN(v)) {
+                              setStrategyLines((prev) => ({
+                                ...prev,
+                                [s.value]: Math.min(Math.max(v, 0), 5),
+                              }));
+                            }
+                          }}
+                          style={{
+                            width: 50,
+                            padding: '4px 6px',
+                            borderRadius: 6,
+                            border: '1px solid #e5e7eb',
+                          }}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleGenerate(s.value, strategyLines[s.value])
+                          }
+                          disabled={generatingStrategy === s.value}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: 6,
+                            background: '#111827',
+                            color: '#fff',
+                            border: 'none',
+                            cursor:
+                              generatingStrategy === s.value
+                                ? 'default'
+                                : 'pointer',
+                            opacity: generatingStrategy === s.value ? 0.7 : 1,
+                            fontSize: 12,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {generatingStrategy === s.value
+                            ? 'Generating…'
+                            : 'Generate'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>

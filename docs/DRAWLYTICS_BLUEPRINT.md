@@ -246,12 +246,16 @@ strengths and limitations.
 - [ ] Check eligible predictions against both same-date draws.
 - [ ] Recalculate any analytics affected by omitted draw records.
 
-### Foundation cleanup
+### Foundation cleanup (completed)
+
+- [x] Centralise model colours.
+- [x] Remove duplicated model descriptions from Strategy Builder.
+- [x] Strategy Builder consumes the canonical Model Registry.
+
+### Foundation cleanup (remaining)
 
 - [ ] Centralise model metadata.
-- [ ] Centralise model colours.
 - [ ] Extract model personality logic from the Performance page.
-- [ ] Remove duplicated model descriptions from Strategy Builder.
 - [ ] Standardise evidence, confidence and sample-maturity terminology.
 - [ ] Create reusable metric and evidence display components.
 - [ ] Audit responsive behaviour across every main page.
@@ -264,6 +268,7 @@ strengths and limitations.
 - [x] Static model profiles.
 - [x] Live model performance.
 - [x] Model-specific evidence.
+- [x] Registry API adopted by Strategy Builder.
 - [ ] Canonical model personality.
 - [ ] Known biases and failure modes.
 - [ ] Version history.

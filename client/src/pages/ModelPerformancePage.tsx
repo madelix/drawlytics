@@ -9,6 +9,7 @@ import {
 } from '../api/performance';
 import { LOTTERIES, type LotteryKey } from '../config/lotteries';
 import { LotterySelector } from '../components/LotterySelector';
+import { getModelColour } from '../config/modelPresentation';
 
 function toNum(v: unknown, fallback = 0) {
   const n = typeof v === 'number' ? v : Number(v);
@@ -77,35 +78,6 @@ function reliabilityLabel(checked: number) {
   return 'Low sample';
 }
 
-const MODEL_COLOR_MAP: Record<string, string> = {
-  balanced_hot_cold: '#7C3AED', // purple
-  hot_focused: '#EF4444', // red
-  cold_focused: '#2563EB', // blue
-  overdue: '#F97316', // orange
-  strategy_mix: '#6d28d9', // strategy mix lavender/purple
-  pure_random: '#22C55E', // green
-  ai_ensemble: '#8B5CF6',
-  ai_statistical_analysis: '#0EA5E9',
-  ai_random_forest: '#10B981',
-  ai_decision_tree: '#F59E0B',
-  ai_gradient_boosting: '#EF4444',
-  ai_xgboost: '#EC4899',
-  ai_q_learning: '#14B8A6',
-  ai_advanced_analysis: '#6366F1',
-  ai_markov_chain: '#84CC16',
-  ai_meta_learning: '#A855F7',
-};
-
-// Stable “hash -> hue” so each model always gets the same colour
-function hashString(str: string) {
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
 function buildHistoryPath(
   series: ModelHistoryPoint[],
   yMax: number,
@@ -142,14 +114,6 @@ function buildHistoryPath(
       return `C ${controlX} ${previous.y}, ${controlX} ${point.y}, ${point.x} ${point.y}`;
     })
     .join(' ');
-}
-
-function modelColor(stableKey: string) {
-  const h = hashString(stableKey);
-  const hue = 220 + (h % 90); // 220..309
-  const sat = 62 + (h % 10); // 62..71
-  const light = 46 + (h % 10); // 46..55
-  return `hsl(${hue} ${sat}% ${light}%)`;
 }
 
 type ChartRow = {
@@ -594,7 +558,7 @@ export default function ModelPerformancePage() {
           trend,
           personality,
 
-          color: MODEL_COLOR_MAP[r.model_key] ?? modelColor(r.model_key),
+          color: getModelColour(r.model_key),
         };
       })
       .sort((a, b) => b.avg_total_hits - a.avg_total_hits);
