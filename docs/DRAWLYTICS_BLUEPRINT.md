@@ -240,11 +240,13 @@ strengths and limitations.
 
 ### Critical correctness
 
-- [ ] Support multiple UK Lotto draws on the same calendar date.
+- [x] Support multiple UK Lotto draws on the same calendar date.
+- [ ] Update UK Lotto prediction checking so one ticket is evaluated against both official draws on the same date.
 - [ ] Stop using draw date as a unique draw identity.
 - [ ] Display every official UK Lotto result in Draw History.
 - [ ] Check eligible predictions against both same-date draws.
 - [ ] Recalculate any analytics affected by omitted draw records.
+- [ ] Display both UK Lotto draw results together when viewing a prediction.
 
 ### Foundation cleanup (completed)
 

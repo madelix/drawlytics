@@ -117,6 +117,52 @@ async function upsertEuroMillionsDraw(payload) {
   return { ok: true, status: 200, day, draw: rows[0] ?? null };
 }
 
+function ukLottoDrawMatchesPayload(existing, payload) {
+  return (
+    existing &&
+    existing.n1 === payload.n1 &&
+    existing.n2 === payload.n2 &&
+    existing.n3 === payload.n3 &&
+    existing.n4 === payload.n4 &&
+    existing.n5 === payload.n5 &&
+    existing.n6 === payload.n6 &&
+    existing.bonus_ball === payload.bonus_ball
+  );
+}
+
+async function syncUkLottoPayload(payload) {
+  const existingRows = await db
+    .select()
+    .from(uk_lotto_draws)
+    .where(
+      and(
+        eq(uk_lotto_draws.draw_date, payload.draw_date),
+        eq(uk_lotto_draws.draw_sequence, payload.draw_sequence ?? 1),
+      ),
+    )
+    .limit(1);
+
+  const existing = existingRows[0] ?? null;
+
+  if (ukLottoDrawMatchesPayload(existing, payload)) {
+    return {
+      mode: 'no_change',
+      draw: existing,
+    };
+  }
+
+  const result = await upsertUkLottoDraw(payload);
+
+  if (!result.ok) {
+    throw new Error(result.error ?? 'uk_lotto_upsert_failed');
+  }
+
+  return {
+    mode: 'fetched_and_upserted',
+    draw: result.draw,
+  };
+}
+
 async function upsertUkLottoDraw(payload) {
   const {
     draw_date,
@@ -378,6 +424,51 @@ async function fetchLatestEuroMillionsFromFeed() {
   };
 }
 
+function parseUkLottoBallsGroup(group) {
+  const ballNodes = Array.isArray(group?.ball)
+    ? group.ball
+    : group?.ball
+      ? [group.ball]
+      : [];
+
+  const mainNumbers = ballNodes
+    .map((ball) => {
+      const order = Number(ball?.number);
+      const value = Number(ball?.['#text'] ?? ball);
+
+      return { order, value };
+    })
+    .filter(
+      (item) => Number.isFinite(item.order) && Number.isFinite(item.value),
+    )
+    .sort((a, b) => a.order - b.order)
+    .map((item) => item.value);
+
+  const bonusNodes = Array.isArray(group?.['bonus-ball'])
+    ? group['bonus-ball']
+    : group?.['bonus-ball']
+      ? [group['bonus-ball']]
+      : [];
+
+  const bonusNumbers = bonusNodes
+    .map((bonusBall) => {
+      const order = Number(bonusBall?.number);
+      const value = Number(bonusBall?.['#text'] ?? bonusBall);
+
+      return { order, value };
+    })
+    .filter(
+      (item) => Number.isFinite(item.order) && Number.isFinite(item.value),
+    )
+    .sort((a, b) => a.order - b.order)
+    .map((item) => item.value);
+
+  return {
+    mainNumbers,
+    bonusNumbers,
+  };
+}
+
 async function fetchLatestUkLottoFromFeed() {
   const url = (process.env.UK_LOTTO_FEED_URL || '').trim();
   if (!url) {
@@ -428,39 +519,40 @@ async function fetchLatestUkLottoFromFeed() {
 
   const game = parsed?.['draw-results']?.game;
   const drawDateRaw = game?.draw?.['draw-date'];
+  const drawMachines = Array.isArray(game?.draw?.['draw-machine'])
+    ? game.draw['draw-machine']
+    : game?.draw?.['draw-machine']
+      ? [game.draw['draw-machine']]
+      : [];
   const ballsGroups = Array.isArray(game?.balls)
     ? game.balls
     : game?.balls
       ? [game.balls]
       : [];
 
-  console.log('UK Lotto feed groups:', {
-    draw: game?.draw ?? null,
-    balls_group_count: ballsGroups.length,
+  const drawGroups = ballsGroups.map((balls, index) => ({
+    draw_sequence: index + 1,
+    draw_machine: drawMachines[index] ?? null,
+    balls,
+  }));
+
+  const firstDraw = drawGroups[0];
+
+  const parsedDraws = drawGroups.map((drawGroup) => {
+    const parsed = parseUkLottoBallsGroup(drawGroup.balls);
+
+    return {
+      draw_sequence: drawGroup.draw_sequence,
+      draw_machine: drawGroup.draw_machine,
+      mainNumbers: parsed.mainNumbers,
+      bonusNumbers: parsed.bonusNumbers,
+    };
   });
 
-  console.log(
-    'UK Lotto balls groups:',
-    ballsGroups.map((group, index) => ({
-      index,
-      balls: (Array.isArray(group?.ball)
-        ? group.ball
-        : group?.ball
-          ? [group.ball]
-          : []
-      ).map((ball) => Number(ball?.['#text'] ?? ball)),
-      bonus_ball: Number(
-        group?.['bonus-ball']?.['#text'] ?? group?.['bonus-ball'] ?? null,
-      ),
-    })),
-  );
-
-  const balls = ballsGroups[0] ?? null;
-
-  const ballNodes = Array.isArray(balls?.ball)
-    ? balls.ball
-    : balls?.ball
-      ? [balls.ball]
+  const ballNodes = Array.isArray(firstDraw?.balls?.ball)
+    ? firstDraw.balls.ball
+    : firstDraw?.balls?.ball
+      ? [firstDraw.balls.ball]
       : [];
 
   const mainNums = ballNodes
@@ -473,10 +565,10 @@ async function fetchLatestUkLottoFromFeed() {
     .sort((a, b) => a.ord - b.ord)
     .map((x) => x.val);
 
-  const bonusNodes = Array.isArray(balls?.['bonus-ball'])
-    ? balls['bonus-ball']
-    : balls?.['bonus-ball']
-      ? [balls['bonus-ball']]
+  const bonusNodes = Array.isArray(firstDraw?.balls?.['bonus-ball'])
+    ? firstDraw.balls['bonus-ball']
+    : firstDraw?.balls?.['bonus-ball']
+      ? [firstDraw.balls['bonus-ball']]
       : [];
 
   const bonusNums = bonusNodes
@@ -490,6 +582,10 @@ async function fetchLatestUkLottoFromFeed() {
     .map((x) => x.val);
 
   const draw_date = normalizeDayString(drawDateRaw);
+
+  const validParsedDraws = parsedDraws.filter(
+    (draw) => draw.mainNumbers.length >= 6 && draw.bonusNumbers.length >= 1,
+  );
 
   if (!draw_date || mainNums.length < 6 || bonusNums.length < 1) {
     return {
@@ -511,7 +607,23 @@ async function fetchLatestUkLottoFromFeed() {
     ok: true,
     status: 200,
     url,
-    payload: { draw_date, n1, n2, n3, n4, n5, n6, bonus_ball },
+    payloads: validParsedDraws.map((draw) => {
+      const [n1, n2, n3, n4, n5, n6] = draw.mainNumbers;
+      const [bonus_ball] = draw.bonusNumbers;
+
+      return {
+        draw_date,
+        draw_sequence: draw.draw_sequence,
+        draw_machine: draw.draw_machine,
+        n1,
+        n2,
+        n3,
+        n4,
+        n5,
+        n6,
+        bonus_ball,
+      };
+    }),
   };
 }
 
@@ -881,56 +993,28 @@ router.post('/draws/uk-lotto/fetch-latest', requireAdmin, async (_req, res) => {
       });
     }
 
-    const { url, payload } = fetched;
-    const { draw_date, n1, n2, n3, n4, n5, n6, bonus_ball } = payload;
-
-    const existingRows = await db
-      .select()
-      .from(uk_lotto_draws)
-      .where(
-        and(
-          eq(uk_lotto_draws.draw_date, draw_date),
-          eq(uk_lotto_draws.draw_sequence, payload.draw_sequence ?? 1),
-        ),
-      )
-      .limit(1);
-
-    const existing = existingRows[0] ?? null;
-
-    if (
-      existing &&
-      existing.n1 === n1 &&
-      existing.n2 === n2 &&
-      existing.n3 === n3 &&
-      existing.n4 === n4 &&
-      existing.n5 === n5 &&
-      existing.n6 === n6 &&
-      existing.bonus_ball === bonus_ball
-    ) {
-      return res.json({
-        ok: true,
-        lottery: 'uk_lotto',
-        mode: 'no_change',
-        source: url,
-        draw: existing,
-      });
-    }
-
-    const result = await upsertUkLottoDraw(payload);
-
-    if (!result.ok) {
-      return res.status(result.status).json({
+    const { url, payloads } = fetched;
+    if (!Array.isArray(payloads) || payloads.length === 0) {
+      return res.status(500).json({
         ok: false,
-        error: result.error,
+        error: 'no_valid_draws_in_feed',
       });
     }
+
+    const syncResults = await Promise.all(
+      payloads.map((item) => syncUkLottoPayload(item)),
+    );
+    const { draw_date, n1, n2, n3, n4, n5, n6, bonus_ball } = payload;
+    const results = [];
 
     return res.json({
       ok: true,
       lottery: 'uk_lotto',
-      mode: 'fetched_and_upserted',
+      mode: syncResults.every((result) => result.mode === 'no_change')
+        ? 'no_change'
+        : 'fetched_and_upserted',
       source: url,
-      draw: result.draw,
+      draws: syncResults.map((result) => result.draw),
     });
   } catch (e) {
     console.error('POST /draws/uk-lotto/fetch-latest failed:', e);
@@ -1082,40 +1166,26 @@ router.post('/cron/uk-lotto/sync', requireAdmin, async (_req, res) => {
       });
     }
 
-    const { url, payload } = fetched;
-    const { draw_date, n1, n2, n3, n4, n5, n6, bonus_ball } = payload;
-
-    const existingRows = await db
-      .select()
-      .from(uk_lotto_draws)
-      .where(
-        and(
-          eq(uk_lotto_draws.draw_date, draw_date),
-          eq(uk_lotto_draws.draw_sequence, payload.draw_sequence ?? 1),
-        ),
-      )
-      .limit(1);
-
-    const existing = existingRows[0] ?? null;
-
-    if (
-      existing &&
-      existing.n1 === n1 &&
-      existing.n2 === n2 &&
-      existing.n3 === n3 &&
-      existing.n4 === n4 &&
-      existing.n5 === n5 &&
-      existing.n6 === n6 &&
-      existing.bonus_ball === bonus_ball
-    ) {
-      return res.json({
-        ok: true,
-        lottery: 'uk_lotto',
-        mode: 'no_change',
-        source: url,
-        draw: existing,
+    const { url, payloads } = fetched;
+    if (!Array.isArray(payloads) || payloads.length === 0) {
+      return res.status(500).json({
+        ok: false,
+        error: 'no_valid_draws_in_feed',
       });
     }
+    const syncResults = await Promise.all(
+      payloads.map((item) => syncUkLottoPayload(item)),
+    );
+
+    return res.json({
+      ok: true,
+      lottery: 'uk_lotto',
+      mode: syncResults.every((result) => result.mode === 'no_change')
+        ? 'no_change'
+        : 'fetched_and_upserted',
+      source: url,
+      draws: syncResults.map((result) => result.draw),
+    });
 
     const result = await upsertUkLottoDraw(payload);
 
