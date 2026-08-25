@@ -1,6 +1,6 @@
 // server/routes/draws.js
 import express from 'express';
-import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import { db } from '../db.js';
 import * as schema from '../drizzle/schema.js';
 import { XMLParser } from 'fast-xml-parser';
@@ -791,19 +791,56 @@ router.get('/draws/all', async (req, res) => {
         ? [desc(uk_lotto_draws.draw_date), desc(uk_lotto_draws.draw_sequence)]
         : [desc(table.draw_date)];
 
-    const draws = await db
-      .select()
-      .from(table)
-      .orderBy(...orderByColumns)
-      .limit(limit)
-      .offset(offset);
+    let draws;
+    let total;
 
-    const countRows = await db
-      .select({ count: sql`count(*)`.mapWith(Number) })
-      .from(table);
+    if (lottery === 'uk_lotto') {
+      const dateRows = await db
+        .selectDistinct({ draw_date: uk_lotto_draws.draw_date })
+        .from(uk_lotto_draws)
+        .orderBy(desc(uk_lotto_draws.draw_date))
+        .limit(limit)
+        .offset(offset);
 
-    const total = countRows?.[0]?.count ?? 0;
-    const hasMore = offset + draws.length < total;
+      const drawDates = dateRows.map((row) => row.draw_date);
+
+      draws =
+        drawDates.length === 0
+          ? []
+          : await db
+              .select()
+              .from(uk_lotto_draws)
+              .where(inArray(uk_lotto_draws.draw_date, drawDates))
+              .orderBy(
+                desc(uk_lotto_draws.draw_date),
+                desc(uk_lotto_draws.draw_sequence),
+              );
+
+      const countRows = await db
+        .select({
+          count: sql`count(distinct ${uk_lotto_draws.draw_date})`.mapWith(
+            Number,
+          ),
+        })
+        .from(uk_lotto_draws);
+
+      total = countRows?.[0]?.count ?? 0;
+    } else {
+      draws = await db
+        .select()
+        .from(table)
+        .orderBy(...orderByColumns)
+        .limit(limit)
+        .offset(offset);
+
+      const countRows = await db
+        .select({ count: sql`count(*)`.mapWith(Number) })
+        .from(table);
+
+      total = countRows?.[0]?.count ?? 0;
+    }
+
+    const hasMore = offset + limit < total;
 
     res.json({
       ok: true,
@@ -1004,8 +1041,6 @@ router.post('/draws/uk-lotto/fetch-latest', requireAdmin, async (_req, res) => {
     const syncResults = await Promise.all(
       payloads.map((item) => syncUkLottoPayload(item)),
     );
-    const { draw_date, n1, n2, n3, n4, n5, n6, bonus_ball } = payload;
-    const results = [];
 
     return res.json({
       ok: true,
@@ -1185,23 +1220,6 @@ router.post('/cron/uk-lotto/sync', requireAdmin, async (_req, res) => {
         : 'fetched_and_upserted',
       source: url,
       draws: syncResults.map((result) => result.draw),
-    });
-
-    const result = await upsertUkLottoDraw(payload);
-
-    if (!result.ok) {
-      return res.status(result.status).json({
-        ok: false,
-        error: result.error,
-      });
-    }
-
-    return res.json({
-      ok: true,
-      lottery: 'uk_lotto',
-      mode: 'fetched_and_upserted',
-      source: url,
-      draw: result.draw,
     });
   } catch (e) {
     console.error('POST /cron/uk-lotto/sync failed:', e);

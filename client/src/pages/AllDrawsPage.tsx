@@ -150,76 +150,262 @@ export function AllDrawsPage() {
         {status === 'success' && draws.length > 0 && (
           <>
             <div className="dl-draws-list">
-              {draws.map((d: LotteryDraw) => {
-                const dateLabel = new Date(d.draw_date).toLocaleDateString(
-                  'en-GB',
-                );
+              {selectedLottery === 'uk_lotto'
+                ? Object.entries(
+                    draws.reduce<Record<string, LotteryDraw[]>>(
+                      (groups, draw) => {
+                        if (!groups[draw.draw_date]) {
+                          groups[draw.draw_date] = [];
+                        }
 
-                const drawSequenceLabel =
-                  selectedLottery === 'uk_lotto' && (d.draw_sequence ?? 1) > 1
-                    ? ` · Draw ${d.draw_sequence}`
-                    : '';
+                        groups[draw.draw_date].push(draw);
 
-                const numbers = [d.n1, d.n2, d.n3, d.n4, d.n5, d.n6].filter(
-                  (value): value is number => typeof value === 'number',
-                );
+                        return groups;
+                      },
+                      {},
+                    ),
+                  ).map(([drawDate, dateDraws]) => {
+                    const dateLabel = new Date(drawDate).toLocaleDateString(
+                      'en-GB',
+                    );
 
-                const specialNumbers = [
-                  d.s1,
-                  d.s2,
-                  d.bonus_ball,
-                  d.life_ball,
-                ].filter((value): value is number => typeof value === 'number');
+                    const sortedDraws = [...dateDraws].sort(
+                      (a, b) => (a.draw_sequence ?? 1) - (b.draw_sequence ?? 1),
+                    );
 
-                return (
-                  <div key={d.id} className="dl-draw-card">
-                    <div className="dl-draw-card-kicker">
-                      {lotteryConfig.label.toUpperCase()}
-                    </div>
+                    if (sortedDraws.length === 1) {
+                      const d = sortedDraws[0];
 
-                    <div className="dl-draw-card-header">
-                      Draw {dateLabel}
-                      {drawSequenceLabel}
-                    </div>
+                      const numbers = [
+                        d.n1,
+                        d.n2,
+                        d.n3,
+                        d.n4,
+                        d.n5,
+                        d.n6,
+                      ].filter(
+                        (value): value is number => typeof value === 'number',
+                      );
 
-                    <div className="dl-draw-card-content">
-                      <div className="dl-draw-card-section">
-                        <div className="dl-draw-card-label">
-                          {mainGroup?.label ?? 'Main numbers'}
+                      const specialNumbers = [d.bonus_ball].filter(
+                        (value): value is number => typeof value === 'number',
+                      );
+
+                      return (
+                        <div key={drawDate} className="dl-draw-card">
+                          <div className="dl-draw-card-kicker">
+                            {lotteryConfig.label.toUpperCase()}
+                          </div>
+
+                          <div className="dl-draw-card-header">
+                            Draw {dateLabel}
+                          </div>
+
+                          <div className="dl-draw-card-content">
+                            <div className="dl-draw-card-section">
+                              <div className="dl-draw-card-label">
+                                {mainGroup?.label ?? 'Main numbers'}
+                              </div>
+
+                              <div className="dl-draw-pill-row">
+                                {numbers.map((n: number) => (
+                                  <span
+                                    key={n}
+                                    className="dl-draw-pill dl-draw-pill--main"
+                                  >
+                                    {n}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="dl-draw-card-section">
+                              <div className="dl-draw-card-label">
+                                {specialGroup?.label ?? 'Bonus ball'}
+                              </div>
+
+                              <div className="dl-draw-pill-row">
+                                {specialNumbers.map((s: number) => (
+                                  <span
+                                    key={s}
+                                    className="dl-draw-pill dl-draw-pill--star"
+                                  >
+                                    {s}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={drawDate} className="dl-draw-card">
+                        <div className="dl-draw-card-kicker">
+                          {lotteryConfig.label.toUpperCase()}
                         </div>
 
-                        <div className="dl-draw-pill-row">
-                          {numbers.map((n: number) => (
-                            <span
-                              key={n}
-                              className="dl-draw-pill dl-draw-pill--main"
-                            >
-                              {n}
-                            </span>
-                          ))}
+                        <div className="dl-draw-card-header">
+                          Draw {dateLabel}
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 18,
+                            marginTop: 16,
+                          }}
+                        >
+                          {sortedDraws.map((d, index) => {
+                            const numbers = [
+                              d.n1,
+                              d.n2,
+                              d.n3,
+                              d.n4,
+                              d.n5,
+                              d.n6,
+                            ].filter(
+                              (value): value is number =>
+                                typeof value === 'number',
+                            );
+
+                            const specialNumbers = [d.bonus_ball].filter(
+                              (value): value is number =>
+                                typeof value === 'number',
+                            );
+
+                            return (
+                              <div
+                                key={d.id}
+                                style={{
+                                  paddingTop: index > 0 ? 18 : 0,
+                                  borderTop:
+                                    index > 0 ? '1px solid #eef2f7' : 'none',
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: 800,
+                                    color: '#6b7280',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.06em',
+                                    marginBottom: 12,
+                                  }}
+                                >
+                                  Draw {d.draw_sequence ?? index + 1}
+                                </div>
+
+                                <div className="dl-draw-card-content">
+                                  <div className="dl-draw-card-section">
+                                    <div className="dl-draw-card-label">
+                                      {mainGroup?.label ?? 'Main numbers'}
+                                    </div>
+
+                                    <div className="dl-draw-pill-row">
+                                      {numbers.map((n: number) => (
+                                        <span
+                                          key={n}
+                                          className="dl-draw-pill dl-draw-pill--main"
+                                        >
+                                          {n}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div className="dl-draw-card-section">
+                                    <div className="dl-draw-card-label">
+                                      {specialGroup?.label ?? 'Bonus ball'}
+                                    </div>
+
+                                    <div className="dl-draw-pill-row">
+                                      {specialNumbers.map((s: number) => (
+                                        <span
+                                          key={s}
+                                          className="dl-draw-pill dl-draw-pill--star"
+                                        >
+                                          {s}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
+                    );
+                  })
+                : draws.map((d: LotteryDraw) => {
+                    const dateLabel = new Date(d.draw_date).toLocaleDateString(
+                      'en-GB',
+                    );
 
-                      <div className="dl-draw-card-section">
-                        <div className="dl-draw-card-label">
-                          {specialGroup?.label ?? 'Special numbers'}
+                    const numbers = [d.n1, d.n2, d.n3, d.n4, d.n5, d.n6].filter(
+                      (value): value is number => typeof value === 'number',
+                    );
+
+                    const specialNumbers = [
+                      d.s1,
+                      d.s2,
+                      d.bonus_ball,
+                      d.life_ball,
+                    ].filter(
+                      (value): value is number => typeof value === 'number',
+                    );
+
+                    return (
+                      <div key={d.id} className="dl-draw-card">
+                        <div className="dl-draw-card-kicker">
+                          {lotteryConfig.label.toUpperCase()}
                         </div>
 
-                        <div className="dl-draw-pill-row">
-                          {specialNumbers.map((s: number) => (
-                            <span
-                              key={s}
-                              className="dl-draw-pill dl-draw-pill--star"
-                            >
-                              {s}
-                            </span>
-                          ))}
+                        <div className="dl-draw-card-header">
+                          Draw {dateLabel}
+                        </div>
+
+                        <div className="dl-draw-card-content">
+                          <div className="dl-draw-card-section">
+                            <div className="dl-draw-card-label">
+                              {mainGroup?.label ?? 'Main numbers'}
+                            </div>
+
+                            <div className="dl-draw-pill-row">
+                              {numbers.map((n: number) => (
+                                <span
+                                  key={n}
+                                  className="dl-draw-pill dl-draw-pill--main"
+                                >
+                                  {n}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="dl-draw-card-section">
+                            <div className="dl-draw-card-label">
+                              {specialGroup?.label ?? 'Special numbers'}
+                            </div>
+
+                            <div className="dl-draw-pill-row">
+                              {specialNumbers.map((s: number) => (
+                                <span
+                                  key={s}
+                                  className="dl-draw-pill dl-draw-pill--star"
+                                >
+                                  {s}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
             </div>
 
             {pagination && (
