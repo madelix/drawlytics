@@ -257,7 +257,7 @@ strengths and limitations.
 ### Foundation cleanup (remaining)
 
 - [ ] Centralise model metadata.
-- [ ] Extract model personality logic from the Performance page.
+- [x] Extract model personality logic from the Performance page.
 - [ ] Standardise evidence, confidence and sample-maturity terminology.
 - [ ] Create reusable metric and evidence display components.
 - [ ] Audit responsive behaviour across every main page.

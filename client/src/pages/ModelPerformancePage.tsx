@@ -10,6 +10,10 @@ import {
 import { LOTTERIES, type LotteryKey } from '../config/lotteries';
 import { LotterySelector } from '../components/LotterySelector';
 import { getModelColour } from '../config/modelPresentation';
+import {
+  getModelPersonality,
+  type ModelPersonality,
+} from '../utils/modelPersonality';
 
 function toNum(v: unknown, fallback = 0) {
   const n = typeof v === 'number' ? v : Number(v);
@@ -71,7 +75,7 @@ function strategyLabel(strategy: 'safe' | 'balanced' | 'aggressive') {
   return 'Balanced';
 }
 
-function reliabilityLabel(checked: number) {
+function sampleMaturityLabel(checked: number) {
   if (checked >= 50) return 'Proven sample';
   if (checked >= 20) return 'Reliable sample';
   if (checked >= 10) return 'Building evidence';
@@ -130,8 +134,8 @@ type ChartRow = {
   avg_total_hits: number;
   recent_avg_total_hits_n: number;
 
-  confidence: number;
-  reliability: string;
+  trust_score: number;
+  sample_maturity: string;
   jackpots: number;
   high_hit_predictions: number;
   four_plus_hits: number;
@@ -153,7 +157,7 @@ type ChartRow = {
   strategy_insight: string;
   strategy_reasons: string[];
   insight: string;
-  personality: 'stable' | 'aggressive' | 'balanced' | 'experimental';
+  personality: ModelPersonality;
 
   color: string;
 };
@@ -379,7 +383,7 @@ export default function ModelPerformancePage() {
         const consistencyScore =
           (avgTotal * 0.6 + highHitRate * 0.4) * sampleFactor;
 
-        const confidenceScore = consistencyScore * 0.6 + sampleFactor * 0.4;
+        const trustScore = consistencyScore * 0.6 + sampleFactor * 0.4;
 
         const upsideScore =
           highHitRate * 1 + fourPlusRate * 2 + fivePlusRate * 4;
@@ -401,7 +405,7 @@ export default function ModelPerformancePage() {
           avgTotal * 0.35 +
           upsideScore * 0.25 +
           consistencyScore * 0.25 +
-          confidenceScore * 0.15;
+          trustScore * 0.15;
 
         const delta = recentAvgTotal - avgTotal;
 
@@ -503,21 +507,13 @@ export default function ModelPerformancePage() {
           insight = 'Stable but unremarkable performance';
         }
 
-        let personality: ChartRow['personality'];
-
-        if (r.model_key === 'strategy_mix') {
-          personality = 'balanced';
-        } else if (checked < 10) {
-          personality = 'experimental';
-        } else if (consistencyScore >= 0.5) {
-          personality = 'stable'; // reliable performer
-        } else if (upsideScore >= 0.25 && consistencyScore < 0.3) {
-          personality = 'aggressive'; // high risk / high reward
-        } else if (avgTotal >= 0.9 && upsideScore >= 0.1) {
-          personality = 'balanced'; // good mix
-        } else {
-          personality = 'stable';
-        }
+        const personality = getModelPersonality({
+          modelKey: r.model_key,
+          checked,
+          consistencyScore,
+          upsideScore,
+          avgTotal,
+        });
 
         return {
           model_key: r.model_key,
@@ -537,8 +533,8 @@ export default function ModelPerformancePage() {
           insight,
           recommendation_score: recommendationScore,
 
-          confidence: confidenceScore,
-          reliability: reliabilityLabel(checked),
+          trust_score: trustScore,
+          sample_maturity: sampleMaturityLabel(checked),
           jackpots: r.jackpots ?? 0,
           high_hit_predictions: r.high_hit_predictions ?? 0,
           four_plus_hits: r.four_plus_hits ?? 0,
@@ -731,7 +727,7 @@ export default function ModelPerformancePage() {
       [...chartRows].sort((a, b) => {
         const getScore = (row: ChartRow) => {
           if (strategyMode === 'safe') {
-            return row.consistency_score * 0.6 + row.confidence * 0.4;
+            return row.consistency_score * 0.6 + row.trust_score * 0.4;
           }
 
           if (strategyMode === 'aggressive') {
@@ -1123,7 +1119,7 @@ export default function ModelPerformancePage() {
             recommendedModel ? (
               <>
                 <div style={{ marginBottom: 8 }}>
-                  {scoreLabel(recommendedModel.confidence, 'confidence')} and{' '}
+                  {scoreLabel(recommendedModel.trust_score, 'confidence')} and{' '}
                   {scoreLabel(
                     recommendedModel.consistency_score,
                     'consistency',
@@ -1567,18 +1563,17 @@ export default function ModelPerformancePage() {
                     ? 'declining'
                     : 'stable';
 
-              const reliability =
+              const sampleMaturity =
                 history.length < 10
-                  ? 'low reliability'
+                  ? 'low sample'
                   : history.length < 25
-                    ? 'moderate reliability'
-                    : 'high reliability';
-
+                    ? 'building evidence'
+                    : 'strong sample';
               return (
                 <>
                   {history.length} recent draws · <strong>{trend}</strong>{' '}
                   performance ({formatNum(diff, 2)}) ·{' '}
-                  <span style={{ opacity: 0.7 }}>{reliability}</span>
+                  <span style={{ opacity: 0.7 }}>{sampleMaturity}</span>
                   {baselineWinRate &&
                     selectedModel?.model_key !== 'pure_random' && (
                       <>
@@ -2192,7 +2187,7 @@ export default function ModelPerformancePage() {
             {filtered.map((r) => {
               const rank =
                 filtered.findIndex((x) => x.model_key === r.model_key) + 1;
-              const conf = r.confidence ?? 0;
+              const conf = r.trust_score ?? 0;
               const jackpotPotLabel = formatNum(r.upside_score, 2);
 
               return (
@@ -2344,7 +2339,7 @@ export default function ModelPerformancePage() {
                     </div>
 
                     <div>
-                      <div style={{ color: '#6b7280' }}>Confidence</div>
+                      <div style={{ color: '#6b7280' }}>Trust score</div>
                       <strong>{Math.round(conf * 100)}%</strong>
                     </div>
                   </div>
@@ -2386,7 +2381,7 @@ export default function ModelPerformancePage() {
                     'Model',
                     'Checked',
                     'Average hits',
-                    'Confidence',
+                    'Trust score',
                     'Jackpot potential',
                   ].map((h) => (
                     <th
@@ -2409,7 +2404,7 @@ export default function ModelPerformancePage() {
                 {filtered.map((r) => {
                   const rank =
                     filtered.findIndex((x) => x.model_key === r.model_key) + 1;
-                  const conf = r.confidence ?? 0;
+                  const conf = r.trust_score ?? 0;
                   const jackpotPotLabel = formatNum(r.upside_score, 2);
 
                   return (
