@@ -360,6 +360,28 @@ strengths and limitations.
 - [ ] Add migration and backup procedures.
 - [ ] Establish production monitoring and error reporting.
 
+## Marketing & Website
+
+- [ ] Redesign the landing page to reflect Drawlytics as a lottery analytics platform rather than a prediction app.
+- [ ] Replace the "Live API Preview" with richer product showcases and screenshots.
+- [ ] Showcase key features:
+  - [ ] Number Analysis
+  - [ ] Model Performance
+  - [ ] Strategy Builder
+  - [ ] Draw History
+  - [ ] Model Profiles
+- [ ] Add "Why Drawlytics?" section focused on transparency and evidence.
+- [ ] Add statistics section (models, historical draws, lotteries supported, etc.).
+- [ ] Improve CTA flow beyond "Join Beta".
+- [ ] Review SEO copy, metadata and structured content after redesign.
+
+## UK Lotto
+
+- [x] Support multiple UK Lotto draws on the same calendar date.
+- [ ] Backfill missing second draws (10 Jun 2026 – 22 Jul 2026).
+- [ ] Evaluate a single UK Lotto prediction against both official draws.
+- [ ] Group same-date UK Lotto results into a single card in the Draws page.
+
 ---
 
 ## Deferred ideas
