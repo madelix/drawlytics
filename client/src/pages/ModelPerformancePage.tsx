@@ -14,6 +14,7 @@ import {
   getModelPersonality,
   type ModelPersonality,
 } from '../utils/modelPersonality';
+import { getShortModelDisplayName } from '../utils/modelDisplay';
 
 function toNum(v: unknown, fallback = 0) {
   const n = typeof v === 'number' ? v : Number(v);
@@ -1032,11 +1033,7 @@ export default function ModelPerformancePage() {
               >
                 {strategyPortfolio
                   .map((model) =>
-                    model.model_display_name
-                      .replace('Balanced Hot/Cold', 'Balanced')
-                      .replace('Cold Focused', 'Cold')
-                      .replace('Hot Focused', 'Hot')
-                      .replace('Pure Random', 'Random'),
+                    getShortModelDisplayName(model.model_display_name),
                   )
                   .join(' + ')}
                 <span style={{ fontSize: 13, marginLeft: 6 }}>→</span>
@@ -1051,11 +1048,9 @@ export default function ModelPerformancePage() {
                 Suggested split:{' '}
                 {strategyPortfolio
                   .map((model) => {
-                    const shortName = model.model_display_name
-                      .replace('Balanced Hot/Cold', 'Balanced')
-                      .replace('Cold Focused', 'Cold')
-                      .replace('Hot Focused', 'Hot')
-                      .replace('Pure Random', 'Random');
+                    const shortName = getShortModelDisplayName(
+                      model.model_display_name,
+                    );
 
                     return `${shortName} ${Math.round(model.weight * 100)}%`;
                   })

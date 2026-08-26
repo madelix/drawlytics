@@ -69,3 +69,16 @@ export function getModelDisplayName(
       .trim()
   );
 }
+
+export function getShortModelDisplayName(
+  rawModelName: string,
+  source?: string | null,
+) {
+  const displayName = getModelDisplayName(rawModelName, source);
+
+  return displayName
+    .replace('Balanced Hot/Cold', 'Balanced')
+    .replace('Cold Focused', 'Cold')
+    .replace('Hot Focused', 'Hot')
+    .replace('Pure Random', 'Random');
+}
