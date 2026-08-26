@@ -107,6 +107,37 @@ export const predictions = pgTable('predictions', {
 });
 
 /* =========================
+   Prediction draw results
+========================= */
+export const prediction_draw_results = pgTable(
+  'prediction_draw_results',
+  {
+    id: serial('id').primaryKey(),
+
+    prediction_id: integer('prediction_id')
+      .notNull()
+      .references(() => predictions.id, { onDelete: 'cascade' }),
+
+    lottery: varchar('lottery', { length: 32 }).notNull(),
+    draw_date: date('draw_date').notNull(),
+
+    // Normally 1. UK Lotto can have multiple official draws
+    // on the same calendar date.
+    draw_sequence: smallint('draw_sequence').default(1).notNull(),
+
+    matched_main: smallint('matched_main').notNull(),
+    matched_special: smallint('matched_special').notNull(),
+
+    created_at: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    prediction_draw_result_unique: uniqueIndex(
+      'prediction_draw_results_prediction_draw_unique',
+    ).on(t.prediction_id, t.draw_date, t.draw_sequence),
+  }),
+);
+
+/* =========================
    Played predictions
 ========================= */
 export const played_predictions = pgTable(

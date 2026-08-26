@@ -64,6 +64,13 @@
       "when": 1785187128559,
       "tag": "0008_dashing_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787752188202,
+      "tag": "0009_opposite_chameleon",
+      "breakpoints": true
     }
   ]
 }

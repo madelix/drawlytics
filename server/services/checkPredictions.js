@@ -11,7 +11,7 @@ function getPredictionLotteryConfig(lotteryRaw) {
     return {
       key: 'uk_lotto',
       mainCount: 6,
-      specialCount: 1,
+      specialCount: 0,
     };
   }
 
@@ -35,6 +35,7 @@ export async function checkPredictions({
   lottery = null,
   limit = 200,
   onlyUnchecked = true,
+  predictionId = null,
 } = {}) {
   const lotteryFilter = lottery
     ? getPredictionLotteryConfig(lottery).key
@@ -57,6 +58,11 @@ export async function checkPredictions({
       $3::text IS NULL
       OR lower(replace(lottery, ' ', '_')) = $3::text
     )
+
+    AND (
+  $4::int IS NULL
+  OR id = $4::int
+)
     AND (
             $2::boolean = false
             OR matched_main IS NULL
@@ -70,7 +76,7 @@ export async function checkPredictions({
         ORDER BY created_at DESC
         LIMIT $1
         `,
-    [limit, onlyUnchecked, lotteryFilter],
+    [limit, onlyUnchecked, lotteryFilter, predictionId],
   );
 
   let predictionsToCheck = preds;
@@ -126,11 +132,13 @@ export async function checkPredictions({
   const drawsByDay = new Map();
   const drawsByLotteryAndDay = new Map();
 
-  const put = (lottery, day, main, stars) => {
+  const put = (lottery, day, main, stars, drawSequence = 1) => {
     if (!day) return;
 
     const key = `${lottery}:${day}`;
-    drawsByLotteryAndDay.set(key, { main, stars });
+    const existing = drawsByLotteryAndDay.get(key) || [];
+
+    drawsByLotteryAndDay.set(key, [...existing, { main, stars, drawSequence }]);
   };
 
   try {
@@ -157,9 +165,10 @@ export async function checkPredictions({
 
     const ukLottoRows = await pool.query(
       `
-    SELECT draw_date, n1,n2,n3,n4,n5,n6, bonus_ball
-    FROM uk_lotto_draws
-    WHERE draw_date::date = ANY($1::date[])
+    SELECT draw_date, draw_sequence, n1,n2,n3,n4,n5,n6, bonus_ball
+FROM uk_lotto_draws
+WHERE draw_date::date = ANY($1::date[])
+ORDER BY draw_date ASC, draw_sequence ASC
     `,
       [daysQuery],
     );
@@ -173,7 +182,7 @@ export async function checkPredictions({
 
       const stars = [r.bonus_ball].map(Number).filter(Number.isFinite);
 
-      put('uk_lotto', day, main, stars);
+      put('uk_lotto', day, main, stars, r.draw_sequence ?? 1);
     }
 
     const setForLifeRows = await pool.query(
@@ -225,10 +234,13 @@ export async function checkPredictions({
 
     const predictionConfig = getPredictionLotteryConfig(p.lottery);
 
-    if (
-      pMain.length !== predictionConfig.mainCount ||
-      pStars.length !== predictionConfig.specialCount
-    ) {
+    const hasValidShape =
+      predictionConfig.key === 'uk_lotto'
+        ? pMain.length === predictionConfig.mainCount
+        : pMain.length === predictionConfig.mainCount &&
+          pStars.length === predictionConfig.specialCount;
+
+    if (!hasValidShape) {
       skipped++;
       continue;
     }
@@ -270,9 +282,58 @@ export async function checkPredictions({
 
     if (drawDay !== day) shifted.push([day, drawDay]);
 
-    const draw = drawsByLotteryAndDay.get(`${predictionLottery}:${drawDay}`);
-    const mMain = countMatches(pMain, draw.main);
-    const mStars = countMatches(pStars, draw.stars);
+    const draws =
+      drawsByLotteryAndDay.get(`${predictionLottery}:${drawDay}`) || [];
+
+    const evaluatedDraws = draws.map((draw) => {
+      const mMain = countMatches(pMain, draw.main);
+
+      const mStars =
+        predictionLottery === 'uk_lotto'
+          ? countMatches(pMain, draw.stars)
+          : countMatches(pStars, draw.stars);
+
+      return {
+        draw,
+        mMain,
+        mStars,
+      };
+    });
+
+    for (const result of evaluatedDraws) {
+      await pool.query(
+        `
+      INSERT INTO prediction_draw_results (
+        prediction_id,
+        lottery,
+        draw_date,
+        draw_sequence,
+        matched_main,
+        matched_special
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (prediction_id, draw_date, draw_sequence)
+      DO UPDATE SET
+        matched_main = EXCLUDED.matched_main,
+        matched_special = EXCLUDED.matched_special
+    `,
+        [
+          p.id,
+          predictionLottery,
+          drawDay,
+          result.draw.drawSequence ?? 1,
+          result.mMain,
+          result.mStars,
+        ],
+      );
+    }
+
+    const bestResult = evaluatedDraws.sort(
+      (a, b) => b.mMain - a.mMain || b.mStars - a.mStars,
+    )[0];
+
+    const mMain = bestResult.mMain;
+    const mStars = bestResult.mStars;
     const label =
       drawDay !== day
         ? `${mMain}+${mStars} (draw:${drawDay})`

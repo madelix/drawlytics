@@ -256,7 +256,8 @@ strengths and limitations.
 
 ### Foundation cleanup (remaining)
 
-- [ ] Centralise model metadata.
+- [x] Centralise model display names and key normalisation.
+- [ ] Centralise remaining model metadata.
 - [x] Extract model personality logic from the Performance page.
 - [x] Standardise evidence, confidence and sample-maturity terminology.
 - [ ] Create reusable metric and evidence display components.
@@ -359,6 +360,7 @@ strengths and limitations.
 - [ ] Document database tables and ownership.
 - [ ] Add migration and backup procedures.
 - [ ] Establish production monitoring and error reporting.
+- [ ] Add automated tests for model-key and display-name normalisation.
 
 ## Marketing & Website
 
@@ -418,6 +420,14 @@ limitations, evidence, evolution and planned improvements.
 
 The Honesty page provides the overall conclusion about whether any Drawlytics
 model has demonstrated credible performance beyond Pure Random.
+
+### 2026-08 — Canonical model identity
+
+Drawlytics uses canonical model keys and shared display-name normalisation rather
+than page-specific model naming.
+
+Model identity should be defined centrally and consumed by Strategy, Models,
+Performance and future model-related systems.
 
 ## Critical data-correctness issues
 
