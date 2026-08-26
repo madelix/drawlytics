@@ -258,7 +258,7 @@ strengths and limitations.
 
 - [ ] Centralise model metadata.
 - [x] Extract model personality logic from the Performance page.
-- [ ] Standardise evidence, confidence and sample-maturity terminology.
+- [x] Standardise evidence, confidence and sample-maturity terminology.
 - [ ] Create reusable metric and evidence display components.
 - [ ] Audit responsive behaviour across every main page.
 

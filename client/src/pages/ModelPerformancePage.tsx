@@ -7,7 +7,7 @@ import {
   type ModelHistoryPoint,
   type ModelPerformanceRow,
 } from '../api/performance';
-import { LOTTERIES, type LotteryKey } from '../config/lotteries';
+import { type LotteryKey } from '../config/lotteries';
 import { LotterySelector } from '../components/LotterySelector';
 import { getModelColour } from '../config/modelPresentation';
 import {
@@ -18,12 +18,6 @@ import {
 function toNum(v: unknown, fallback = 0) {
   const n = typeof v === 'number' ? v : Number(v);
   return Number.isFinite(n) ? n : fallback;
-}
-
-function formatPctFromString(s: string) {
-  const n = Number(s);
-  if (!Number.isFinite(n)) return '—';
-  return `${n.toFixed(1)}%`;
 }
 
 function formatNum(n: number, decimals = 2) {
@@ -663,10 +657,6 @@ export default function ModelPerformancePage() {
     }
   }, [filtered]);
 
-  const hiddenCount = useMemo(() => {
-    return Math.max(0, rows.length - filtered.length);
-  }, [rows.length, filtered.length]);
-
   const bestStrategyModel = useMemo(() => {
     return (
       [...chartRows].sort((a, b) => b.strategy_score - a.strategy_score)[0] ??
@@ -742,25 +732,10 @@ export default function ModelPerformancePage() {
     );
   }, [chartRows, strategyMode]);
 
-  const biggestMover = useMemo(() => {
-    const movers = filtered.filter((r) => r.trend !== 'flat');
-    if (movers.length === 0) return null;
-
-    return [...movers].sort((a, b) => {
-      const aDiff = Math.abs(a.recent_avg_total_hits_n - a.avg_total_hits);
-      const bDiff = Math.abs(b.recent_avg_total_hits_n - b.avg_total_hits);
-      return bDiff - aDiff;
-    })[0];
-  }, [filtered]);
-
   const heatingUp = useMemo(() => {
     return [...filtered]
       .filter((r) => r.trend === 'up')
       .sort((a, b) => b.trend_delta - a.trend_delta);
-  }, [filtered]);
-
-  const coolingDown = useMemo(() => {
-    return filtered.filter((r) => r.trend === 'down');
   }, [filtered]);
 
   const byLabel = useMemo(() => {
@@ -791,26 +766,6 @@ export default function ModelPerformancePage() {
       }))
       .reverse();
   }, [filtered, rankingMode, isMobile]);
-
-  const checkedCoveragePct = useMemo(() => {
-    if (!summary.total) return null;
-    return (100 * summary.checked) / summary.total;
-  }, [summary.total, summary.checked]);
-
-  const historyChartData = useMemo(() => {
-    if (!selectedModel) return [];
-
-    return [
-      {
-        id: selectedModel.model_display_name,
-        data: history.map((point, index) => ({
-          x: index + 1,
-          y: toNum(point.avg_total_hits, 0),
-        })),
-        color: selectedModel.color,
-      },
-    ];
-  }, [history, selectedModel]);
 
   const baselineWinRate = useMemo(() => {
     if (!history.length || !baselineHistory.length) return null;
