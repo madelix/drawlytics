@@ -6,7 +6,7 @@ import { and, eq, inArray, desc } from 'drizzle-orm';
 
 const router = express.Router();
 
-const { predictions, played_predictions } = schema;
+const { predictions, played_predictions, prediction_draw_results } = schema;
 
 function isPgUniqueViolation(err) {
   return err && typeof err === 'object' && err.code === '23505';
@@ -206,7 +206,42 @@ router.get('/played-predictions', async (req, res) => {
       .orderBy(desc(played_predictions.played_at))
       .limit(500);
 
-    return res.json({ ok: true, played: rows });
+    const predictionIds = rows.map((row) => row.prediction_id);
+
+    const resultRows =
+      predictionIds.length === 0
+        ? []
+        : await db
+            .select({
+              prediction_id: prediction_draw_results.prediction_id,
+              lottery: prediction_draw_results.lottery,
+              draw_date: prediction_draw_results.draw_date,
+              draw_sequence: prediction_draw_results.draw_sequence,
+              matched_main: prediction_draw_results.matched_main,
+              matched_special: prediction_draw_results.matched_special,
+            })
+            .from(prediction_draw_results)
+            .where(
+              inArray(prediction_draw_results.prediction_id, predictionIds),
+            );
+
+    const resultsByPrediction = new Map();
+
+    for (const result of resultRows) {
+      const existing = resultsByPrediction.get(result.prediction_id) ?? [];
+
+      existing.push(result);
+      existing.sort((a, b) => (a.draw_sequence ?? 1) - (b.draw_sequence ?? 1));
+
+      resultsByPrediction.set(result.prediction_id, existing);
+    }
+
+    const played = rows.map((row) => ({
+      ...row,
+      draw_results: resultsByPrediction.get(row.prediction_id) ?? [],
+    }));
+
+    return res.json({ ok: true, played });
   } catch (err) {
     console.error('played-predictions GET error:', err);
     return res.status(500).json({

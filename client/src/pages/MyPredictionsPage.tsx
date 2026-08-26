@@ -22,6 +22,12 @@ type PredictionRow = {
   matched_main: number | null;
   matched_stars: number | null;
   result_label: string | null;
+  draw_results?: Array<{
+    draw_date: string;
+    draw_sequence: number;
+    matched_main: number;
+    matched_special: number;
+  }>;
 };
 
 type DrawRow = {
@@ -45,6 +51,8 @@ type PredictionsResponse = {
   predictions?: PredictionRow[];
   error?: string;
 };
+
+const PAGE_SIZE = 10;
 
 type DrawsAllResponse = {
   ok: boolean;
@@ -110,6 +118,7 @@ function formatDayLabel(dayKey: string): string {
 type DrawLookup = {
   main: Set<number>;
   stars: Set<number>;
+  draw_sequence?: number;
 };
 
 function countHits(
@@ -152,7 +161,7 @@ function getDrawLookupKey(
 function bestLabelForGroup(
   dayKey: string,
   items: PredictionRow[],
-  drawMap: Record<string, DrawLookup>,
+  drawMap: Record<string, DrawLookup[]>,
 ): string {
   if (dayKey === 'unknown') return '—';
 
@@ -161,18 +170,20 @@ function bestLabelForGroup(
 
   for (const p of items) {
     const lookupKey = getDrawLookupKey(p.lottery, dayKey);
-    const draw = lookupKey ? drawMap[lookupKey] : undefined;
-    if (!draw) continue;
+    const draws = lookupKey ? drawMap[lookupKey] : undefined;
+    if (!draws?.length) continue;
 
-    const hits = countHits(p, draw);
-    if (!hits) continue;
+    for (const draw of draws) {
+      const hits = countHits(p, draw);
+      if (!hits) continue;
 
-    if (
-      hits.main > bestMain ||
-      (hits.main === bestMain && hits.stars > bestStars)
-    ) {
-      bestMain = hits.main;
-      bestStars = hits.stars;
+      if (
+        hits.main > bestMain ||
+        (hits.main === bestMain && hits.stars > bestStars)
+      ) {
+        bestMain = hits.main;
+        bestStars = hits.stars;
+      }
     }
   }
 
@@ -187,6 +198,15 @@ export default function MyPredictionsPage() {
   const [predictions, setPredictions] = useState<PredictionRow[]>([]);
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
 
+  const [offset, setOffset] = useState(0);
+
+  const [pagination, setPagination] = useState<{
+    limit: number;
+    offset: number;
+    total: number;
+    hasMore: boolean;
+  } | null>(null);
+
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [selectedPredictionIds, setSelectedPredictionIds] = useState<
     Set<number>
@@ -195,12 +215,16 @@ export default function MyPredictionsPage() {
   const [playedMap, setPlayedMap] = useState<Record<number, boolean>>({});
   const [playingId, setPlayingId] = useState<number | null>(null);
 
-  const [drawMap, setDrawMap] = useState<Record<string, DrawLookup>>({});
+  const [drawMap, setDrawMap] = useState<Record<string, DrawLookup[]>>({});
   const [isMobile, setIsMobile] = useState(false);
 
   const [selectedLottery, setSelectedLottery] = useState<LotteryKey | 'all'>(
     'all',
   );
+
+  useEffect(() => {
+    setOffset(0);
+  }, [selectedLottery]);
 
   const [deleteConfirmIds, setDeleteConfirmIds] = useState<number[] | null>(
     null,
@@ -223,11 +247,14 @@ export default function MyPredictionsPage() {
   });
 
   useEffect(() => {
-    void loadPredictions();
     void loadPlayedMap();
     void loadDrawsForHighlighting();
     void loadUsage();
   }, []);
+
+  useEffect(() => {
+    void loadPredictions();
+  }, [offset, selectedLottery]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 700px)');
@@ -259,8 +286,25 @@ export default function MyPredictionsPage() {
     setLoading(true);
 
     try {
-      const data =
-        await fetchJsonOrThrow<PredictionsResponse>('/api/predictions');
+      const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: String(offset),
+      });
+
+      if (selectedLottery !== 'all') {
+        params.set('lottery', selectedLottery);
+      }
+
+      const data = await fetchJsonOrThrow<
+        PredictionsResponse & {
+          pagination?: {
+            limit: number;
+            offset: number;
+            total: number;
+            hasMore: boolean;
+          };
+        }
+      >(`/api/predictions?${params.toString()}`);
 
       if (!data.ok) {
         throw new Error(data.error || 'Could not load predictions');
@@ -276,6 +320,7 @@ export default function MyPredictionsPage() {
       );
 
       setPredictions(data.predictions ?? []);
+      setPagination(data.pagination ?? null);
     } catch (err: any) {
       console.error(err);
       setError(err?.message ?? 'Could not load predictions');
@@ -328,7 +373,7 @@ export default function MyPredictionsPage() {
         'set_for_life',
       ];
 
-      const nextMap: Record<string, DrawLookup> = {};
+      const nextMap: Record<string, DrawLookup[]> = {};
 
       for (const lotteryKey of lotteryKeys) {
         const data = await fetchJsonOrThrow<DrawsAllResponse>(
@@ -353,10 +398,22 @@ export default function MyPredictionsPage() {
                 ? [row.life_ball]
                 : [row.s1, row.s2];
 
-          nextMap[`${lotteryKey}:${dayKey}`] = {
+          const key = `${lotteryKey}:${dayKey}`;
+
+          const lookup: DrawLookup = {
             main: new Set(mainNumbers.map(Number).filter(Number.isFinite)),
             stars: new Set(specialNumbers.map(Number).filter(Number.isFinite)),
+            draw_sequence: Number((row as any).draw_sequence ?? 1),
           };
+
+          if (!nextMap[key]) {
+            nextMap[key] = [];
+          }
+
+          nextMap[key].push(lookup);
+          nextMap[key].sort(
+            (a, b) => (a.draw_sequence ?? 1) - (b.draw_sequence ?? 1),
+          );
         }
       }
 
@@ -389,16 +446,15 @@ export default function MyPredictionsPage() {
   }, [predictions, selectedLottery]);
 
   const visibleUsage = useMemo(() => {
-    const visibleCount =
-      selectedLottery === 'all' ? predictions.length : predictionsSorted.length;
+    const totalSaved = usage?.used ?? 0;
 
     return {
-      used: visibleCount,
+      used: totalSaved,
       label: usage?.limits_disabled
-        ? `${visibleCount} saved • unlimited dev mode`
-        : `${visibleCount}/${usage?.limit ?? 50} saved`,
+        ? `${totalSaved} saved • unlimited dev mode`
+        : `${totalSaved}/${usage?.limit ?? 50} saved`,
     };
-  }, [predictions.length, predictionsSorted.length, selectedLottery, usage]);
+  }, [usage]);
 
   const predictionsByDraw = useMemo(() => {
     const map: Record<string, PredictionRow[]> = {};
@@ -423,6 +479,19 @@ export default function MyPredictionsPage() {
 
     return entries;
   }, [predictionsByDraw]);
+
+  const canPrev = offset > 0;
+  const canNext = Boolean(pagination?.hasMore);
+
+  const handlePrev = () => {
+    if (!canPrev) return;
+    setOffset((prev) => Math.max(prev - PAGE_SIZE, 0));
+  };
+
+  const handleNext = () => {
+    if (!canNext) return;
+    setOffset((prev) => prev + PAGE_SIZE);
+  };
 
   // Keep openDraws in sync with the current drawGroups keys (persisted)
   useEffect(() => {
@@ -955,23 +1024,25 @@ export default function MyPredictionsPage() {
               const lookupKey = getDrawLookupKey(items[0]?.lottery, dayKey);
               if (!lookupKey || !drawMap[lookupKey]) return null;
 
-              const draw = drawMap[lookupKey];
+              const draws = drawMap[lookupKey];
 
               let bestMain = 0;
               let bestStars = 0;
               let bestModel: string | null = null;
 
               for (const p of items) {
-                const hits = countHits(p, draw);
-                if (!hits) continue;
+                for (const draw of draws) {
+                  const hits = countHits(p, draw);
+                  if (!hits) continue;
 
-                if (
-                  hits.main > bestMain ||
-                  (hits.main === bestMain && hits.stars > bestStars)
-                ) {
-                  bestMain = hits.main;
-                  bestStars = hits.stars;
-                  bestModel = getModelDisplayName(p.model_name);
+                  if (
+                    hits.main > bestMain ||
+                    (hits.main === bestMain && hits.stars > bestStars)
+                  ) {
+                    bestMain = hits.main;
+                    bestStars = hits.stars;
+                    bestModel = getModelDisplayName(p.model_name);
+                  }
                 }
               }
 
@@ -986,7 +1057,7 @@ export default function MyPredictionsPage() {
 
               if (!lookupKey || !drawMap[lookupKey]) return null;
 
-              const draw = drawMap[lookupKey];
+              const draws = drawMap[lookupKey];
 
               let bestMain = 0;
               let bestStars = 0;
@@ -997,16 +1068,18 @@ export default function MyPredictionsPage() {
                 if (!playedMap[p.id]) continue;
                 anyPlayed = true;
 
-                const hits = countHits(p, draw);
-                if (!hits) continue;
+                for (const draw of draws) {
+                  const hits = countHits(p, draw);
+                  if (!hits) continue;
 
-                if (
-                  hits.main > bestMain ||
-                  (hits.main === bestMain && hits.stars > bestStars)
-                ) {
-                  bestMain = hits.main;
-                  bestStars = hits.stars;
-                  bestModel = getModelDisplayName(p.model_name);
+                  if (
+                    hits.main > bestMain ||
+                    (hits.main === bestMain && hits.stars > bestStars)
+                  ) {
+                    bestMain = hits.main;
+                    bestStars = hits.stars;
+                    bestModel = getModelDisplayName(p.model_name);
+                  }
                 }
               }
 
@@ -1024,10 +1097,8 @@ export default function MyPredictionsPage() {
             );
 
             const winning =
-              winningLookupKey && drawMap[winningLookupKey]
-                ? (() => {
-                    const d = drawMap[winningLookupKey];
-
+              winningLookupKey && drawMap[winningLookupKey]?.length
+                ? drawMap[winningLookupKey].map((d, index) => {
                     const main = Array.from(d.main)
                       .sort((a, b) => a - b)
                       .join(' ');
@@ -1037,16 +1108,22 @@ export default function MyPredictionsPage() {
                       .join(' ');
 
                     const specialLabel =
-                      items[0]?.lottery === 'uk_lotto'
+                      normalizeLotteryKey(items[0]?.lottery) === 'uk_lotto'
                         ? 'Bonus'
-                        : items[0]?.lottery === 'set_for_life'
+                        : normalizeLotteryKey(items[0]?.lottery) ===
+                            'set_for_life'
                           ? 'Life'
                           : 'Stars';
 
+                    const drawPrefix =
+                      drawMap[winningLookupKey].length > 1
+                        ? `Draw ${d.draw_sequence ?? index + 1}: `
+                        : 'Winning: ';
+
                     return special
-                      ? `Winning: ${main} • ${specialLabel}: ${special}`
-                      : `Winning: ${main}`;
-                  })()
+                      ? `${drawPrefix}${main} • ${specialLabel}: ${special}`
+                      : `${drawPrefix}${main}`;
+                  })
                 : null;
 
             return (
@@ -1164,7 +1241,17 @@ export default function MyPredictionsPage() {
                     </div>
 
                     {winning ? (
-                      <div style={{ opacity: 0.85 }}>{winning}</div>
+                      <div
+                        style={{
+                          opacity: 0.85,
+                          display: 'grid',
+                          gap: 2,
+                        }}
+                      >
+                        {winning.map((line, index) => (
+                          <div key={index}>{line}</div>
+                        ))}
+                      </div>
                     ) : null}
                   </div>
                 </button>
@@ -1273,7 +1360,20 @@ export default function MyPredictionsPage() {
                     const mainGroup = getMainGroup(p.lottery);
                     const secondaryGroup = getSecondaryGroup(p.lottery);
                     const drawKey = getDrawLookupKey(p.lottery, predDayKey);
-                    const draw = drawKey ? drawMap[drawKey] : undefined;
+                    const draws = drawKey ? drawMap[drawKey] : undefined;
+
+                    const draw = draws?.length
+                      ? [...draws].sort((a, b) => {
+                          const aHits = countHits(p, a);
+                          const bHits = countHits(p, b);
+
+                          if (!aHits || !bHits) return 0;
+
+                          return (
+                            bHits.main - aHits.main || bHits.stars - aHits.stars
+                          );
+                        })[0]
+                      : undefined;
                     const canTogglePlayed = !draw; // lock played when results exist
                     const isPlayed = Boolean(playedMap[p.id]);
 
@@ -1542,23 +1642,47 @@ export default function MyPredictionsPage() {
                                 {`${Math.round(Number(p.confidence) || 0)}%`}
                               </div>
 
-                              {(p.matched_main != null ||
-                                p.matched_stars != null) && (
+                              {normalizeLotteryKey(p.lottery) === 'uk_lotto' &&
+                              p.draw_results &&
+                              p.draw_results.length > 1 ? (
                                 <div
                                   style={{
                                     fontSize: '0.75rem',
                                     color: '#6b7280',
                                     marginTop: 2,
+                                    display: 'grid',
+                                    gap: 2,
                                   }}
                                 >
-                                  Hits: {p.matched_main ?? 0}{' '}
-                                  {mainGroup?.shortLabel.toLowerCase() ??
-                                    'main'}{' '}
-                                  / {p.matched_stars ?? 0}{' '}
-                                  {secondaryGroup?.shortLabel.toLowerCase() ??
-                                    'stars'}
-                                  {p.result_label ? ` • ${p.result_label}` : ''}
+                                  {p.draw_results.map((result) => (
+                                    <div key={result.draw_sequence}>
+                                      Draw {result.draw_sequence}:{' '}
+                                      {result.matched_main} main /{' '}
+                                      {result.matched_special} bonus
+                                    </div>
+                                  ))}
                                 </div>
+                              ) : (
+                                (p.matched_main != null ||
+                                  p.matched_stars != null) && (
+                                  <div
+                                    style={{
+                                      fontSize: '0.75rem',
+                                      color: '#6b7280',
+                                      marginTop: 2,
+                                    }}
+                                  >
+                                    Hits: {p.matched_main ?? 0}{' '}
+                                    {mainGroup?.shortLabel.toLowerCase() ??
+                                      'main'}{' '}
+                                    / {p.matched_stars ?? 0}{' '}
+                                    {secondaryGroup?.shortLabel.toLowerCase() ??
+                                      'stars'}
+                                    {p.result_label
+                                      ? ` • ${p.result_label}`
+                                      : ''}
+                                  </div>
+                                )
                               )}
 
                               {!isMobile && !draw && (
@@ -1633,8 +1757,44 @@ export default function MyPredictionsPage() {
               </div>
             );
           })}
+          {pagination && pagination.total > 0 && (
+            <div
+              className="dl-pagination-bar"
+              style={{
+                width: '100%',
+                gridColumn: '1 / -1',
+              }}
+            >
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={!canPrev}
+                className="dl-pagination-btn"
+                style={{ opacity: canPrev ? 1 : 0.5 }}
+              >
+                ← Previous
+              </button>
+
+              <div>
+                Showing {offset + 1}–
+                {Math.min(offset + PAGE_SIZE, pagination.total)} of{' '}
+                {pagination.total}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={!canNext}
+                className="dl-pagination-btn"
+                style={{ opacity: canNext ? 1 : 0.5 }}
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </section>
       )}
+
       {deleteConfirmIds && (
         <div
           role="dialog"

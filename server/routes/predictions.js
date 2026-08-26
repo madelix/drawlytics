@@ -160,32 +160,118 @@ LIMIT 1
 /**
  * GET /api/predictions
  */
-router.get('/predictions', async (_req, res) => {
+router.get('/predictions', async (req, res) => {
   try {
-    const { rows } = await pool.query(
+    const limitRaw = Number(req.query.limit ?? 20);
+    const offsetRaw = Number(req.query.offset ?? 0);
+
+    const limit = Number.isFinite(limitRaw)
+      ? Math.max(1, Math.min(100, Math.floor(limitRaw)))
+      : 20;
+
+    const offset = Number.isFinite(offsetRaw)
+      ? Math.max(0, Math.floor(offsetRaw))
+      : 0;
+
+    const lotteryRaw = req.query.lottery
+      ? String(req.query.lottery).trim()
+      : null;
+
+    const lotteryFilter =
+      lotteryRaw && lotteryRaw !== 'all'
+        ? getPredictionLotteryConfig(lotteryRaw).key
+        : null;
+
+    const dateRows = await pool.query(
       `
-      SELECT
-  id,
-  lottery,
-  draw_date,
-  model_name,
-  main_numbers,
-  star_numbers,
-  confidence,
-  status,
-  created_at,
-  matched_main,
-  matched_stars,
-  result_label,
-  source
+      SELECT DISTINCT draw_date
       FROM predictions
-WHERE user_id = 1
-ORDER BY created_at DESC
-LIMIT 500
+      WHERE user_id = 1
+        AND (
+          $3::text IS NULL
+          OR lower(replace(lottery, ' ', '_')) = $3::text
+        )
+      ORDER BY draw_date DESC
+      LIMIT $1
+      OFFSET $2
       `,
+      [limit, offset, lotteryFilter],
     );
 
-    res.json({ ok: true, predictions: rows });
+    const drawDates = dateRows.rows.map((row) => row.draw_date);
+
+    const { rows } =
+      drawDates.length === 0
+        ? { rows: [] }
+        : await pool.query(
+            `
+            SELECT
+              id,
+              lottery,
+              draw_date,
+              model_name,
+              main_numbers,
+              star_numbers,
+              confidence,
+              status,
+              created_at,
+              matched_main,
+              matched_stars,
+              result_label,
+              source,
+              COALESCE(
+                (
+                  SELECT json_agg(
+                    json_build_object(
+                      'draw_date', pdr.draw_date,
+                      'draw_sequence', pdr.draw_sequence,
+                      'matched_main', pdr.matched_main,
+                      'matched_special', pdr.matched_special
+                    )
+                    ORDER BY pdr.draw_date, pdr.draw_sequence
+                  )
+                  FROM prediction_draw_results pdr
+                  WHERE pdr.prediction_id = predictions.id
+                ),
+                '[]'::json
+              ) AS draw_results
+            FROM predictions
+            WHERE user_id = 1
+              AND draw_date = ANY($1::date[])
+              AND (
+                $2::text IS NULL
+                OR lower(replace(lottery, ' ', '_')) = $2::text
+              )
+            ORDER BY draw_date DESC, created_at DESC
+            `,
+            [drawDates, lotteryFilter],
+          );
+
+    const countResult = await pool.query(
+      `
+      SELECT COUNT(DISTINCT draw_date)::int AS total
+      FROM predictions
+      WHERE user_id = 1
+        AND (
+          $1::text IS NULL
+          OR lower(replace(lottery, ' ', '_')) = $1::text
+        )
+      `,
+      [lotteryFilter],
+    );
+
+    const total = countResult.rows?.[0]?.total ?? 0;
+
+    return res.json({
+      ok: true,
+      predictions: rows,
+      pagination: {
+        limit,
+        offset,
+        total,
+        hasMore: offset + limit < total,
+      },
+    });
   } catch (err) {
     console.error('GET /predictions failed:', err);
     res.status(500).json({ ok: false, error: 'predictions_failed' });
