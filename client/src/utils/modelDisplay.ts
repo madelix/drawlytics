@@ -13,6 +13,7 @@ export const MODEL_DISPLAY_NAMES: Record<string, string> = {
   ai_gradient_boosting: 'AI Gradient Boosting',
   ai_xgboost: 'AI XGBoost',
   ai_q_learning: 'AI Q-Learning',
+  ai_advanced_analysis: 'AI Advanced Analysis',
   ai_neural_network: 'AI Neural Network',
   ai_lstm: 'AI LSTM',
   ai_bayesian: 'AI Bayesian',
