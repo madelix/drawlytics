@@ -2,6 +2,7 @@
 import './App.css';
 
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import { Show, SignInButton, UserButton } from '@clerk/react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 
 import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
@@ -141,6 +142,37 @@ function AppHeader() {
             My predictions
           </NavLink>
         </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <button
+                type="button"
+                aria-label="Sign in"
+                title="Sign in"
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 999,
+                  border: '1px solid #d1d5db',
+                  background: '#ffffff',
+                  color: '#374151',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                }}
+              >
+                👤
+              </button>
+            </SignInButton>
+          </Show>
+
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
+        </div>
 
         {/* Mobile hamburger */}
         <button

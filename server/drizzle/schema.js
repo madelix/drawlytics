@@ -89,6 +89,33 @@ export const set_for_life_draws = pgTable(
 );
 
 /* =========================
+   Users
+========================= */
+export const users = pgTable(
+  'users',
+  {
+    id: serial('id').primaryKey(),
+
+    clerk_user_id: varchar('clerk_user_id', { length: 255 }).notNull(),
+
+    email: varchar('email', { length: 255 }),
+
+    created_at: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+
+    updated_at: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => ({
+    users_clerk_user_id_unique: uniqueIndex('users_clerk_user_id_unique').on(
+      t.clerk_user_id,
+    ),
+  }),
+);
+
+/* =========================
    Predictions
 ========================= */
 export const predictions = pgTable('predictions', {
@@ -104,6 +131,8 @@ export const predictions = pgTable('predictions', {
   matched_stars: smallint('matched_stars'),
   result_label: varchar('result_label', { length: 24 }),
   created_at: timestamp('created_at').defaultNow().notNull(),
+  user_id: integer('user_id'),
+  source: text('source'),
 });
 
 /* =========================

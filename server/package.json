@@ -11,6 +11,7 @@
     "start:prod": "npm run db:migrate && node index.js"
   },
   "dependencies": {
+    "@clerk/express": "^2.1.63",
     "cors": "^2.8.5",
     "csv-parse": "^5.5.6",
     "dotenv": "^17.2.3",

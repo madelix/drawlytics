@@ -1,0 +1,644 @@
+{
+  "id": "e23377aa-df37-4148-a8f4-f8aa3b1595e6",
+  "prevId": "59ca99b4-e1b2-4e53-b75d-48a37bb9c653",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.euromillions_draws": {
+      "name": "euromillions_draws",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "draw_date": {
+          "name": "draw_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n1": {
+          "name": "n1",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n2": {
+          "name": "n2",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n3": {
+          "name": "n3",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n4": {
+          "name": "n4",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n5": {
+          "name": "n5",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "s1": {
+          "name": "s1",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "s2": {
+          "name": "s2",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.played_predictions": {
+      "name": "played_predictions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "lottery": {
+          "name": "lottery",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "draw_date": {
+          "name": "draw_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prediction_id": {
+          "name": "prediction_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model_name": {
+          "name": "model_name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "played_at": {
+          "name": "played_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "played_predictions_lottery_draw_prediction_unique": {
+          "name": "played_predictions_lottery_draw_prediction_unique",
+          "columns": [
+            {
+              "expression": "lottery",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "draw_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "prediction_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "played_predictions_prediction_id_predictions_id_fk": {
+          "name": "played_predictions_prediction_id_predictions_id_fk",
+          "tableFrom": "played_predictions",
+          "tableTo": "predictions",
+          "columnsFrom": [
+            "prediction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.prediction_draw_results": {
+      "name": "prediction_draw_results",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "prediction_id": {
+          "name": "prediction_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lottery": {
+          "name": "lottery",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "draw_date": {
+          "name": "draw_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "draw_sequence": {
+          "name": "draw_sequence",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "matched_main": {
+          "name": "matched_main",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "matched_special": {
+          "name": "matched_special",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "prediction_draw_results_prediction_draw_unique": {
+          "name": "prediction_draw_results_prediction_draw_unique",
+          "columns": [
+            {
+              "expression": "prediction_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "draw_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "draw_sequence",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "prediction_draw_results_prediction_id_predictions_id_fk": {
+          "name": "prediction_draw_results_prediction_id_predictions_id_fk",
+          "tableFrom": "prediction_draw_results",
+          "tableTo": "predictions",
+          "columnsFrom": [
+            "prediction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.predictions": {
+      "name": "predictions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "lottery": {
+          "name": "lottery",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'euromillions'"
+        },
+        "draw_date": {
+          "name": "draw_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model_name": {
+          "name": "model_name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "main_numbers": {
+          "name": "main_numbers",
+          "type": "smallint[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "star_numbers": {
+          "name": "star_numbers",
+          "type": "smallint[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(24)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "matched_main": {
+          "name": "matched_main",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "matched_stars": {
+          "name": "matched_stars",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result_label": {
+          "name": "result_label",
+          "type": "varchar(24)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.set_for_life_draws": {
+      "name": "set_for_life_draws",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "draw_date": {
+          "name": "draw_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n1": {
+          "name": "n1",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n2": {
+          "name": "n2",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n3": {
+          "name": "n3",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n4": {
+          "name": "n4",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n5": {
+          "name": "n5",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "life_ball": {
+          "name": "life_ball",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "set_for_life_draws_draw_date_unique": {
+          "name": "set_for_life_draws_draw_date_unique",
+          "columns": [
+            {
+              "expression": "draw_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.uk_lotto_draws": {
+      "name": "uk_lotto_draws",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "draw_date": {
+          "name": "draw_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "draw_sequence": {
+          "name": "draw_sequence",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "n1": {
+          "name": "n1",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n2": {
+          "name": "n2",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n3": {
+          "name": "n3",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n4": {
+          "name": "n4",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n5": {
+          "name": "n5",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n6": {
+          "name": "n6",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bonus_ball": {
+          "name": "bonus_ball",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uk_lotto_draws_draw_identity_unique": {
+          "name": "uk_lotto_draws_draw_identity_unique",
+          "columns": [
+            {
+              "expression": "draw_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "draw_sequence",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "clerk_user_id": {
+          "name": "clerk_user_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "users_clerk_user_id_unique": {
+          "name": "users_clerk_user_id_unique",
+          "columns": [
+            {
+              "expression": "clerk_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

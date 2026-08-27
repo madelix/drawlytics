@@ -93,6 +93,7 @@ body {
   border-radius: 5px;
   text-decoration: none;
   color: #4b5563;
+  white-space: nowrap;
   transition:
     background 0.18s ease,
     color 0.18s ease,

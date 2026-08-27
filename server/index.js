@@ -11,9 +11,11 @@ import predictionsRouter from './routes/predictions.js';
 import performanceRouter from './routes/performance.js';
 import playedPredictionsRouter from './routes/playedPredictions.js';
 import drawsRouter from './routes/draws.js';
+import { clerkMiddleware, getAuth } from '@clerk/express';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.use(clerkMiddleware());
 
 // Pull tables from the Drizzle schema
 const { euromillions_draws, uk_lotto_draws, set_for_life_draws } = schema;
@@ -84,6 +86,52 @@ app.use(
   }),
 );
 app.use(express.json());
+
+app.get('/api/auth-test', (req, res) => {
+  const auth = getAuth(req);
+
+  res.json({
+    ok: true,
+    isAuthenticated: auth.isAuthenticated,
+    userId: auth.userId ?? null,
+  });
+});
+
+app.get('/api/me', async (req, res) => {
+  try {
+    const auth = getAuth(req);
+
+    if (!auth.userId) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
+
+    const { rows } = await pool.query(
+      `
+      INSERT INTO users (clerk_user_id)
+      VALUES ($1)
+      ON CONFLICT (clerk_user_id)
+      DO UPDATE SET updated_at = now()
+      RETURNING id, clerk_user_id, email, created_at, updated_at
+      `,
+      [auth.userId],
+    );
+
+    return res.json({
+      ok: true,
+      user: rows[0],
+    });
+  } catch (err) {
+    console.error('GET /api/me failed:', err);
+
+    return res.status(500).json({
+      ok: false,
+      error: 'user_sync_failed',
+    });
+  }
+});
 
 // ✅ Mount routers (all under /api)
 app.use('/api', predictionsRouter);

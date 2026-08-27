@@ -1,9 +1,30 @@
 // server/routes/predictions.js
 import express from 'express';
+import { getAuth } from '@clerk/express';
 import { pool } from '../db.js';
 import { checkPredictions } from '../services/checkPredictions.js';
 
 const router = express.Router();
+
+async function getCurrentDrawlyticsUser(req) {
+  const auth = getAuth(req);
+
+  if (!auth.userId) {
+    return null;
+  }
+
+  const { rows } = await pool.query(
+    `
+    SELECT id, clerk_user_id, email
+    FROM users
+    WHERE clerk_user_id = $1
+    LIMIT 1
+    `,
+    [auth.userId],
+  );
+
+  return rows[0] ?? null;
+}
 
 function getPredictionLotteryConfig(lotteryRaw) {
   const lottery = String(lotteryRaw ?? 'euromillions')
@@ -162,6 +183,16 @@ LIMIT 1
  */
 router.get('/predictions', async (req, res) => {
   try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
+
+    const userId = currentUser.id;
     const limitRaw = Number(req.query.limit ?? 20);
     const offsetRaw = Number(req.query.offset ?? 0);
 
@@ -184,18 +215,18 @@ router.get('/predictions', async (req, res) => {
 
     const dateRows = await pool.query(
       `
-      SELECT DISTINCT draw_date
-      FROM predictions
-      WHERE user_id = 1
-        AND (
-          $3::text IS NULL
-          OR lower(replace(lottery, ' ', '_')) = $3::text
-        )
-      ORDER BY draw_date DESC
-      LIMIT $1
-      OFFSET $2
-      `,
-      [limit, offset, lotteryFilter],
+  SELECT DISTINCT draw_date
+  FROM predictions
+  WHERE user_id = $4
+    AND (
+      $3::text IS NULL
+      OR lower(replace(lottery, ' ', '_')) = $3::text
+    )
+  ORDER BY draw_date DESC
+  LIMIT $1
+  OFFSET $2
+  `,
+      [limit, offset, lotteryFilter, userId],
     );
 
     const drawDates = dateRows.rows.map((row) => row.draw_date);
@@ -205,59 +236,59 @@ router.get('/predictions', async (req, res) => {
         ? { rows: [] }
         : await pool.query(
             `
-            SELECT
-              id,
-              lottery,
-              draw_date,
-              model_name,
-              main_numbers,
-              star_numbers,
-              confidence,
-              status,
-              created_at,
-              matched_main,
-              matched_stars,
-              result_label,
-              source,
-              COALESCE(
-                (
-                  SELECT json_agg(
-                    json_build_object(
-                      'draw_date', pdr.draw_date,
-                      'draw_sequence', pdr.draw_sequence,
-                      'matched_main', pdr.matched_main,
-                      'matched_special', pdr.matched_special
-                    )
-                    ORDER BY pdr.draw_date, pdr.draw_sequence
-                  )
-                  FROM prediction_draw_results pdr
-                  WHERE pdr.prediction_id = predictions.id
-                ),
-                '[]'::json
-              ) AS draw_results
-            FROM predictions
-            WHERE user_id = 1
-              AND draw_date = ANY($1::date[])
-              AND (
-                $2::text IS NULL
-                OR lower(replace(lottery, ' ', '_')) = $2::text
+        SELECT
+          id,
+          lottery,
+          draw_date,
+          model_name,
+          main_numbers,
+          star_numbers,
+          confidence,
+          status,
+          created_at,
+          matched_main,
+          matched_stars,
+          result_label,
+          source,
+          COALESCE(
+            (
+              SELECT json_agg(
+                json_build_object(
+                  'draw_date', pdr.draw_date,
+                  'draw_sequence', pdr.draw_sequence,
+                  'matched_main', pdr.matched_main,
+                  'matched_special', pdr.matched_special
+                )
+                ORDER BY pdr.draw_date, pdr.draw_sequence
               )
-            ORDER BY draw_date DESC, created_at DESC
-            `,
-            [drawDates, lotteryFilter],
+              FROM prediction_draw_results pdr
+              WHERE pdr.prediction_id = predictions.id
+            ),
+            '[]'::json
+          ) AS draw_results
+        FROM predictions
+        WHERE user_id = $3
+          AND draw_date = ANY($1::date[])
+          AND (
+            $2::text IS NULL
+            OR lower(replace(lottery, ' ', '_')) = $2::text
+          )
+        ORDER BY draw_date DESC, created_at DESC
+        `,
+            [drawDates, lotteryFilter, userId],
           );
 
     const countResult = await pool.query(
       `
-      SELECT COUNT(DISTINCT draw_date)::int AS total
-      FROM predictions
-      WHERE user_id = 1
-        AND (
-          $1::text IS NULL
-          OR lower(replace(lottery, ' ', '_')) = $1::text
-        )
-      `,
-      [lotteryFilter],
+  SELECT COUNT(DISTINCT draw_date)::int AS total
+  FROM predictions
+  WHERE user_id = $2
+    AND (
+      $1::text IS NULL
+      OR lower(replace(lottery, ' ', '_')) = $1::text
+    )
+  `,
+      [lotteryFilter, userId],
     );
 
     const total = countResult.rows?.[0]?.total ?? 0;
@@ -282,14 +313,25 @@ router.get('/predictions', async (req, res) => {
  * GET /api/predictions/usage
  * Returns usage for current user (temporary: user_id = 1).
  */
-router.get('/predictions/usage', async (_req, res) => {
+router.get('/predictions/usage', async (req, res) => {
   try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
+
+    const userId = currentUser.id;
     const LIMIT_FREE = 50;
     const disableLimits =
       String(process.env.DISABLE_LIMITS ?? '').trim() === '1';
 
     const { rows } = await pool.query(
-      `SELECT COUNT(*)::int AS used FROM predictions WHERE user_id = 1`,
+      `SELECT COUNT(*)::int AS used FROM predictions WHERE user_id = $1`,
+      [userId],
     );
 
     return res.json({
@@ -312,6 +354,16 @@ router.get('/predictions/usage', async (_req, res) => {
  */
 router.post('/predictions/generate', async (req, res) => {
   try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
+
+    const userId = currentUser.id;
     const lotteryRaw = String(req.body?.lottery ?? '').trim();
     const strategy = String(req.body?.strategy ?? 'pure_random').trim();
     const source = String(req.body?.source ?? 'manual').trim();
@@ -1174,7 +1226,8 @@ router.post('/predictions/generate', async (req, res) => {
     const saved = [];
     // Free plan limit (temporary)
     const { rows: countRows } = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM predictions WHERE user_id = 1`,
+      `SELECT COUNT(*)::int AS count FROM predictions WHERE user_id = $1`,
+      [userId],
     );
 
     const currentCount = countRows[0]?.count ?? 0;
@@ -1217,7 +1270,7 @@ router.post('/predictions/generate', async (req, res) => {
 user_id,
 source
 )
-        VALUES (
+VALUES (
   $1,
   $2,
   $3,
@@ -1229,8 +1282,8 @@ source
   NULL,
   NULL,
   'pending',
-1,
-$7
+  $7,
+  $8
 )
         RETURNING
   id,
@@ -1254,6 +1307,7 @@ $7
           line.main,
           line.stars,
           confidence,
+          userId,
           source,
         ],
       );
@@ -1350,8 +1404,17 @@ router.get('/predictions/debug-draws', async (req, res) => {
  */
 router.post('/predictions/check', async (req, res) => {
   try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
+
     const result = await checkPredictions({
-      userId: 1,
+      userId: currentUser.id,
       lottery: req.body?.lottery ?? null,
       limit: req.body?.limit ?? 200,
       onlyUnchecked: req.body?.onlyUnchecked !== false,
@@ -1656,16 +1719,49 @@ WHERE id = $1
  */
 router.delete('/predictions/:id', async (req, res) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ ok: false, error: 'invalid_id' });
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
     }
 
-    await pool.query(`DELETE FROM predictions WHERE id = $1`, [id]);
-    res.status(204).send();
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        ok: false,
+        error: 'invalid_id',
+      });
+    }
+
+    const result = await pool.query(
+      `
+      DELETE FROM predictions
+      WHERE id = $1
+        AND user_id = $2
+      RETURNING id
+      `,
+      [id, currentUser.id],
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        ok: false,
+        error: 'prediction_not_found',
+      });
+    }
+
+    return res.status(204).send();
   } catch (err) {
     console.error('DELETE /predictions/:id failed:', err);
-    res.status(500).json({ ok: false, error: 'delete_failed' });
+
+    return res.status(500).json({
+      ok: false,
+      error: 'delete_failed',
+    });
   }
 });
 

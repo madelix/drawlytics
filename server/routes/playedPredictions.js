@@ -1,12 +1,34 @@
 // server/routes/playedPredictions.js
 import express from 'express';
+import { getAuth } from '@clerk/express';
 import { db } from '../db.js';
 import * as schema from '../drizzle/schema.js';
 import { and, eq, inArray, desc } from 'drizzle-orm';
 
 const router = express.Router();
 
-const { predictions, played_predictions, prediction_draw_results } = schema;
+async function getCurrentDrawlyticsUser(req) {
+  const auth = getAuth(req);
+
+  if (!auth.userId) {
+    return null;
+  }
+
+  const [user] = await db
+    .select({
+      id: users.id,
+      clerk_user_id: users.clerk_user_id,
+      email: users.email,
+    })
+    .from(users)
+    .where(eq(users.clerk_user_id, auth.userId))
+    .limit(1);
+
+  return user ?? null;
+}
+
+const { users, predictions, played_predictions, prediction_draw_results } =
+  schema;
 
 function isPgUniqueViolation(err) {
   return err && typeof err === 'object' && err.code === '23505';
@@ -24,6 +46,14 @@ function isPgForeignKeyViolation(err) {
  */
 router.post('/played-predictions', async (req, res) => {
   try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
     const prediction_id = Number(req.body?.prediction_id);
     const notes =
       req.body?.notes != null && String(req.body.notes).trim() !== ''
@@ -53,7 +83,12 @@ router.post('/played-predictions', async (req, res) => {
         created_at: predictions.created_at,
       })
       .from(predictions)
-      .where(eq(predictions.id, prediction_id))
+      .where(
+        and(
+          eq(predictions.id, prediction_id),
+          eq(predictions.user_id, currentUser.id),
+        ),
+      )
       .limit(1);
 
     if (!p) {
@@ -138,12 +173,38 @@ router.post('/played-predictions', async (req, res) => {
  */
 router.delete('/played-predictions/:predictionId', async (req, res) => {
   try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
     const predictionId = Number(req.params.predictionId);
 
     if (!Number.isInteger(predictionId) || predictionId <= 0) {
       return res
         .status(400)
         .json({ ok: false, error: 'invalid_prediction_id' });
+    }
+
+    const [ownedPrediction] = await db
+      .select({ id: predictions.id })
+      .from(predictions)
+      .where(
+        and(
+          eq(predictions.id, predictionId),
+          eq(predictions.user_id, currentUser.id),
+        ),
+      )
+      .limit(1);
+
+    if (!ownedPrediction) {
+      return res.status(404).json({
+        ok: false,
+        error: 'not_found',
+      });
     }
 
     const deleted = await db
@@ -171,10 +232,18 @@ router.delete('/played-predictions/:predictionId', async (req, res) => {
  */
 router.get('/played-predictions', async (req, res) => {
   try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
     const lottery = req.query.lottery ? String(req.query.lottery) : null;
     const draw_date = req.query.draw_date ? String(req.query.draw_date) : null;
 
-    const whereParts = [];
+    const whereParts = [eq(predictions.user_id, currentUser.id)];
     if (lottery) whereParts.push(eq(played_predictions.lottery, lottery));
     if (draw_date) whereParts.push(eq(played_predictions.draw_date, draw_date));
 
@@ -257,6 +326,14 @@ router.get('/played-predictions', async (req, res) => {
  */
 router.get('/played-predictions/status', async (req, res) => {
   try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
     const raw = String(req.query.ids ?? '').trim();
     if (!raw) return res.json({ ok: true, playedIds: [] });
 
@@ -270,7 +347,16 @@ router.get('/played-predictions/status', async (req, res) => {
     const rows = await db
       .select({ prediction_id: played_predictions.prediction_id })
       .from(played_predictions)
-      .where(inArray(played_predictions.prediction_id, ids));
+      .innerJoin(
+        predictions,
+        eq(predictions.id, played_predictions.prediction_id),
+      )
+      .where(
+        and(
+          inArray(played_predictions.prediction_id, ids),
+          eq(predictions.user_id, currentUser.id),
+        ),
+      );
 
     return res.json({ ok: true, playedIds: rows.map((r) => r.prediction_id) });
   } catch (err) {
