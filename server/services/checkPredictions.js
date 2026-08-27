@@ -36,47 +36,54 @@ export async function checkPredictions({
   limit = 200,
   onlyUnchecked = true,
   predictionId = null,
+  offset = 0,
 } = {}) {
   const lotteryFilter = lottery
     ? getPredictionLotteryConfig(lottery).key
     : null;
+
   const { rows: preds } = await pool.query(
     `
-        SELECT
-          id,
-          lottery,
-          draw_date,
-          main_numbers,
-          star_numbers,
-          matched_main,
-          matched_stars,
-          result_label,
-          status
-        FROM predictions
-  WHERE lower(replace(lottery, ' ', '_')) IN ('euromillions', 'uk_lotto', 'set_for_life')
-    AND (
-      $3::text IS NULL
-      OR lower(replace(lottery, ' ', '_')) = $3::text
-    )
-
-    AND (
-  $4::int IS NULL
-  OR id = $4::int
-)
-    AND (
-            $2::boolean = false
-            OR matched_main IS NULL
-            OR matched_stars IS NULL
-            OR result_label IS NULL
-            OR result_label = ''
-            OR result_label LIKE 'no_draw%'
-            OR status IS NULL
-            OR status = 'pending'
-          )
-        ORDER BY created_at DESC
-        LIMIT $1
-        `,
-    [limit, onlyUnchecked, lotteryFilter, predictionId],
+    SELECT
+      id,
+      lottery,
+      draw_date,
+      main_numbers,
+      star_numbers,
+      matched_main,
+      matched_stars,
+      result_label,
+      status
+    FROM predictions
+    WHERE user_id = $6::int
+      AND lower(replace(lottery, ' ', '_')) IN (
+        'euromillions',
+        'uk_lotto',
+        'set_for_life'
+      )
+      AND (
+        $3::text IS NULL
+        OR lower(replace(lottery, ' ', '_')) = $3::text
+      )
+      AND (
+        $4::int IS NULL
+        OR id = $4::int
+      )
+      AND (
+        $2::boolean = false
+        OR matched_main IS NULL
+        OR matched_stars IS NULL
+        OR result_label IS NULL
+        OR result_label = ''
+        OR result_label LIKE 'no_draw%'
+        OR status IS NULL
+        OR status = 'pending'
+      )
+    ORDER BY created_at DESC
+    LIMIT $1::int
+    OFFSET $5::int
+  `,
+    [limit, onlyUnchecked, lotteryFilter, predictionId, offset, userId],
   );
 
   let predictionsToCheck = preds;

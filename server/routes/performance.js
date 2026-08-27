@@ -39,13 +39,22 @@ router.get('/performance/models', async (req, res) => {
     const { rows } = await pool.query(
       `
       WITH base AS (
-        SELECT
-          *,
-          LOWER(model_name) AS model_name_lc
-        FROM predictions
-        WHERE LOWER(lottery) = LOWER($1)
-      ),
-      normalized AS (
+  SELECT
+    p.id,
+    p.model_name,
+    p.source,
+    p.status,
+    pdr.draw_date,
+    pdr.draw_sequence,
+    pdr.matched_main,
+    pdr.matched_special AS matched_stars,
+    LOWER(p.model_name) AS model_name_lc
+  FROM predictions p
+  INNER JOIN prediction_draw_results pdr
+    ON pdr.prediction_id = p.id
+  WHERE LOWER(p.lottery) = LOWER($1)
+),
+normalized AS (
         SELECT
           CASE
   WHEN source = 'strategy_mix' THEN 'strategy_mix'
@@ -71,12 +80,13 @@ router.get('/performance/models', async (req, res) => {
               ''
             )
           END AS model_key,
-          draw_date,
-          status,
-          matched_main,
-          matched_stars,
-          source
-        FROM base
+draw_date,
+draw_sequence,
+status,
+matched_main,
+matched_stars,
+source
+FROM base
       ),
         named AS (
         SELECT
@@ -100,41 +110,53 @@ WHEN 'ai_markov_chain' THEN 'AI Markov Chain'
 WHEN 'ai_meta_learning' THEN 'AI Meta Learning'
             ELSE INITCAP(REPLACE(model_key, '_', ' '))
           END AS model_display_name,
-          draw_date,
-          status,
-          matched_main,
-          matched_stars,
-          source
-        FROM normalized
+draw_date,
+draw_sequence,
+status,
+matched_main,
+matched_stars,
+source
+FROM normalized
       ),
       ranked_checked AS (
   SELECT
-    model_key,
-    draw_date,
-    matched_main,
-    matched_stars,
+  model_key,
+  draw_date,
+  draw_sequence,
+  matched_main,
+  matched_stars,
     ROW_NUMBER() OVER (
       PARTITION BY model_key
-      ORDER BY draw_date DESC
+      ORDER BY draw_date DESC, draw_sequence DESC
     ) AS recency_rank
   FROM named
   WHERE status = 'checked'
+),
+draw_model_scores AS (
+  SELECT
+    model_key,
+    draw_date,
+    draw_sequence,
+    AVG(
+      COALESCE(matched_main, 0) + COALESCE(matched_stars, 0)
+    ) AS avg_total_hits
+  FROM named
+  WHERE status = 'checked'
+  GROUP BY model_key, draw_date, draw_sequence
 ),
 baseline_compare AS (
   SELECT
     m.model_key,
     COUNT(*)::int AS baseline_compared_draws,
     COUNT(*) FILTER (
-      WHERE COALESCE(m.matched_main, 0) + COALESCE(m.matched_stars, 0)
-          > COALESCE(b.matched_main, 0) + COALESCE(b.matched_stars, 0)
+      WHERE m.avg_total_hits > b.avg_total_hits
     )::int AS baseline_wins
-  FROM named m
-  JOIN named b
+  FROM draw_model_scores m
+  JOIN draw_model_scores b
     ON b.draw_date = m.draw_date
+   AND b.draw_sequence = m.draw_sequence
    AND b.model_key = 'pure_random'
-   AND b.status = 'checked'
-  WHERE m.status = 'checked'
-    AND m.model_key <> 'pure_random'
+  WHERE m.model_key <> 'pure_random'
   GROUP BY m.model_key
 )
 
@@ -239,13 +261,20 @@ router.get('/performance/model-history', async (req, res) => {
     const { rows } = await pool.query(
       `
       WITH base AS (
-        SELECT
-          *,
-          LOWER(model_name) AS model_name_lc
-        FROM predictions
-        WHERE LOWER(lottery) = LOWER($1)
-          AND LOWER(TRIM(status)) = 'checked'
-      ),
+  SELECT
+    p.model_name,
+    p.status,
+    pdr.draw_date,
+    pdr.draw_sequence,
+    pdr.matched_main,
+    pdr.matched_special AS matched_stars,
+    LOWER(p.model_name) AS model_name_lc
+  FROM predictions p
+  INNER JOIN prediction_draw_results pdr
+    ON pdr.prediction_id = p.id
+  WHERE LOWER(p.lottery) = LOWER($1)
+    AND LOWER(TRIM(p.status)) = 'checked'
+),
       normalized AS (
         SELECT
           CASE
@@ -281,20 +310,22 @@ WHEN model_name_lc LIKE 'ai:meta_learning%' THEN 'ai_meta_learning'
               ''
             )
           END AS model_key,
-          draw_date,
-          COALESCE(matched_main, 0) + COALESCE(matched_stars, 0) AS total_hits
-        FROM base
+draw_date,
+draw_sequence,
+COALESCE(matched_main, 0) + COALESCE(matched_stars, 0) AS total_hits
+FROM base
       )
       SELECT
   draw_date,
+  draw_sequence,
   model_key,
   AVG(total_hits)::numeric AS avg_total_hits,
   COUNT(*)::int AS prediction_count
 FROM normalized
 WHERE model_key = $2
    OR model_key = 'pure_random'
-GROUP BY draw_date, model_key
-ORDER BY draw_date ASC;
+GROUP BY draw_date, draw_sequence, model_key
+ORDER BY draw_date ASC, draw_sequence ASC;
       `,
       [lottery, modelKey],
     );
@@ -320,14 +351,18 @@ router.get('/performance/honesty-summary', async (req, res) => {
 
     const { rows } = await pool.query(
       `
-            SELECT
-  model_name,
-  source,
-  status,
-  matched_main,
-  matched_stars
-FROM predictions
-WHERE LOWER(lottery) = LOWER($1);
+           SELECT
+  p.model_name,
+  p.source,
+  p.status,
+  pdr.draw_date,
+  pdr.draw_sequence,
+  pdr.matched_main,
+  pdr.matched_special AS matched_stars
+FROM predictions p
+INNER JOIN prediction_draw_results pdr
+  ON pdr.prediction_id = p.id
+WHERE LOWER(p.lottery) = LOWER($1);
       `,
       [lottery],
     );
@@ -589,12 +624,14 @@ router.get('/performance/random-comparison', async (req, res) => {
     const { rows } = await pool.query(
       `
   SELECT
-  model_name,
-  source,
-  COALESCE(matched_main, 0) + COALESCE(matched_stars, 0) AS total_hits
-FROM predictions
-WHERE LOWER(lottery) = LOWER($1)
-  AND LOWER(TRIM(status)) = 'checked';
+  p.model_name,
+  p.source,
+  COALESCE(pdr.matched_main, 0) + COALESCE(pdr.matched_special, 0) AS total_hits
+FROM predictions p
+INNER JOIN prediction_draw_results pdr
+  ON pdr.prediction_id = p.id
+WHERE LOWER(p.lottery) = LOWER($1)
+  AND LOWER(TRIM(p.status)) = 'checked';
   `,
       [lottery],
     );
@@ -745,13 +782,15 @@ router.get(
       const { rows } = await pool.query(
         `
       SELECT
-        model_name,
-        matched_main,
-        matched_stars,
-        status
-      FROM predictions
-      WHERE LOWER(lottery) = LOWER($1)
-        AND LOWER(TRIM(status)) = 'checked';
+  p.model_name,
+  p.status,
+  pdr.matched_main,
+  pdr.matched_special AS matched_stars
+FROM predictions p
+INNER JOIN prediction_draw_results pdr
+  ON pdr.prediction_id = p.id
+WHERE LOWER(p.lottery) = LOWER($1)
+  AND LOWER(TRIM(p.status)) = 'checked';
       `,
         [lottery],
       );

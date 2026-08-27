@@ -4,16 +4,19 @@ import { normalizeModelKey } from '../modelNormalization.js';
 export async function buildLeaderboardHistory(lottery) {
   const { rows } = await pool.query(
     `
-    SELECT
-      draw_date,
-      model_name,
-      matched_main,
-      matched_stars
-    FROM predictions
-    WHERE LOWER(lottery) = LOWER($1)
-      AND LOWER(TRIM(status)) = 'checked'
-    ORDER BY draw_date ASC;
-    `,
+  SELECT
+    pdr.draw_date,
+    pdr.draw_sequence,
+    p.model_name,
+    pdr.matched_main,
+    pdr.matched_special AS matched_stars
+  FROM prediction_draw_results pdr
+  INNER JOIN predictions p
+    ON p.id = pdr.prediction_id
+  WHERE LOWER(p.lottery) = LOWER($1)
+    AND LOWER(TRIM(p.status)) = 'checked'
+  ORDER BY pdr.draw_date ASC, pdr.draw_sequence ASC;
+  `,
     [lottery],
   );
 
@@ -21,24 +24,25 @@ export async function buildLeaderboardHistory(lottery) {
 
   for (const row of rows) {
     const drawDate = new Date(row.draw_date).toISOString().slice(0, 10);
+    const drawKey = `${drawDate}:${row.draw_sequence ?? 1}`;
     const modelKey = normalizeModelKey(row.model_name);
     const totalHits =
       Number(row.matched_main ?? 0) + Number(row.matched_stars ?? 0);
 
-    const drawPredictions = predictionsByDraw.get(drawDate) ?? [];
+    const drawPredictions = predictionsByDraw.get(drawKey) ?? [];
 
     drawPredictions.push({
       model_key: modelKey,
       total_hits: totalHits,
     });
 
-    predictionsByDraw.set(drawDate, drawPredictions);
+    predictionsByDraw.set(drawKey, drawPredictions);
   }
 
   const cumulativeStats = new Map();
   const history = [];
 
-  for (const [drawDate, drawPredictions] of predictionsByDraw.entries()) {
+  for (const [drawKey, drawPredictions] of predictionsByDraw.entries()) {
     for (const prediction of drawPredictions) {
       const current = cumulativeStats.get(prediction.model_key) ?? {
         totalHits: 0,
@@ -67,8 +71,12 @@ export async function buildLeaderboardHistory(lottery) {
     const leader = rankedModels[0];
 
     if (leader) {
+      const [drawDate, drawSequenceRaw] = drawKey.split(':');
+      const drawSequence = Number(drawSequenceRaw || 1);
+
       history.push({
         draw_date: drawDate,
+        draw_sequence: drawSequence,
         leader_model_key: leader.model_key,
         leader_avg_total_hits: leader.avg_total_hits,
         leader_checked_predictions: leader.checked_predictions,

@@ -241,11 +241,11 @@ strengths and limitations.
 ### Critical correctness
 
 - [x] Support multiple UK Lotto draws on the same calendar date.
-- [ ] Update UK Lotto prediction checking so one ticket is evaluated against both official draws on the same date.
-- [ ] Stop using draw date as a unique draw identity.
-- [ ] Display every official UK Lotto result in Draw History.
-- [ ] Check eligible predictions against both same-date draws.
-- [ ] Recalculate any analytics affected by omitted draw records.
+- [x] Update UK Lotto prediction checking so one ticket is evaluated against both official draws on the same date.
+- [x] Stop using draw date as a unique draw identity.
+- [x] Display every official UK Lotto result in Draw History.
+- [x] Check eligible predictions against both same-date draws.
+- [x] Recalculate any analytics affected by omitted draw records.
 - [ ] Display both UK Lotto draw results together when viewing a prediction.
 
 ### Foundation cleanup (completed)
@@ -380,8 +380,8 @@ strengths and limitations.
 ## UK Lotto
 
 - [x] Support multiple UK Lotto draws on the same calendar date.
-- [ ] Backfill missing second draws (10 Jun 2026 – 22 Jul 2026).
-- [ ] Evaluate a single UK Lotto prediction against both official draws.
+- [x] Backfill missing second draws (10 Jun 2026 – 22 Jul 2026).
+- [x] Evaluate a single UK Lotto prediction against both official draws.
 - [ ] Group same-date UK Lotto results into a single card in the Draws page.
 
 ---
@@ -521,11 +521,11 @@ The following areas must be audited for date-only assumptions:
 #### Status
 
 - [ ] Verify the official naming and identifiers for the two draws.
-- [ ] Inspect the UK Lotto table for same-date rows.
-- [ ] Audit database uniqueness constraints.
-- [ ] Introduce a stable draw identifier or sequence.
-- [ ] Correct the Draw History API and page.
-- [ ] Correct prediction result checking.
-- [ ] Correct historical analysis calculations.
-- [ ] Recalculate affected model-performance statistics.
+- [x] Inspect the UK Lotto table for same-date rows.
+- [x] Audit database uniqueness constraints.
+- [x] Introduce a stable draw identifier or sequence.
+- [x] Correct the Draw History API and page.
+- [x] Correct prediction result checking.
+- [x] Correct historical analysis calculations.
+- [x] Recalculate affected model-performance statistics.
 - [ ] Add regression tests covering two draws on one date.
