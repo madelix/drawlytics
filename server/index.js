@@ -15,7 +15,6 @@ import { clerkMiddleware, getAuth } from '@clerk/express';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.use(clerkMiddleware());
 
 // Pull tables from the Drizzle schema
 const { euromillions_draws, uk_lotto_draws, set_for_life_draws } = schema;
@@ -85,6 +84,8 @@ app.use(
     origin: true, // reflect request origin
   }),
 );
+
+app.use(clerkMiddleware());
 app.use(express.json());
 
 app.get('/api/auth-test', (req, res) => {
