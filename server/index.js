@@ -118,13 +118,35 @@ app.get('/api/me', async (req, res) => {
 
     const { rows } = await pool.query(
       `
-  INSERT INTO users (clerk_user_id, email)
-  VALUES ($1, $2)
-  ON CONFLICT (clerk_user_id)
-  DO UPDATE SET
-    email = EXCLUDED.email,
-    updated_at = now()
-  RETURNING id, clerk_user_id, email, created_at, updated_at
+  WITH existing_user AS (
+    UPDATE users
+    SET
+      clerk_user_id = $1,
+      email = $2,
+      updated_at = now()
+    WHERE id = (
+  SELECT id
+  FROM users
+  WHERE LOWER(email) = LOWER($2)
+  ORDER BY id
+  LIMIT 1
+)
+    RETURNING id, clerk_user_id, email, created_at, updated_at
+  ),
+  inserted_user AS (
+    INSERT INTO users (clerk_user_id, email)
+    SELECT $1, $2
+    WHERE NOT EXISTS (SELECT 1 FROM existing_user)
+    ON CONFLICT (clerk_user_id)
+    DO UPDATE SET
+      email = EXCLUDED.email,
+      updated_at = now()
+    RETURNING id, clerk_user_id, email, created_at, updated_at
+  )
+  SELECT * FROM existing_user
+  UNION ALL
+  SELECT * FROM inserted_user
+  LIMIT 1
   `,
       [auth.userId, primaryEmail],
     );
