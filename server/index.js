@@ -11,7 +11,7 @@ import predictionsRouter from './routes/predictions.js';
 import performanceRouter from './routes/performance.js';
 import playedPredictionsRouter from './routes/playedPredictions.js';
 import drawsRouter from './routes/draws.js';
-import { clerkMiddleware, getAuth } from '@clerk/express';
+import { clerkClient, clerkMiddleware, getAuth } from '@clerk/express';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -109,15 +109,24 @@ app.get('/api/me', async (req, res) => {
       });
     }
 
+    const clerkUser = await clerkClient.users.getUser(auth.userId);
+
+    const primaryEmail =
+      clerkUser.emailAddresses.find(
+        (email) => email.id === clerkUser.primaryEmailAddressId,
+      )?.emailAddress ?? null;
+
     const { rows } = await pool.query(
       `
-      INSERT INTO users (clerk_user_id)
-      VALUES ($1)
-      ON CONFLICT (clerk_user_id)
-      DO UPDATE SET updated_at = now()
-      RETURNING id, clerk_user_id, email, created_at, updated_at
-      `,
-      [auth.userId],
+  INSERT INTO users (clerk_user_id, email)
+  VALUES ($1, $2)
+  ON CONFLICT (clerk_user_id)
+  DO UPDATE SET
+    email = EXCLUDED.email,
+    updated_at = now()
+  RETURNING id, clerk_user_id, email, created_at, updated_at
+  `,
+      [auth.userId, primaryEmail],
     );
 
     return res.json({
