@@ -3,7 +3,7 @@ import './App.css';
 
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { Show, SignInButton, UserButton, useAuth } from '@clerk/react';
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useLayoutEffect, useState } from 'react';
 
 import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
 
@@ -298,7 +298,7 @@ function AppHeader() {
 export default function App() {
   const { getToken } = useAuth();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setApiAuthTokenGetter(() => getToken());
 
     return () => {
