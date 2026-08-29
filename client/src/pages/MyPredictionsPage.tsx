@@ -8,6 +8,7 @@ import {
 } from '../config/lotteries';
 import { getMainGroup, getSecondaryGroup } from '../utils/lotteryNumbers';
 import { LotterySelector } from '../components/LotterySelector';
+import { apiGetJson } from '../api/apiClient';
 
 type PredictionRow = {
   id: number;
@@ -273,8 +274,7 @@ export default function MyPredictionsPage() {
 
   async function loadUsage() {
     try {
-      const res = await fetch('/api/predictions/usage');
-      const json = await res.json();
+      const json = await apiGetJson<any>('/api/predictions/usage');
       if (json?.ok) setUsage(json);
     } catch (err) {
       console.warn('Could not load usage', err);
@@ -295,7 +295,7 @@ export default function MyPredictionsPage() {
         params.set('lottery', selectedLottery);
       }
 
-      const data = await fetchJsonOrThrow<
+      const data = await apiGetJson<
         PredictionsResponse & {
           pagination?: {
             limit: number;
