@@ -2,7 +2,7 @@
 import './App.css';
 
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
-import { Show, SignInButton, UserButton } from '@clerk/react';
+import { Show, SignInButton, UserButton, useAuth } from '@clerk/react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 
 import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
@@ -13,6 +13,7 @@ import ModelPerformancePage from './pages/ModelPerformancePage';
 import HonestyDashboardPage from './pages/HonestyDashboardPage';
 import ModelRegistryPage from './pages/ModelRegistryPage';
 import ModelProfilePage from './pages/ModelProfilePage';
+import { setApiAuthTokenGetter } from './api/apiClient';
 
 // --- Lazy-loaded pages ---
 const AnalysisPage = lazy(() =>
@@ -295,6 +296,16 @@ function AppHeader() {
    ────────────────────────────────────────────── */
 
 export default function App() {
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setApiAuthTokenGetter(() => getToken());
+
+    return () => {
+      setApiAuthTokenGetter(async () => null);
+    };
+  }, [getToken]);
+
   return (
     <>
       <AppHeader />

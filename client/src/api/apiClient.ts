@@ -1,5 +1,13 @@
 // client/src/api/apiClient.ts
 
+let authTokenGetter: (() => Promise<string | null>) | null = null;
+
+export function setApiAuthTokenGetter(
+  getter: () => Promise<string | null>,
+): void {
+  authTokenGetter = getter;
+}
+
 /**
  * Goal:
  * - In DEV: always use relative "/api/..." so Vite proxy handles it (no CORS, no Railway).
@@ -42,7 +50,12 @@ function looksLikeHtml(text: string): boolean {
 }
 
 export async function apiGetJson<T>(path: string): Promise<T> {
-  const res = await fetch(apiUrl(path), { method: 'GET' });
+  const token = authTokenGetter ? await authTokenGetter() : null;
+
+  const res = await fetch(apiUrl(path), {
+    method: 'GET',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   const text = await readText(res);
 
   if (!res.ok) {
@@ -65,9 +78,14 @@ export async function apiSendJson<T>(
   path: string,
   options: { method: 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: any },
 ): Promise<T> {
+  const token = authTokenGetter ? await authTokenGetter() : null;
+
   const res = await fetch(apiUrl(path), {
     method: options.method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: options.body != null ? JSON.stringify(options.body) : undefined,
   });
 
