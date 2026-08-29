@@ -99,6 +99,9 @@ app.get('/api/auth-test', (req, res) => {
     ok: true,
     isAuthenticated: auth.isAuthenticated,
     userId: auth.userId ?? null,
+    sessionId: auth.sessionId ?? null,
+    tokenType: auth.tokenType ?? null,
+    status: auth.status ?? null,
   });
 });
 
