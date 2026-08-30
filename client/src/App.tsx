@@ -1,7 +1,13 @@
 // client/src/App.tsx
 import './App.css';
 
-import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import {
+  Routes,
+  Route,
+  NavLink,
+  Navigate,
+  useLocation,
+} from 'react-router-dom';
 import { Show, SignInButton, UserButton, useAuth } from '@clerk/react';
 import { Suspense, lazy, useEffect, useLayoutEffect, useState } from 'react';
 
@@ -134,14 +140,16 @@ function AppHeader() {
             Honesty
           </NavLink>
 
-          <NavLink
-            to="/predictions"
-            className={({ isActive }) =>
-              `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
-            }
-          >
-            My predictions
-          </NavLink>
+          <Show when="signed-in">
+            <NavLink
+              to="/predictions"
+              className={({ isActive }) =>
+                `dl-nav-link ${isActive ? 'dl-nav-link--active' : ''}`
+              }
+            >
+              My predictions
+            </NavLink>
+          </Show>
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -265,16 +273,18 @@ function AppHeader() {
             Honesty
           </NavLink>
 
-          <NavLink
-            to="/predictions"
-            className={({ isActive }) =>
-              `dl-nav-link dl-nav-link--mobile ${
-                isActive ? 'dl-nav-link--active' : ''
-              }`
-            }
-          >
-            My predictions
-          </NavLink>
+          <Show when="signed-in">
+            <NavLink
+              to="/predictions"
+              className={({ isActive }) =>
+                `dl-nav-link dl-nav-link--mobile ${
+                  isActive ? 'dl-nav-link--active' : ''
+                }`
+              }
+            >
+              My predictions
+            </NavLink>
+          </Show>
 
           <span
             style={{
@@ -294,6 +304,19 @@ function AppHeader() {
 /* ──────────────────────────────────────────────
    ROOT APP
    ────────────────────────────────────────────── */
+function ProtectedPredictionsRoute() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return null;
+  }
+
+  if (!isSignedIn) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <MyPredictionsPage />;
+}
 
 export default function App() {
   const { getToken } = useAuth();
@@ -320,7 +343,7 @@ export default function App() {
           <Route path="/models/:modelKey" element={<ModelProfilePage />} />
           <Route path="/performance" element={<ModelPerformancePage />} />
           <Route path="/honesty" element={<HonestyDashboardPage />} />
-          <Route path="/predictions" element={<MyPredictionsPage />} />
+          <Route path="/predictions" element={<ProtectedPredictionsRoute />} />
         </Routes>
       </Suspense>
     </>

@@ -37,6 +37,39 @@ The platform must distinguish between:
 Model names, descriptions, categories, colours, implementation status and
 personality logic should not be duplicated across pages.
 
+### Global analytics and personal data are separate
+
+Drawlytics must distinguish between platform-level benchmark data and
+user-owned prediction data.
+
+Global analytics include:
+
+- Model Registry evidence,
+- Model Profiles,
+- Performance,
+- Honesty,
+- model rankings and comparisons.
+
+These must ultimately be calculated from a canonical Drawlytics-controlled
+benchmark dataset so that every user sees the same platform-level evidence.
+
+Personal data includes:
+
+- My Predictions,
+- played status,
+- saved prediction history,
+- future My Performance,
+- future user-specific experiments and strategies.
+
+Personal prediction activity must not change Drawlytics' global claims about
+which models perform best or whether a model has demonstrated evidence beyond
+Pure Random.
+
+The current implementation does not yet fully enforce this separation.
+Performance and Honesty still consume prediction data that can include
+user-generated predictions. Separating the canonical benchmark from personal
+prediction history is a beta-readiness requirement.
+
 ### Clear page ownership
 
 Each page should answer a distinct user question and avoid reproducing another
@@ -322,18 +355,37 @@ strengths and limitations.
 - [ ] Separate genuine ML implementations from heuristic simulations.
 - [ ] Introduce actual retraining only where technically justified.
 
-### Accounts and user dashboard
+### Global benchmark and personal prediction separation
 
-- [ ] User authentication.
-- [ ] User-specific predictions.
-- [ ] User-specific played status.
+- [ ] Define the canonical Drawlytics benchmark dataset.
+- [ ] Separate benchmark predictions from user-owned predictions.
+- [ ] Ensure Performance uses only canonical benchmark data.
+- [ ] Ensure Honesty uses only canonical benchmark data.
+- [ ] Ensure Model Profile evidence uses only canonical benchmark data.
+- [ ] Prevent user-generated predictions from affecting global model rankings.
+- [ ] Preserve personal prediction results for future My Performance analytics.
+- [ ] Audit existing historical predictions and classify benchmark vs personal data.
+- [ ] Add tests proving personal predictions cannot alter global analytics.
+
+### Accounts, privacy and personal data
+
+- [x] User authentication with Clerk.
+- [x] Internal Drawlytics user identity.
+- [x] User-specific prediction ownership.
+- [x] User-specific prediction history.
+- [x] User-specific played status.
+- [x] Authenticated prediction generation and saving.
+- [x] Hide My Predictions navigation from signed-out visitors.
+- [x] Protect direct access to the My Predictions route.
+- [x] Migrate the original prediction history to the production Drawlytics account.
+- [x] Remove the temporary lifetime saved-prediction limit for beta.
 - [ ] User-specific saved strategies.
 - [ ] User-specific experiments.
 - [ ] Personal dashboard.
 - [ ] Personal performance history.
 - [ ] Subscription or usage-tier preparation.
 - [ ] Privacy and data-deletion controls.
-- [ ] Migrate existing anonymous data safely.
+- [ ] Support multiple external authentication identities for one Drawlytics user where required.
 
 ### Product and UX
 
@@ -428,6 +480,26 @@ than page-specific model naming.
 
 Model identity should be defined centrally and consumed by Strategy, Models,
 Performance and future model-related systems.
+
+### 2026-08 — Global benchmark is separate from personal predictions
+
+Drawlytics distinguishes between platform-level model evidence and
+user-owned prediction activity.
+
+Performance, Honesty, Model Profile evidence and global model rankings must
+ultimately use a canonical Drawlytics-controlled benchmark dataset.
+
+Predictions generated and saved by individual users belong to their personal
+prediction history and must not alter Drawlytics' global claims about model
+performance or statistical evidence.
+
+The current implementation does not yet fully enforce this boundary because
+global analytics can still consume user-generated prediction results. Separating
+these datasets is therefore a beta-readiness requirement.
+
+Personal prediction results should be retained so they can support future
+user-specific analytics such as My Performance without contaminating the
+global benchmark.
 
 ## Critical data-correctness issues
 
