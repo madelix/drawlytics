@@ -944,3 +944,41 @@ export const generateOneLine = (strategy, lotteryConfig, historyRows) => {
     ),
   };
 };
+
+export async function generatePredictionBatch({
+  lotteryRaw,
+  strategy,
+  lines = 1,
+  drawDateRaw = null,
+}) {
+  const canonicalLottery = getPredictionLotteryConfig(lotteryRaw).key;
+  const lotteryConfig = getPredictionLotteryConfig(canonicalLottery);
+
+  const resolved = await resolveLotteryDrawDate(drawDateRaw, lotteryConfig);
+
+  if (!resolved.ok) {
+    return resolved;
+  }
+
+  const { rows: historyRows } = await pool.query(
+    `
+    SELECT *
+    FROM ${lotteryConfig.table}
+    ORDER BY draw_date DESC
+    LIMIT 200
+    `,
+  );
+
+  const predictions = [];
+
+  for (let i = 0; i < lines; i++) {
+    predictions.push(generateOneLine(strategy, lotteryConfig, historyRows));
+  }
+
+  return {
+    ok: true,
+    lotteryConfig,
+    draw_date: resolved.draw_date,
+    predictions,
+  };
+}

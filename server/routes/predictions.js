@@ -5,28 +5,9 @@ import { pool } from '../db.js';
 import { checkPredictions } from '../services/checkPredictions.js';
 import {
   getPredictionLotteryConfig,
-  resolveLotteryDrawDate,
-  randInt,
-  sampleUnique,
-  weightedSampleUnique,
-  buildLinearWeights,
-  buildFrequencyWeights,
-  buildRecencyFrequencyWeights,
-  buildBayesianWeights,
-  buildTrendBoostWeights,
-  buildMarkovWeights,
-  buildStatisticalWeights,
-  buildDecisionTreeWeights,
-  buildQLearningWeights,
-  buildNeuralNetworkWeights,
-  buildLSTMWeights,
-  mergeWeightSets,
-  buildMetaLearningWeights,
   getBaseConfidence,
-  sampleRangeBalancedMainNumbers,
-  generateOneLine,
+  generatePredictionBatch,
 } from '../services/predictionGenerator.js';
-
 const router = express.Router();
 
 async function getCurrentDrawlyticsUser(req) {
@@ -278,24 +259,27 @@ router.post('/predictions/generate', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'invalid_lines' });
     }
 
-    const resolved = await resolveLotteryDrawDate(drawDateRaw, lotteryConfig);
-    if (!resolved.ok) {
-      return res.status(400).json({ ok: false, error: resolved.error });
+    const generatedBatch = await generatePredictionBatch({
+      lotteryRaw,
+      strategy,
+      lines,
+      drawDateRaw,
+    });
+
+    if (!generatedBatch.ok) {
+      return res.status(400).json({
+        ok: false,
+        error: generatedBatch.error,
+      });
     }
-    const draw_date = resolved.draw_date;
-    const { rows: historyRows } = await pool.query(
-      `
-  SELECT *
-  FROM ${lotteryConfig.table}
-  ORDER BY draw_date DESC
-  LIMIT 200
-  `,
-    );
+
+    const draw_date = generatedBatch.draw_date;
+    const generatedLines = generatedBatch.predictions;
 
     const saved = [];
 
     for (let i = 0; i < lines; i++) {
-      const line = generateOneLine(strategy, lotteryConfig, historyRows);
+      const line = generatedLines[i];
       const confidence =
         getBaseConfidence(strategy) + Math.floor(Math.random() * 8) - 4;
       const model_name = strategy.startsWith('ai:')
