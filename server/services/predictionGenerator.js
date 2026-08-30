@@ -974,7 +974,12 @@ export async function generatePredictionBatch({
   for (let i = 0; i < lines; i++) {
     const line = generateOneLine(strategy, lotteryConfig, historyRows);
 
-    const { confidence, model_name } = line;
+    const confidence =
+      getBaseConfidence(strategy) + Math.floor(Math.random() * 8) - 4;
+
+    const model_name = strategy.startsWith('ai:')
+      ? strategy
+      : `make_magic:${strategy}`;
 
     predictions.push({
       ...line,
