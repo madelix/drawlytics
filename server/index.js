@@ -85,11 +85,7 @@ app.use(
   }),
 );
 
-app.use(
-  clerkMiddleware({
-    debug: true,
-  }),
-);
+app.use(clerkMiddleware());
 app.use(express.json());
 
 app.get('/api/auth-test', (req, res) => {
