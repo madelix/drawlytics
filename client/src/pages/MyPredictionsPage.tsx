@@ -450,9 +450,10 @@ export default function MyPredictionsPage() {
 
     return {
       used: totalSaved,
-      label: usage?.limits_disabled
-        ? `${totalSaved} saved • unlimited dev mode`
-        : `${totalSaved}/${usage?.limit ?? 50} saved`,
+      label:
+        usage?.limit == null
+          ? `${totalSaved} saved`
+          : `${totalSaved}/${usage.limit} saved`,
     };
   }, [usage]);
 

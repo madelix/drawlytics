@@ -325,9 +325,6 @@ router.get('/predictions/usage', async (req, res) => {
     }
 
     const userId = currentUser.id;
-    const LIMIT_FREE = 50;
-    const disableLimits =
-      String(process.env.DISABLE_LIMITS ?? '').trim() === '1';
 
     const { rows } = await pool.query(
       `SELECT COUNT(*)::int AS used FROM predictions WHERE user_id = $1`,
@@ -337,8 +334,8 @@ router.get('/predictions/usage', async (req, res) => {
     return res.json({
       ok: true,
       used: rows?.[0]?.used ?? 0,
-      limit: disableLimits ? null : LIMIT_FREE,
-      limits_disabled: disableLimits,
+      limit: null,
+      limits_disabled: true,
     });
   } catch (err) {
     console.error('GET /predictions/usage failed:', err);
@@ -1224,26 +1221,6 @@ router.post('/predictions/generate', async (req, res) => {
     };
 
     const saved = [];
-    // Free plan limit (temporary)
-    const { rows: countRows } = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM predictions WHERE user_id = $1`,
-      [userId],
-    );
-
-    const currentCount = countRows[0]?.count ?? 0;
-    const LIMIT_FREE = 50;
-
-    // Owner/dev override (set DISABLE_LIMITS=1)
-    const disableLimits =
-      String(process.env.DISABLE_LIMITS ?? '').trim() === '1';
-
-    if (!disableLimits && currentCount + lines > LIMIT_FREE) {
-      return res.status(403).json({
-        ok: false,
-        error: 'prediction_limit_reached',
-        message: `Free plan allows up to ${LIMIT_FREE} saved predictions.`,
-      });
-    }
 
     for (let i = 0; i < lines; i++) {
       const line = generateOneLine();
