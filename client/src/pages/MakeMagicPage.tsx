@@ -1,6 +1,6 @@
 // client/src/pages/MakeMagicPage.tsx
 import { useEffect, useState } from 'react';
-import { apiUrl } from '../api/apiClient';
+import { apiSendJson, apiUrl } from '../api/apiClient';
 import { LOTTERIES, getLotteryConfig, LotteryKey } from '../config/lotteries';
 import { LotterySelector } from '../components/LotterySelector';
 import { getModelColour } from '../config/modelPresentation';
@@ -272,33 +272,14 @@ export function MakeMagicPage() {
         lines: selectedLineCount,
       });
 
-      const res = await fetch(apiUrl('/api/predictions/generate'), {
+      await apiSendJson('/api/predictions/generate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        body: {
           lottery: selectedLottery,
           strategy: selectedStrategyValue,
           lines: selectedLineCount,
-        }),
+        },
       });
-
-      if (!res.ok) {
-        const text = await res.text();
-
-        let msg = text;
-        try {
-          const j = JSON.parse(text);
-          msg = j?.message || j?.error || text;
-        } catch {
-          // not JSON, keep text
-        }
-
-        throw new Error(
-          msg || 'Something went wrong while generating predictions.',
-        );
-      }
 
       setStatus('success');
       // tiny auto-reset after a moment
@@ -328,25 +309,17 @@ export function MakeMagicPage() {
       }
 
       for (const [strategyKey, count] of entries) {
-        const res = await fetch(apiUrl('/api/predictions/generate'), {
+        await apiSendJson('/api/predictions/generate', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+          body: {
             lottery: selectedLottery,
             strategy: strategyKey,
             lines: count,
             source: hasAppliedSuggestedMix
               ? 'strategy_mix'
               : 'strategy_builder',
-          }),
+          },
         });
-
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || 'Failed on one of the strategies');
-        }
       }
 
       setMultiStatus('success');
@@ -365,23 +338,15 @@ export function MakeMagicPage() {
       const aiStrategies = strategies.filter((s) => s.value.startsWith('ai:'));
 
       for (const s of aiStrategies) {
-        const res = await fetch(apiUrl('/api/predictions/generate'), {
+        await apiSendJson('/api/predictions/generate', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+          body: {
             lottery: selectedLottery,
             strategy: s.value,
             lines: 1,
             source: 'ai_lab',
-          }),
+          },
         });
-
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || `Failed to generate ${s.label}`);
-        }
       }
 
       setAllAiStatus('success');
