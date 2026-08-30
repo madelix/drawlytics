@@ -14,7 +14,8 @@ export async function buildLeaderboardHistory(lottery) {
   INNER JOIN predictions p
     ON p.id = pdr.prediction_id
   WHERE LOWER(p.lottery) = LOWER($1)
-    AND LOWER(TRIM(p.status)) = 'checked'
+  AND p.benchmark_eligible = true
+  AND LOWER(TRIM(p.status)) = 'checked'
   ORDER BY pdr.draw_date ASC, pdr.draw_sequence ASC;
   `,
     [lottery],

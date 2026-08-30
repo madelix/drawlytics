@@ -413,6 +413,7 @@ strengths and limitations.
 - [ ] Add migration and backup procedures.
 - [ ] Establish production monitoring and error reporting.
 - [ ] Add automated tests for model-key and display-name normalisation.
+- [ ] Reconcile Drizzle migration history with the current production database schema.
 
 ## Marketing & Website
 

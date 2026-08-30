@@ -10,6 +10,7 @@ import {
   numeric,
   text,
   uniqueIndex,
+  boolean,
 } from 'drizzle-orm/pg-core';
 
 /* =========================
@@ -133,6 +134,7 @@ export const predictions = pgTable('predictions', {
   created_at: timestamp('created_at').defaultNow().notNull(),
   user_id: integer('user_id'),
   source: text('source'),
+  benchmark_eligible: boolean('benchmark_eligible').default(false).notNull(),
 });
 
 /* =========================

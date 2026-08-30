@@ -53,6 +53,7 @@ router.get('/performance/models', async (req, res) => {
   INNER JOIN prediction_draw_results pdr
     ON pdr.prediction_id = p.id
   WHERE LOWER(p.lottery) = LOWER($1)
+  AND p.benchmark_eligible = true
 ),
 normalized AS (
         SELECT
@@ -273,7 +274,8 @@ router.get('/performance/model-history', async (req, res) => {
   INNER JOIN prediction_draw_results pdr
     ON pdr.prediction_id = p.id
   WHERE LOWER(p.lottery) = LOWER($1)
-    AND LOWER(TRIM(p.status)) = 'checked'
+  AND p.benchmark_eligible = true
+  AND LOWER(TRIM(p.status)) = 'checked'
 ),
       normalized AS (
         SELECT
@@ -362,7 +364,8 @@ router.get('/performance/honesty-summary', async (req, res) => {
 FROM predictions p
 INNER JOIN prediction_draw_results pdr
   ON pdr.prediction_id = p.id
-WHERE LOWER(p.lottery) = LOWER($1);
+WHERE LOWER(p.lottery) = LOWER($1)
+  AND p.benchmark_eligible = true;
       `,
       [lottery],
     );
@@ -631,6 +634,7 @@ FROM predictions p
 INNER JOIN prediction_draw_results pdr
   ON pdr.prediction_id = p.id
 WHERE LOWER(p.lottery) = LOWER($1)
+  AND p.benchmark_eligible = true
   AND LOWER(TRIM(p.status)) = 'checked';
   `,
       [lottery],
@@ -790,6 +794,7 @@ FROM predictions p
 INNER JOIN prediction_draw_results pdr
   ON pdr.prediction_id = p.id
 WHERE LOWER(p.lottery) = LOWER($1)
+  AND p.benchmark_eligible = true
   AND LOWER(TRIM(p.status)) = 'checked';
       `,
         [lottery],

@@ -1245,7 +1245,8 @@ router.post('/predictions/generate', async (req, res) => {
   result_label,
   status,
 user_id,
-source
+source,
+benchmark_eligible
 )
 VALUES (
   $1,
@@ -1260,7 +1261,8 @@ VALUES (
   NULL,
   'pending',
   $7,
-  $8
+  $8,
+  false
 )
         RETURNING
   id,
