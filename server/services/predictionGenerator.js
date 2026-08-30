@@ -972,7 +972,15 @@ export async function generatePredictionBatch({
   const predictions = [];
 
   for (let i = 0; i < lines; i++) {
-    predictions.push(generateOneLine(strategy, lotteryConfig, historyRows));
+    const line = generateOneLine(strategy, lotteryConfig, historyRows);
+
+    const { confidence, model_name } = line;
+
+    predictions.push({
+      ...line,
+      confidence,
+      model_name,
+    });
   }
 
   return {

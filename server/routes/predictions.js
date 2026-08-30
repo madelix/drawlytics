@@ -5,7 +5,6 @@ import { pool } from '../db.js';
 import { checkPredictions } from '../services/checkPredictions.js';
 import {
   getPredictionLotteryConfig,
-  getBaseConfidence,
   generatePredictionBatch,
 } from '../services/predictionGenerator.js';
 const router = express.Router();
