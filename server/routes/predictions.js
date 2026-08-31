@@ -8,6 +8,7 @@ import {
   generatePredictionBatch,
 } from '../services/predictionGenerator.js';
 const router = express.Router();
+import { runBenchmarkForDraw } from '../services/benchmarkRunner.js';
 
 async function getCurrentDrawlyticsUser(req) {
   const auth = getAuth(req);
@@ -28,6 +29,53 @@ async function getCurrentDrawlyticsUser(req) {
 
   return rows[0] ?? null;
 }
+
+/**
+ * TEMPORARY
+ * POST /api/predictions/benchmark-dry-run
+ *
+ * Runs the canonical benchmark without saving predictions.
+ * Restricted to Drawlytics user ID 1.
+ */
+router.post('/predictions/benchmark-dry-run', async (req, res) => {
+  try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
+
+    if (currentUser.id !== 1) {
+      return res.status(403).json({
+        ok: false,
+        error: 'forbidden',
+      });
+    }
+
+    const lottery = String(req.body?.lottery ?? 'euromillions');
+
+    const drawDate = req.body?.draw_date ?? null;
+
+    const result = await runBenchmarkForDraw({
+      lottery,
+      drawDate,
+      dryRun: true,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error('Benchmark dry run failed:', error);
+
+    return res.status(500).json({
+      ok: false,
+      error: 'benchmark_dry_run_failed',
+      message: error.message,
+    });
+  }
+});
 
 /**
  * Resolve EuroMillions draw date:
