@@ -78,6 +78,69 @@ router.post('/predictions/benchmark-dry-run', async (req, res) => {
 });
 
 /**
+ * TEMPORARY
+ * POST /api/predictions/benchmark-run
+ *
+ * Runs and saves the canonical benchmark.
+ * Restricted to Drawlytics user ID 1.
+ */
+router.post('/predictions/benchmark-run', async (req, res) => {
+  try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
+
+    if (currentUser.id !== 1) {
+      return res.status(403).json({
+        ok: false,
+        error: 'forbidden',
+      });
+    }
+
+    const requestedLottery = String(req.body?.lottery ?? 'all')
+      .trim()
+      .toLowerCase();
+
+    const drawDate = req.body?.draw_date ?? null;
+
+    const lotteries =
+      requestedLottery === 'all'
+        ? ['euromillions', 'uk_lotto', 'set_for_life']
+        : [requestedLottery];
+
+    const results = [];
+
+    for (const lottery of lotteries) {
+      const result = await runBenchmarkForDraw({
+        lottery,
+        drawDate,
+        dryRun: false,
+      });
+
+      results.push(result);
+    }
+
+    return res.json({
+      ok: results.every((result) => result.ok === true),
+      results,
+    });
+  } catch (error) {
+    console.error('Benchmark run failed:', error);
+
+    return res.status(500).json({
+      ok: false,
+      error: 'benchmark_run_failed',
+      message: error.message,
+    });
+  }
+});
+
+/**
  * Resolve EuroMillions draw date:
  * - If client provides draw_date: validate and use it (date-only UTC midnight)
  * - If not provided:
