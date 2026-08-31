@@ -34,7 +34,10 @@ export async function getModelPerformanceData(
     normalized AS (
       SELECT
         CASE
-          WHEN source = 'strategy_mix' THEN 'strategy_mix'
+          WHEN source IN (
+  'strategy_mix',
+  'benchmark_strategy_mix'
+) THEN 'strategy_mix'
 
           WHEN model_name_lc LIKE 'make_magic:cold_focused%'
             THEN 'cold_focused'
@@ -155,7 +158,10 @@ export async function getModelPerformanceData(
       COUNT(*)::int AS total_predictions,
 
       COUNT(*) FILTER (
-        WHERE source = 'strategy_mix'
+        WHERE source IN (
+  'strategy_mix',
+  'benchmark_strategy_mix'
+)
       )::int AS strategy_mix_predictions,
 
       COUNT(*) FILTER (

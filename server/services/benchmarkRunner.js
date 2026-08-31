@@ -8,7 +8,7 @@ import { getModelPerformanceData } from './modelPerformanceData.js';
 import { buildStrategyRecommendation } from './strategyRecommendation.js';
 
 const BENCHMARK_SOURCE = 'benchmark_runner';
-const SUGGESTED_MIX_SOURCE = 'strategy_mix';
+const SUGGESTED_MIX_SOURCE = 'benchmark_strategy_mix';
 
 const SUPPORTED_LOTTERIES = new Set([
   'euromillions',

@@ -966,7 +966,6 @@ export async function generatePredictionBatch({
   FROM ${lotteryConfig.table}
   WHERE draw_date < $1::date
   ORDER BY draw_date DESC
-  LIMIT 200
   `,
     [resolved.draw_date],
   );
