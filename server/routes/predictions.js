@@ -141,6 +141,51 @@ router.post('/predictions/benchmark-run', async (req, res) => {
 });
 
 /**
+ * TEMPORARY
+ * POST /api/predictions/benchmark-check
+ *
+ * Checks canonical benchmark predictions
+ * against available official draw results.
+ * Restricted to Drawlytics user ID 1.
+ */
+router.post('/predictions/benchmark-check', async (req, res) => {
+  try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
+
+    if (currentUser.id !== 1) {
+      return res.status(403).json({
+        ok: false,
+        error: 'forbidden',
+      });
+    }
+
+    const result = await checkPredictions({
+      lottery: req.body?.lottery ?? null,
+      limit: req.body?.limit ?? 500,
+      onlyUnchecked: req.body?.onlyUnchecked !== false,
+      scope: 'benchmark',
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error('Benchmark prediction check failed:', error);
+
+    return res.status(500).json({
+      ok: false,
+      error: 'benchmark_check_failed',
+      message: error.message,
+    });
+  }
+});
+
+/**
  * Resolve EuroMillions draw date:
  * - If client provides draw_date: validate and use it (date-only UTC midnight)
  * - If not provided:

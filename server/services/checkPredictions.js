@@ -37,7 +37,16 @@ export async function checkPredictions({
   onlyUnchecked = true,
   predictionId = null,
   offset = 0,
+  scope = 'personal',
 } = {}) {
+  const benchmarkMode = scope === 'benchmark';
+
+  if (scope !== 'personal' && scope !== 'benchmark') {
+    return {
+      ok: false,
+      error: 'invalid_prediction_scope',
+    };
+  }
   const lotteryFilter = lottery
     ? getPredictionLotteryConfig(lottery).key
     : null;
@@ -55,8 +64,19 @@ export async function checkPredictions({
       result_label,
       status
     FROM predictions
-    WHERE user_id = $6::int
-      AND lower(replace(lottery, ' ', '_')) IN (
+    WHERE (
+    (
+      $7::boolean = true
+      AND user_id IS NULL
+      AND benchmark_eligible = true
+    )
+    OR
+    (
+      $7::boolean = false
+      AND user_id = $6::int
+    )
+  )
+  AND lower(replace(lottery, ' ', '_')) IN (
         'euromillions',
         'uk_lotto',
         'set_for_life'
@@ -83,7 +103,15 @@ export async function checkPredictions({
     LIMIT $1::int
     OFFSET $5::int
   `,
-    [limit, onlyUnchecked, lotteryFilter, predictionId, offset, userId],
+    [
+      limit,
+      onlyUnchecked,
+      lotteryFilter,
+      predictionId,
+      offset,
+      userId,
+      benchmarkMode,
+    ],
   );
 
   let predictionsToCheck = preds;
