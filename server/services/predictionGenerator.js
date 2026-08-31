@@ -962,11 +962,13 @@ export async function generatePredictionBatch({
 
   const { rows: historyRows } = await pool.query(
     `
-    SELECT *
-    FROM ${lotteryConfig.table}
-    ORDER BY draw_date DESC
-    LIMIT 200
-    `,
+  SELECT *
+  FROM ${lotteryConfig.table}
+  WHERE draw_date < $1::date
+  ORDER BY draw_date DESC
+  LIMIT 200
+  `,
+    [resolved.draw_date],
   );
 
   const predictions = [];
