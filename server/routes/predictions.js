@@ -186,6 +186,90 @@ router.post('/predictions/benchmark-check', async (req, res) => {
 });
 
 /**
+ * TEMPORARY / INTERNAL
+ * POST /api/ml-history
+ *
+ * Returns historical lottery draws strictly before
+ * a target date for ML training.
+ * Restricted to Drawlytics user ID 1.
+ */
+router.post('/ml-history', async (req, res) => {
+  try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        ok: false,
+        error: 'unauthenticated',
+      });
+    }
+
+    if (currentUser.id !== 1) {
+      return res.status(403).json({
+        ok: false,
+        error: 'forbidden',
+      });
+    }
+
+    const lottery = String(req.body?.lottery ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
+
+    const drawDate = String(req.body?.draw_date ?? '').trim();
+
+    const supportedLotteries = new Set([
+      'euromillions',
+      'uk_lotto',
+      'set_for_life',
+    ]);
+
+    if (!supportedLotteries.has(lottery)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'unsupported_lottery',
+      });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(drawDate)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'invalid_draw_date',
+      });
+    }
+
+    const lotteryConfig = getPredictionLotteryConfig(lottery);
+
+    const { rows } = await pool.query(
+      `
+      SELECT *
+      FROM ${lotteryConfig.table}
+      WHERE draw_date < $1::date
+      ORDER BY draw_date ASC
+      `,
+      [drawDate],
+    );
+
+    return res.json({
+      ok: true,
+      lottery: lotteryConfig.key,
+      target_draw_date: drawDate,
+      historical_draws: rows.length,
+      first_draw: rows[0]?.draw_date ?? null,
+      last_draw: rows.at(-1)?.draw_date ?? null,
+      draws: rows,
+    });
+  } catch (error) {
+    console.error('[ml-history] failed:', error);
+
+    return res.status(500).json({
+      ok: false,
+      error: 'ml_history_failed',
+    });
+  }
+});
+
+/**
  * Resolve EuroMillions draw date:
  * - If client provides draw_date: validate and use it (date-only UTC midnight)
  * - If not provided:

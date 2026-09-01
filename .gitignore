@@ -140,3 +140,6 @@ vite.config.ts.timestamp-*
 
 # Database files
 server/.env
+
+__pycache__/
+*.py[cod]
