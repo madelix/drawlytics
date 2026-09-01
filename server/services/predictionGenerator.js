@@ -69,18 +69,46 @@ export async function resolveLotteryDrawDate(drawDateRaw, lotteryConfig) {
 
   // 2) Try next draw from draws table (only works if table includes future dates)
   try {
+    const now = new Date();
+
+    const londonParts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+    }).formatToParts(now);
+
+    const londonHour = Number(
+      londonParts.find((p) => p.type === 'hour')?.value ?? '00',
+    );
+
+    const londonMinute = Number(
+      londonParts.find((p) => p.type === 'minute')?.value ?? '00',
+    );
+
+    const afterCutoff =
+      londonHour > 19 || (londonHour === 19 && londonMinute > 20);
+
     const next = await pool.query(
       `
-      SELECT draw_date
-FROM ${lotteryConfig.table}
-WHERE draw_date >= CURRENT_DATE
-ORDER BY draw_date ASC
-LIMIT 1
-      `,
+  SELECT draw_date
+  FROM ${lotteryConfig.table}
+  WHERE draw_date > CURRENT_DATE
+     OR (
+       draw_date = CURRENT_DATE
+       AND $1::boolean = false
+     )
+  ORDER BY draw_date ASC
+  LIMIT 1
+  `,
+      [afterCutoff],
     );
 
     if (next.rows?.length) {
-      return { ok: true, draw_date: next.rows[0].draw_date };
+      return {
+        ok: true,
+        draw_date: next.rows[0].draw_date,
+      };
     }
   } catch (e) {
     // If the table doesn't exist or query fails, we still have the fallback below.

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node --watch index.js",
     "start": "node index.js",
+    "benchmark:lifecycle": "node jobs/benchmarkLifecycle.js",
     "db:generate": "drizzle-kit generate --config=drizzle.config.js",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.js",
     "seed:euromillions": "node seed-euromillions.js",

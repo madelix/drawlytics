@@ -76,6 +76,10 @@ export async function checkPredictions({
       AND user_id = $6::int
     )
   )
+      AND (
+    $7::boolean = false
+    OR draw_date <= CURRENT_DATE
+  )
   AND lower(replace(lottery, ' ', '_')) IN (
         'euromillions',
         'uk_lotto',
