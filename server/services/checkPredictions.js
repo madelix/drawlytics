@@ -77,10 +77,37 @@ export async function checkPredictions({
     )
   )
       AND (
-    $7::boolean = false
-    OR draw_date <= CURRENT_DATE
+  $7::boolean = false
+  OR (
+    (
+      lower(replace(lottery, ' ', '_')) = 'euromillions'
+      AND EXISTS (
+        SELECT 1
+        FROM euromillions_draws d
+        WHERE d.draw_date::date = predictions.draw_date::date
+      )
+    )
+    OR
+    (
+      lower(replace(lottery, ' ', '_')) = 'uk_lotto'
+      AND EXISTS (
+        SELECT 1
+        FROM uk_lotto_draws d
+        WHERE d.draw_date::date = predictions.draw_date::date
+      )
+    )
+    OR
+    (
+      lower(replace(lottery, ' ', '_')) = 'set_for_life'
+      AND EXISTS (
+        SELECT 1
+        FROM set_for_life_draws d
+        WHERE d.draw_date::date = predictions.draw_date::date
+      )
+    )
   )
-  AND lower(replace(lottery, ' ', '_')) IN (
+)
+AND lower(replace(lottery, ' ', '_')) IN (
         'euromillions',
         'uk_lotto',
         'set_for_life'
