@@ -1571,38 +1571,40 @@ export default function MyPredictionsPage() {
                             </div>
                           </div>
 
-                          <div>
-                            <div
-                              style={{
-                                fontSize: '0.75rem',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.06em',
-                                color: '#6b7280',
-                                marginBottom: 4,
-                              }}
-                            >
-                              {secondaryGroup?.label ?? 'Stars'}
-                              {starHitCount != null
-                                ? ` (hits: ${starHitCount})`
-                                : ''}
-                            </div>
-
+                          {p.star_numbers.length > 0 && (
                             <div>
-                              {p.star_numbers.map((n) => {
-                                const isHit = Boolean(draw?.stars.has(n));
-                                return (
-                                  <span
-                                    key={n}
-                                    className="dl-draw-pill dl-draw-pill--star"
-                                    style={hitStyle(isHit)}
-                                    title={isHit ? 'Hit' : undefined}
-                                  >
-                                    {n}
-                                  </span>
-                                );
-                              })}
+                              <div
+                                style={{
+                                  fontSize: '0.75rem',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.06em',
+                                  color: '#6b7280',
+                                  marginBottom: 4,
+                                }}
+                              >
+                                {secondaryGroup?.label ?? 'Stars'}
+                                {starHitCount != null
+                                  ? ` (hits: ${starHitCount})`
+                                  : ''}
+                              </div>
+
+                              <div>
+                                {p.star_numbers.map((n) => {
+                                  const isHit = Boolean(draw?.stars.has(n));
+                                  return (
+                                    <span
+                                      key={n}
+                                      className="dl-draw-pill dl-draw-pill--star"
+                                      style={hitStyle(isHit)}
+                                      title={isHit ? 'Hit' : undefined}
+                                    >
+                                      {n}
+                                    </span>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          </div>
+                          )}
 
                           <div
                             style={{

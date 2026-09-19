@@ -12,13 +12,13 @@ export function getPredictionLotteryConfig(lotteryRaw) {
       label: 'UK Lotto',
       table: 'uk_lotto_draws',
       mainKeys: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6'],
-      specialKeys: ['bonus_ball'],
+      specialKeys: [],
       mainMin: 1,
       mainMax: 59,
       mainCount: 6,
       specialMin: 1,
       specialMax: 59,
-      specialCount: 1,
+      specialCount: 0,
     };
   }
 
