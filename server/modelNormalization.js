@@ -46,7 +46,7 @@ export function getModelDisplayName(modelKey) {
     ai_random_forest: 'AI Random Forest',
     ai_decision_tree: 'AI Decision Tree',
     ai_gradient_boosting: 'AI Gradient Boosting',
-    ai_xgboost: 'AI XGBoost',
+    ai_xgboost: 'Legacy XGBoost (Heuristic)',
     ai_q_learning: 'AI Q-Learning',
     ai_advanced_analysis: 'AI Advanced Analysis',
     ai_markov_chain: 'AI Markov Chain',

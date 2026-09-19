@@ -569,7 +569,6 @@ export const buildMetaLearningWeights = (min, max, rows, keys) => {
 
 export const getBaseConfidence = (strategyKey) => {
   const confidenceMap = {
-    'ai:xgboost': 72,
     'ai:random_forest': 68,
     'ai:bayesian': 74,
     'ai:gradient_boosting': 66,
@@ -632,31 +631,6 @@ export const sampleRangeBalancedMainNumbers = (historyRows) => {
 };
 
 export const generateOneLine = (strategy, lotteryConfig, historyRows) => {
-  if (strategy === 'ai:xgboost') {
-    return {
-      main: weightedSampleUnique(
-        buildRecencyFrequencyWeights(
-          lotteryConfig.mainMin,
-          lotteryConfig.mainMax,
-          historyRows,
-          lotteryConfig.mainKeys,
-        ),
-        lotteryConfig.mainCount,
-        1.8,
-      ),
-      stars: weightedSampleUnique(
-        buildRecencyFrequencyWeights(
-          lotteryConfig.specialMin,
-          lotteryConfig.specialMax,
-          historyRows,
-          lotteryConfig.specialKeys,
-        ),
-        lotteryConfig.specialCount,
-        1.6,
-      ),
-    };
-  }
-
   if (strategy === 'ai:random_forest') {
     return {
       main: weightedSampleUnique(

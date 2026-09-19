@@ -13,7 +13,7 @@ export const MODEL_DISPLAY_NAMES = {
   ai_random_forest: 'AI Random Forest',
   ai_decision_tree: 'AI Decision Tree',
   ai_gradient_boosting: 'AI Gradient Boosting',
-  ai_xgboost: 'AI XGBoost',
+  ai_xgboost: 'Legacy XGBoost (Heuristic)',
   ai_q_learning: 'AI Q-Learning',
   ai_advanced_analysis: 'AI Advanced Analysis',
   ai_neural_network: 'AI Neural Network',

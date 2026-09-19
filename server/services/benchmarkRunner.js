@@ -21,7 +21,6 @@ export const BENCHMARK_STRATEGIES = [
   'hot_focused',
   'cold_focused',
   'overdue',
-  'ai:xgboost',
   'ai:ensemble',
   'ai:random_forest',
   'ai:gradient_boosting',

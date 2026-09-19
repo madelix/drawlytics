@@ -45,7 +45,9 @@ export function buildStrategyRecommendation(models) {
     })
     .filter(
       (model) =>
-        model.model_key !== 'pure_random' && model.model_key !== 'strategy_mix',
+        model.model_key !== 'pure_random' &&
+        model.model_key !== 'strategy_mix' &&
+        model.model_key !== 'xgboost',
     )
     .sort((a, b) => b.strategy_score - a.strategy_score)
     .slice(0, 3);
