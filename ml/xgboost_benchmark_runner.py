@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 import tempfile
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -75,34 +75,41 @@ def validate_draw_date(draw_date: str) -> str:
 def resolve_target_draw_date(
     connection: psycopg.Connection,
 ) -> str:
+    """
+    Resolve the next EuroMillions draw from the official
+    Tuesday/Friday schedule.
+
+    The database is deliberately not used to discover future
+    draw dates because euromillions_draws may contain only
+    completed/known draw rows.
+
+    On a draw day, today's draw remains eligible until the
+    19:20 Europe/London cutoff. After that, the next scheduled
+    Tuesday or Friday is returned.
+    """
+    del connection  # Kept in the signature for compatibility.
+
     london_now = datetime.now(LONDON_TIMEZONE)
+    candidate = london_now.date()
 
-    include_today = london_now.time() < DRAW_CUTOFF_TIME
+    # Python weekday:
+    # Monday = 0
+    # Tuesday = 1
+    # Friday = 4
+    draw_weekdays = {1, 4}
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT draw_date
-            FROM euromillions_draws
-            WHERE draw_date > CURRENT_DATE
-               OR (
-                    draw_date = CURRENT_DATE
-                    AND %s::boolean = true
-               )
-            ORDER BY draw_date ASC
-            LIMIT 1
-            """,
-            (include_today,),
-        )
+    if (
+        candidate.weekday() in draw_weekdays
+        and london_now.time() < DRAW_CUTOFF_TIME
+    ):
+        return candidate.isoformat()
 
-        row = cursor.fetchone()
+    candidate += timedelta(days=1)
 
-    if row is None:
-        raise RuntimeError(
-            "Could not resolve the next EuroMillions draw date."
-        )
+    while candidate.weekday() not in draw_weekdays:
+        candidate += timedelta(days=1)
 
-    return row[0].isoformat()
+    return candidate.isoformat()
 
 
 def acquire_benchmark_lock(
