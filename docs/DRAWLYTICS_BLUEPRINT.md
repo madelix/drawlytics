@@ -65,10 +65,20 @@ Personal prediction activity must not change Drawlytics' global claims about
 which models perform best or whether a model has demonstrated evidence beyond
 Pure Random.
 
-The current implementation does not yet fully enforce this separation.
-Performance and Honesty still consume prediction data that can include
-user-generated predictions. Separating the canonical benchmark from personal
-prediction history is a beta-readiness requirement.
+This separation is now enforced for the core global benchmark path.
+
+Canonical benchmark predictions are explicitly marked with
+`benchmark_eligible = true`, while new normal user-generated predictions remain
+personal and are excluded from canonical benchmark evidence.
+
+The benchmark is generated independently of whether a user chooses to save or
+play a prediction. Drawlytics can therefore continue testing strategies and
+models automatically without personal prediction activity affecting
+platform-level evidence.
+
+The initial legacy benchmark seed still requires a historical audit, and the
+remaining Honesty and Model Profile evidence queries must be verified as
+benchmark-only.
 
 ### Clear page ownership
 
@@ -267,6 +277,45 @@ stability and statistical evidence.
 Provides canonical model identity, descriptions, status, implementation type,
 strengths and limitations.
 
+### Canonical Benchmark Runner
+
+Automatically generates controlled benchmark predictions independently of
+personal user activity.
+
+Canonical benchmark predictions use dedicated benchmark provenance and
+`benchmark_eligible = true`.
+
+The benchmark runner is idempotent, so repeated runs do not create duplicate
+benchmark evidence for the same strategy and target draw.
+
+### Benchmark Lifecycle
+
+Runs automatically on Railway and manages the ongoing benchmark process.
+
+It:
+
+- generates canonical benchmark predictions for supported lotteries,
+- checks benchmark predictions only when an official result exists,
+- keeps benchmark evidence separate from personal predictions,
+- uses only historical draws before the target draw when generating predictions,
+- allows long-term model and strategy evidence to accumulate without users
+  having to save predictions manually.
+
+### XGBoost v2 ML Benchmark Runner
+
+Runs the first genuinely trained Drawlytics machine-learning model
+prospectively for EuroMillions.
+
+XGBoost v2:
+
+- trains only on draws before the target draw,
+- uses chronological, no-lookahead data,
+- has the distinct model identity `xgboost_v2`,
+- remains separate from `Legacy XGBoost (Heuristic)`,
+- saves canonical predictions with `source = benchmark_ml_runner`,
+- saves predictions with `benchmark_eligible = true`,
+- is evaluated by the existing benchmark result-checking lifecycle.
+
 ---
 
 ## Confirmed roadmap
@@ -327,6 +376,15 @@ strengths and limitations.
 - [ ] Move derived analytics into reusable backend services.
 - [ ] Replace browser-local rank comparisons with persisted historical data.
 - [ ] Improve long-term performance-vs-random reporting.
+- [ ] Build the Benchmark Observatory / Model League around canonical benchmark evidence.
+- [ ] Show benchmark sample size prominently for every model and strategy.
+- [ ] Show prospective-only performance separately from legacy historical evidence.
+- [ ] Distinguish Strategies, Trained Models, Meta/Portfolio systems and Controls.
+- [ ] Add within-lottery Pure Random comparisons and observed-vs-expected reporting.
+- [ ] Show recent versus long-term benchmark performance.
+- [ ] Surface high-hit and high-upside result frequency.
+- [ ] Make benchmark evidence explorable without relying on My Predictions.
+- [ ] Keep XGBoost v2 evidence completely separate from Legacy XGBoost (Heuristic).
 
 ### Model Honesty
 
@@ -352,20 +410,34 @@ strengths and limitations.
 - [ ] Save experiment configuration.
 - [ ] Compare experiment results.
 - [ ] Re-run an experiment using the same settings.
-- [ ] Separate genuine ML implementations from heuristic simulations.
-- [ ] Introduce actual retraining only where technically justified.
+- [x] Separate genuine ML implementations from heuristic simulations.
+- [x] Introduce the first genuinely trained model: XGBoost v2 for EuroMillions.
+- [x] Retire the legacy XGBoost heuristic from future benchmark generation while preserving its historical evidence.
+- [ ] Audit remaining AI-labelled models and strategies against their actual implementations.
+- [ ] Fix strategies that currently fall through to random generation rather than implementing their advertised logic.
+- [ ] Add additional genuinely trained models only where technically justified.
 
 ### Global benchmark and personal prediction separation
 
-- [ ] Define the canonical Drawlytics benchmark dataset.
-- [ ] Separate benchmark predictions from user-owned predictions.
-- [ ] Ensure Performance uses only canonical benchmark data.
-- [ ] Ensure Honesty uses only canonical benchmark data.
-- [ ] Ensure Model Profile evidence uses only canonical benchmark data.
-- [ ] Prevent user-generated predictions from affecting global model rankings.
-- [ ] Preserve personal prediction results for future My Performance analytics.
-- [ ] Audit existing historical predictions and classify benchmark vs personal data.
+- [x] Define the canonical Drawlytics benchmark dataset.
+- [x] Add explicit `benchmark_eligible` classification.
+- [x] Separate new canonical benchmark predictions from user-owned predictions.
+- [x] Ensure core global Performance queries use only canonical benchmark data.
+- [x] Ensure benchmark leaderboard history uses only canonical benchmark data.
+- [x] Prevent new user-generated predictions from becoming benchmark evidence.
+- [x] Preserve personal prediction results for future My Performance analytics.
+- [x] Add an automated canonical benchmark runner.
+- [x] Add an automated benchmark checking lifecycle.
+- [x] Make benchmark generation idempotent.
+- [x] Prevent benchmark checking before an exact-date official result exists.
+- [x] Use only historical draws before the target draw when generating benchmark predictions.
+- [x] Deploy XGBoost v2 as a separate prospective canonical ML benchmark.
+- [ ] Complete the audit of Honesty so all global evidence is benchmark-only.
+- [ ] Complete the audit of Model Profile evidence so all global evidence is benchmark-only.
+- [ ] Audit and classify/freeze the initial legacy benchmark seed.
 - [ ] Add tests proving personal predictions cannot alter global analytics.
+- [ ] Add database-level uniqueness protection for canonical benchmark identities where appropriate.
+- [ ] Remove temporary internal benchmark/ML routes once they are no longer required.
 
 ### Accounts, privacy and personal data
 
@@ -414,6 +486,12 @@ strengths and limitations.
 - [ ] Establish production monitoring and error reporting.
 - [ ] Add automated tests for model-key and display-name normalisation.
 - [ ] Reconcile Drizzle migration history with the current production database schema.
+- [ ] Centralise reusable benchmark and performance SQL and remove remaining duplicated performance queries.
+- [ ] Add automated tests for benchmark idempotency.
+- [ ] Add automated tests proving benchmark generation cannot use target or future draw data.
+- [ ] Add automated tests proving personal predictions cannot affect global benchmark analytics.
+- [ ] Add production monitoring for failed benchmark lifecycle and ML cron runs.
+- [ ] Define canonical model categories: Strategy, Trained Model, Meta/Portfolio and Control.
 
 ## Marketing & Website
 
@@ -501,6 +579,83 @@ these datasets is therefore a beta-readiness requirement.
 Personal prediction results should be retained so they can support future
 user-specific analytics such as My Performance without contaminating the
 global benchmark.
+
+### 2026-09 — Canonical benchmark runs independently of personal activity
+
+Users do not need to save or play predictions in order for Drawlytics to test
+a strategy or model.
+
+The canonical benchmark automatically generates controlled predictions,
+records them separately from personal activity and checks them after official
+results become available.
+
+Personal use of Make Magic therefore has no bearing on whether Drawlytics
+continues collecting model evidence.
+
+The canonical benchmark is the source for answering the long-term question:
+
+**Are any Drawlytics strategies or models actually performing beyond random
+chance?**
+
+### 2026-09 — XGBoost v2 is the first genuinely trained ML benchmark model
+
+`xgboost_v2` is the first genuinely trained machine-learning model deployed
+into the prospective Drawlytics benchmark.
+
+It is intentionally distinct from the historical model now labelled
+**Legacy XGBoost (Heuristic)**. Historical legacy evidence is preserved but
+must never be merged into XGBoost v2 evidence.
+
+Historical chronological walk-forward validation found that XGBoost v2
+main-number performance was approximately at random, while Lucky Star
+performance showed an observed uplift over both date-adjusted random
+expectation and a simple all-history hot-star baseline.
+
+These historical results are exploratory rather than proof of future
+predictability. Prospective benchmark evidence is the stronger test.
+
+The first prospective canonical XGBoost v2 prediction was generated for the
+EuroMillions draw on **22 September 2026**:
+
+- model: `xgboost_v2`
+- prediction ID: `2978`
+- main numbers: `11, 17, 19, 29, 50`
+- Lucky Stars: `2, 6`
+- historical draws before target: `1979`
+- source: `benchmark_ml_runner`
+- benchmark eligible: `true`
+
+This prediction and all future prospective benchmark results must remain
+untouched after generation regardless of outcome.
+
+### 2026-09 — Benchmark Observatory is the next product phase
+
+The next major product task is to make canonical benchmark evidence easy to
+inspect without relying on My Predictions.
+
+The Performance / Model League experience should allow users to follow every
+controlled strategy and model automatically and understand:
+
+- how many prospective predictions have been tested,
+- average main-number and special-number hits,
+- high-hit and high-upside result frequency,
+- performance versus an appropriate Pure Random baseline,
+- recent versus long-term performance,
+- sample maturity,
+- and whether an apparent advantage survives statistical scrutiny.
+
+The interface must clearly distinguish:
+
+- **Strategies** — rule-based approaches such as hot/cold, overdue,
+  statistical, Markov and Bayesian approaches;
+- **Trained Models** — genuine fitted ML systems such as XGBoost v2;
+- **Meta / Portfolio systems** — Strategy Mix, Ensemble and future
+  meta-learners;
+- **Control** — Pure Random.
+
+Prospective evidence must be distinguishable from legacy historical evidence,
+and sample size must remain visible so small-sample results are not presented
+as established performance.
 
 ## Critical data-correctness issues
 
