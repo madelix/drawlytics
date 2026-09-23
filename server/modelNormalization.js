@@ -1,7 +1,11 @@
 // server/modelNormalization.js
 
+import { getModelDisplayName as getRegistryModelDisplayName } from './modelMetadata.js';
+
 export function normalizeModelKey(rawModelName, source = null) {
-  if (source === 'strategy_mix') return 'strategy_mix';
+  if (source === 'strategy_mix' || source === 'benchmark_strategy_mix') {
+    return 'strategy_mix';
+  }
 
   const raw = String(rawModelName ?? '')
     .trim()
@@ -9,19 +13,54 @@ export function normalizeModelKey(rawModelName, source = null) {
 
   if (!raw) return 'unknown';
 
+  /*
+   * Genuine trained models have their own stable identities.
+   * These must never be normalized into historical heuristic keys.
+   */
+  if (raw === 'xgboost_v2') {
+    return 'xgboost_v2';
+  }
+
+  /*
+   * Current Make Magic identities.
+   */
   if (raw.startsWith('make_magic:')) {
     return raw.replace('make_magic:', '').replace(/:/g, '_').trim();
   }
 
+  /*
+   * Historical ai:* identities.
+   *
+   * These keys are deliberately preserved because historical benchmark
+   * evidence already uses them. Their truthful implementation metadata
+   * lives in modelMetadata.js.
+   */
   if (raw.startsWith('ai:')) {
     return raw.replace('ai:', 'ai_').replace(/:/g, '_').trim();
   }
 
-  if (raw.includes('cold-focused generator')) return 'cold_focused';
-  if (raw.includes('hot-focused generator')) return 'hot_focused';
-  if (raw.includes('balanced hot/cold generator')) return 'balanced_hot_cold';
-  if (raw.includes('pure random generator')) return 'pure_random';
-  if (raw.includes('overdue-focused generator')) return 'overdue';
+  /*
+   * Older human-readable generator names.
+   */
+  if (raw.includes('cold-focused generator')) {
+    return 'cold_focused';
+  }
+
+  if (raw.includes('hot-focused generator')) {
+    return 'hot_focused';
+  }
+
+  if (raw.includes('balanced hot/cold generator')) {
+    return 'balanced_hot_cold';
+  }
+
+  if (raw.includes('pure random generator')) {
+    return 'pure_random';
+  }
+
+  if (raw.includes('overdue-focused generator')) {
+    return 'overdue';
+  }
 
   return raw
     .replace(/\s+generator$/i, '')
@@ -31,35 +70,12 @@ export function normalizeModelKey(rawModelName, source = null) {
     .trim();
 }
 
+/*
+ * Preserve the existing public API so current imports throughout
+ * Drawlytics continue to work.
+ *
+ * Display-name ownership now lives in modelMetadata.js.
+ */
 export function getModelDisplayName(modelKey) {
-  const key = String(modelKey ?? '').trim();
-
-  const names = {
-    strategy_mix: 'Strategy Mix',
-    cold_focused: 'Cold Focused',
-    hot_focused: 'Hot Focused',
-    balanced_hot_cold: 'Balanced Hot/Cold',
-    pure_random: 'Pure Random',
-    overdue: 'Overdue',
-    ai_ensemble: 'AI Ensemble',
-    ai_statistical_analysis: 'AI Statistical Analysis',
-    ai_random_forest: 'AI Random Forest',
-    ai_decision_tree: 'AI Decision Tree',
-    ai_gradient_boosting: 'AI Gradient Boosting',
-    ai_xgboost: 'Legacy XGBoost (Heuristic)',
-    ai_q_learning: 'AI Q-Learning',
-    ai_advanced_analysis: 'AI Advanced Analysis',
-    ai_markov_chain: 'AI Markov Chain',
-    ai_meta_learning: 'AI Meta Learning',
-    ai_lstm: 'AI LSTM',
-    ai_bayesian: 'AI Bayesian',
-  };
-
-  return (
-    names[key] ??
-    key
-      .replace(/^make_magic_/, '')
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (char) => char.toUpperCase())
-  );
+  return getRegistryModelDisplayName(modelKey);
 }
