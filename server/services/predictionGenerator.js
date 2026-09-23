@@ -630,7 +630,219 @@ export const sampleRangeBalancedMainNumbers = (historyRows) => {
   return [...low, ...mid, ...high].sort((a, b) => a - b);
 };
 
+/*
+ * Build inverse-frequency weights.
+ *
+ * Numbers that have appeared less often historically receive
+ * more weight, while every number remains possible.
+ */
+export const buildColdWeights = (min, max, rows, keys) => {
+  const frequencyWeights = buildFrequencyWeights(min, max, rows, keys);
+
+  const maxWeight = Math.max(...frequencyWeights.map((item) => item.weight), 1);
+
+  return frequencyWeights.map((item) => ({
+    n: item.n,
+    weight: Math.max(1, maxWeight + 1 - item.weight),
+  }));
+};
+
+/*
+ * Build overdue weights.
+ *
+ * historyRows is ordered newest -> oldest by generatePredictionBatch().
+ * The further back we need to look before finding a number, the more
+ * overdue that number is considered.
+ *
+ * Numbers that have never appeared in the available history receive
+ * the largest gap.
+ */
+export const buildOverdueWeights = (min, max, rows, keys) => {
+  const weights = [];
+
+  for (let n = min; n <= max; n++) {
+    let gap = rows.length + 1;
+
+    for (let index = 0; index < rows.length; index++) {
+      const appeared = keys.some((key) => Number(rows[index][key]) === n);
+
+      if (appeared) {
+        gap = index + 1;
+        break;
+      }
+    }
+
+    weights.push({
+      n,
+      weight: Math.max(1, gap),
+    });
+  }
+
+  return weights;
+};
+
+/*
+ * Balanced hot/cold sampling.
+ *
+ * The available number pool is divided into two non-overlapping groups
+ * according to historical frequency:
+ *
+ * - hot half: more frequently drawn numbers
+ * - cold half: less frequently drawn numbers
+ *
+ * The prediction deliberately takes numbers from both groups.
+ */
+export const sampleBalancedHotCold = (min, max, count, rows, keys) => {
+  if (count <= 0) {
+    return [];
+  }
+
+  const frequencyWeights = buildFrequencyWeights(min, max, rows, keys);
+
+  const ranked = [...frequencyWeights].sort((a, b) => {
+    if (b.weight !== a.weight) {
+      return b.weight - a.weight;
+    }
+
+    return a.n - b.n;
+  });
+
+  const splitIndex = Math.ceil(ranked.length / 2);
+
+  const hotPool = ranked.slice(0, splitIndex);
+  const coldPool = ranked.slice(splitIndex);
+
+  const hotCount = Math.ceil(count / 2);
+  const coldCount = count - hotCount;
+
+  const hot = weightedSampleUnique(
+    hotPool,
+    Math.min(hotCount, hotPool.length),
+    2.0,
+  );
+
+  const cold =
+    coldCount > 0
+      ? weightedSampleUnique(
+          coldPool.map((item) => ({
+            n: item.n,
+            weight: 1,
+          })),
+          Math.min(coldCount, coldPool.length),
+          1,
+        )
+      : [];
+
+  return [...hot, ...cold].sort((a, b) => a - b);
+};
+
 export const generateOneLine = (strategy, lotteryConfig, historyRows) => {
+  /*
+   * Rule-based benchmark strategies
+   */
+
+  if (strategy === 'balanced_hot_cold') {
+    return {
+      main: sampleBalancedHotCold(
+        lotteryConfig.mainMin,
+        lotteryConfig.mainMax,
+        lotteryConfig.mainCount,
+        historyRows,
+        lotteryConfig.mainKeys,
+      ),
+      stars: sampleBalancedHotCold(
+        lotteryConfig.specialMin,
+        lotteryConfig.specialMax,
+        lotteryConfig.specialCount,
+        historyRows,
+        lotteryConfig.specialKeys,
+      ),
+    };
+  }
+
+  if (strategy === 'hot_focused') {
+    return {
+      main: weightedSampleUnique(
+        buildFrequencyWeights(
+          lotteryConfig.mainMin,
+          lotteryConfig.mainMax,
+          historyRows,
+          lotteryConfig.mainKeys,
+        ),
+        lotteryConfig.mainCount,
+        1.6,
+      ),
+      stars: weightedSampleUnique(
+        buildFrequencyWeights(
+          lotteryConfig.specialMin,
+          lotteryConfig.specialMax,
+          historyRows,
+          lotteryConfig.specialKeys,
+        ),
+        lotteryConfig.specialCount,
+        1.6,
+      ),
+    };
+  }
+
+  if (strategy === 'cold_focused') {
+    return {
+      main: weightedSampleUnique(
+        buildColdWeights(
+          lotteryConfig.mainMin,
+          lotteryConfig.mainMax,
+          historyRows,
+          lotteryConfig.mainKeys,
+        ),
+        lotteryConfig.mainCount,
+        1.6,
+      ),
+      stars: weightedSampleUnique(
+        buildColdWeights(
+          lotteryConfig.specialMin,
+          lotteryConfig.specialMax,
+          historyRows,
+          lotteryConfig.specialKeys,
+        ),
+        lotteryConfig.specialCount,
+        1.6,
+      ),
+    };
+  }
+
+  if (strategy === 'overdue') {
+    return {
+      main: weightedSampleUnique(
+        buildOverdueWeights(
+          lotteryConfig.mainMin,
+          lotteryConfig.mainMax,
+          historyRows,
+          lotteryConfig.mainKeys,
+        ),
+        lotteryConfig.mainCount,
+        1.5,
+      ),
+      stars: weightedSampleUnique(
+        buildOverdueWeights(
+          lotteryConfig.specialMin,
+          lotteryConfig.specialMax,
+          historyRows,
+          lotteryConfig.specialKeys,
+        ),
+        lotteryConfig.specialCount,
+        1.5,
+      ),
+    };
+  }
+
+  /*
+   * Legacy heuristic strategies.
+   *
+   * These currently retain their historical ai:* keys so existing
+   * prediction evidence remains compatible. They are heuristic
+   * implementations, not genuinely trained ML models.
+   */
+
   if (strategy === 'ai:random_forest') {
     return {
       main: weightedSampleUnique(
@@ -855,6 +1067,7 @@ export const generateOneLine = (strategy, lotteryConfig, historyRows) => {
       ),
     };
   }
+
   if (strategy === 'ai:ensemble') {
     return {
       main: weightedSampleUnique(
@@ -933,6 +1146,12 @@ export const generateOneLine = (strategy, lotteryConfig, historyRows) => {
     };
   }
 
+  /*
+   * Pure Random control and fallback.
+   *
+   * At present pure_random deliberately reaches this branch.
+   * Unknown strategies also fall back here for backwards compatibility.
+   */
   return {
     main: sampleUnique(
       lotteryConfig.mainMin,
