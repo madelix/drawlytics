@@ -268,72 +268,96 @@ router.get('/performance/model-history', async (req, res) => {
     const { rows } = await pool.query(
       `
       WITH base AS (
-  SELECT
-    p.model_name,
-    p.status,
-    pdr.draw_date,
-    pdr.draw_sequence,
-    pdr.matched_main,
-    pdr.matched_special AS matched_stars,
-    LOWER(p.model_name) AS model_name_lc
-  FROM predictions p
-  INNER JOIN prediction_draw_results pdr
-    ON pdr.prediction_id = p.id
-  WHERE LOWER(p.lottery) = LOWER($1)
-  AND p.benchmark_eligible = true
-  AND LOWER(TRIM(p.status)) = 'checked'
-),
+        SELECT
+          p.model_name,
+          p.source,
+          p.status,
+          pdr.draw_date,
+          pdr.draw_sequence,
+          pdr.matched_main,
+          pdr.matched_special AS matched_stars,
+          LOWER(p.model_name) AS model_name_lc
+        FROM predictions p
+        INNER JOIN prediction_draw_results pdr
+          ON pdr.prediction_id = p.id
+        WHERE LOWER(p.lottery) = LOWER($1)
+          AND p.benchmark_eligible = true
+          AND LOWER(TRIM(p.status)) = 'checked'
+      ),
       normalized AS (
         SELECT
           CASE
-            WHEN model_name_lc LIKE 'make_magic:cold_focused%' THEN 'cold_focused'
-            WHEN model_name_lc LIKE 'make_magic:hot_focused%' THEN 'hot_focused'
-            WHEN model_name_lc LIKE 'make_magic:balanced_hot_cold%' THEN 'balanced_hot_cold'
-            WHEN model_name_lc LIKE 'make_magic:pure_random%' THEN 'pure_random'
-            WHEN model_name_lc LIKE 'make_magic:overdue%' THEN 'overdue'
-            WHEN model_name_lc LIKE 'ai:ensemble%' THEN 'ai_ensemble'
-WHEN model_name_lc LIKE 'ai:statistical_analysis%' THEN 'ai_statistical_analysis'
-WHEN model_name_lc LIKE 'ai:random_forest%' THEN 'ai_random_forest'
-WHEN model_name_lc LIKE 'ai:decision_tree%' THEN 'ai_decision_tree'
-WHEN model_name_lc LIKE 'ai:gradient_boosting%' THEN 'ai_gradient_boosting'
-WHEN model_name_lc LIKE 'ai:xgboost%' THEN 'ai_xgboost'
-WHEN model_name_lc LIKE 'ai:q_learning%' THEN 'ai_q_learning'
-WHEN model_name_lc LIKE 'ai:advanced_analysis%' THEN 'ai_advanced_analysis'
-WHEN model_name_lc LIKE 'ai:markov_chain%' THEN 'ai_markov_chain'
-WHEN model_name_lc LIKE 'ai:meta_learning%' THEN 'ai_meta_learning'
+            WHEN source IN (
+              'strategy_mix',
+              'benchmark_strategy_mix'
+            )
+              THEN 'strategy_mix'
 
-            WHEN model_name_lc LIKE '%cold-focused generator%' THEN 'cold_focused'
-            WHEN model_name_lc LIKE '%hot-focused generator%' THEN 'hot_focused'
-            WHEN model_name_lc LIKE '%balanced hot/cold generator%' THEN 'balanced_hot_cold'
-            WHEN model_name_lc LIKE '%pure random generator%' THEN 'pure_random'
-            WHEN model_name_lc LIKE '%overdue-focused generator%' THEN 'overdue'
+            WHEN model_name_lc LIKE 'make_magic:%'
+              THEN REPLACE(
+                REPLACE(model_name_lc, 'make_magic:', ''),
+                ':',
+                '_'
+              )
+
+            WHEN model_name_lc LIKE 'ai:%'
+              THEN REPLACE(
+                REPLACE(model_name_lc, 'ai:', 'ai_'),
+                ':',
+                '_'
+              )
+
+            WHEN model_name_lc LIKE '%cold-focused generator%'
+              THEN 'cold_focused'
+
+            WHEN model_name_lc LIKE '%hot-focused generator%'
+              THEN 'hot_focused'
+
+            WHEN model_name_lc LIKE '%balanced hot/cold generator%'
+              THEN 'balanced_hot_cold'
+
+            WHEN model_name_lc LIKE '%pure random generator%'
+              THEN 'pure_random'
+
+            WHEN model_name_lc LIKE '%overdue-focused generator%'
+              THEN 'overdue'
 
             ELSE REPLACE(
               REPLACE(
-                REPLACE(model_name_lc, 'make_magic:', ''),
-                ' generator',
+                REPLACE(
+                  model_name_lc,
+                  ' generator',
+                  ''
+                ),
+                '-focused',
                 ''
               ),
-              '-focused',
-              ''
+              ':',
+              '_'
             )
           END AS model_key,
-draw_date,
-draw_sequence,
-COALESCE(matched_main, 0) + COALESCE(matched_stars, 0) AS total_hits
-FROM base
+          draw_date,
+          draw_sequence,
+          COALESCE(matched_main, 0) +
+            COALESCE(matched_stars, 0) AS total_hits
+        FROM base
       )
       SELECT
-  draw_date,
-  draw_sequence,
-  model_key,
-  AVG(total_hits)::numeric AS avg_total_hits,
-  COUNT(*)::int AS prediction_count
-FROM normalized
-WHERE model_key = $2
-   OR model_key = 'pure_random'
-GROUP BY draw_date, draw_sequence, model_key
-ORDER BY draw_date ASC, draw_sequence ASC;
+        draw_date,
+        draw_sequence,
+        model_key,
+        AVG(total_hits)::numeric AS avg_total_hits,
+        COUNT(*)::int AS prediction_count
+      FROM normalized
+      WHERE model_key = $2
+         OR model_key = 'pure_random'
+      GROUP BY
+        draw_date,
+        draw_sequence,
+        model_key
+      ORDER BY
+        draw_date ASC,
+        draw_sequence ASC;
       `,
       [lottery, modelKey],
     );
@@ -342,12 +366,16 @@ ORDER BY draw_date ASC, draw_sequence ASC;
       ok: true,
       model_key: modelKey,
       baseline_model_key: 'pure_random',
-      history: rows.filter((r) => r.model_key === modelKey),
-      baseline_history: rows.filter((r) => r.model_key === 'pure_random'),
+      history: rows.filter((row) => row.model_key === modelKey),
+      baseline_history: rows.filter((row) => row.model_key === 'pure_random'),
     });
   } catch (err) {
     console.error('GET /performance/model-history failed:', err);
-    res.status(500).json({ ok: false, error: 'model_history_failed' });
+
+    res.status(500).json({
+      ok: false,
+      error: 'model_history_failed',
+    });
   }
 });
 
@@ -379,7 +407,7 @@ WHERE LOWER(p.lottery) = LOWER($1)
     const checkedRows = rows
       .filter((row) => String(row.status).trim().toLowerCase() === 'checked')
       .map((row) => ({
-        model_key: normalizeModelKey(row.model_name),
+        model_key: normalizeModelKey(row.model_name, row.source),
         total_hits:
           Number(row.matched_main ?? 0) + Number(row.matched_stars ?? 0),
       }));
@@ -647,7 +675,7 @@ WHERE LOWER(p.lottery) = LOWER($1)
     );
 
     const normalizedRows = rows.map((row) => ({
-      model_key: normalizeModelKey(row.model_name),
+      model_key: normalizeModelKey(row.model_name, row.source),
       total_hits: row.total_hits,
     }));
 
@@ -793,6 +821,7 @@ router.get(
         `
       SELECT
   p.model_name,
+  p.source,
   p.status,
   pdr.matched_main,
   pdr.matched_special AS matched_stars
@@ -807,7 +836,7 @@ WHERE LOWER(p.lottery) = LOWER($1)
       );
 
       const checkedRows = rows.map((row) => ({
-        model_key: normalizeModelKey(row.model_name),
+        model_key: normalizeModelKey(row.model_name, row.source),
         total_hits:
           Number(row.matched_main ?? 0) + Number(row.matched_stars ?? 0),
       }));
