@@ -131,7 +131,7 @@ type ChartRow = {
 
   trust_score: number;
   sample_maturity: string;
-  jackpots: number;
+  top_prize_hits: number;
   high_hit_predictions: number;
   four_plus_hits: number;
   five_plus_hits: number;
@@ -530,7 +530,7 @@ export default function ModelPerformancePage() {
 
           trust_score: trustScore,
           sample_maturity: sampleMaturityLabel(checked),
-          jackpots: r.jackpots ?? 0,
+          top_prize_hits: r.top_prize_hits ?? r.jackpots ?? 0,
           high_hit_predictions: r.high_hit_predictions ?? 0,
           four_plus_hits: r.four_plus_hits ?? 0,
           five_plus_hits: r.five_plus_hits ?? 0,
@@ -553,7 +553,7 @@ export default function ModelPerformancePage() {
         };
       })
       .sort((a, b) => b.avg_total_hits - a.avg_total_hits);
-  }, [rows]);
+  }, [rows, strategyMode]);
 
   const topAverageModel = useMemo(() => {
     return (
@@ -1426,7 +1426,8 @@ export default function ModelPerformancePage() {
             {formatNum(selectedModel.avg_stars_n, 2)} · 3+ hits{' '}
             <strong>{selectedModel.high_hit_predictions}</strong> · 4+ hits{' '}
             <strong>{selectedModel.four_plus_hits}</strong> · 5+ hits{' '}
-            <strong>{selectedModel.five_plus_hits}</strong> · checked{' '}
+            <strong>{selectedModel.five_plus_hits}</strong> · top-prize hits{' '}
+            <strong>{selectedModel.top_prize_hits}</strong> · checked{' '}
             <strong>{selectedModel.checked}</strong>/{selectedModel.total}
           </div>
         </div>
@@ -2138,7 +2139,7 @@ export default function ModelPerformancePage() {
               const rank =
                 filtered.findIndex((x) => x.model_key === r.model_key) + 1;
               const conf = r.trust_score ?? 0;
-              const jackpotPotLabel = formatNum(r.upside_score, 2);
+              const upsideLabel = formatNum(r.upside_score, 2);
 
               return (
                 <div
@@ -2284,8 +2285,8 @@ export default function ModelPerformancePage() {
                     </div>
 
                     <div>
-                      <div style={{ color: '#6b7280' }}>Jackpot potential</div>
-                      <strong>{jackpotPotLabel}</strong>
+                      <div style={{ color: '#6b7280' }}>Upside score</div>
+                      <strong>{upsideLabel}</strong>
                     </div>
 
                     <div>
@@ -2332,7 +2333,7 @@ export default function ModelPerformancePage() {
                     'Checked',
                     'Average hits',
                     'Trust score',
-                    'Jackpot potential',
+                    'Upside score',
                   ].map((h) => (
                     <th
                       key={h}
@@ -2355,7 +2356,7 @@ export default function ModelPerformancePage() {
                   const rank =
                     filtered.findIndex((x) => x.model_key === r.model_key) + 1;
                   const conf = r.trust_score ?? 0;
-                  const jackpotPotLabel = formatNum(r.upside_score, 2);
+                  const upsideLabel = formatNum(r.upside_score, 2);
 
                   return (
                     <tr key={r.model_key}>
@@ -2444,7 +2445,7 @@ export default function ModelPerformancePage() {
                           fontWeight: 700,
                         }}
                       >
-                        {jackpotPotLabel}
+                        {upsideLabel}
                       </td>
                     </tr>
                   );

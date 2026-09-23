@@ -2,7 +2,6 @@
 import { apiGetJson, apiSendJson } from './apiClient';
 
 export type ModelPerformanceRow = {
-  // ✅ new backend fields
   model_key: string;
   model_display_name: string;
 
@@ -10,17 +9,32 @@ export type ModelPerformanceRow = {
   checked_predictions: number;
   strategy_mix_predictions: number;
 
-  // returned from Postgres as numeric -> often string in node-postgres
+  // Returned from Postgres as numeric -> often string in node-postgres.
   checked_rate_pct: string;
 
   avg_main: string;
   avg_stars: string;
   recent_avg_total_hits: string;
 
+  /*
+   * Lottery-neutral top-prize metric.
+   *
+   * EuroMillions: 5 main + 2 Lucky Stars
+   * UK Lotto:     6 main
+   * Set For Life: 5 main + 1 Life Ball
+   */
+  top_prize_hits: number;
+
+  /*
+   * Temporary backwards-compatible alias from the backend.
+   * Existing UI code may still reference this until migration is complete.
+   */
   jackpots: number;
+
   high_hit_predictions: number;
   four_plus_hits: number;
   five_plus_hits: number;
+
   baseline_wins: number;
   baseline_compared_draws: number;
 };
