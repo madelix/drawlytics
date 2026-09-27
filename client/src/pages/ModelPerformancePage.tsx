@@ -427,31 +427,26 @@ export default function ModelPerformancePage() {
 
         let strategyInsight: string;
 
-        if (baselineWeightedScore >= 0.5 && consistencyScore >= 0.5) {
+        if (baselineCompared < 10) {
           strategyInsight =
-            baselineCompared >= 20
-              ? 'Strong and proven, consistently beats random'
-              : 'Strong performance, but still building sample';
-        } else if (baselineWeightedScore >= 0.5) {
+            'Early evidence only — too little baseline history to judge reliably';
+        } else if (baselineWinRateGlobal >= 0.6 && consistencyScore >= 0.5) {
           strategyInsight =
-            baselineCompared >= 20
-              ? 'Beating random reliably, moderate consistency'
-              : 'Beating random, but sample is still limited';
+            baselineCompared >= 25
+              ? 'Consistent results with a positive record against random'
+              : 'Promising results against random, but evidence is still building';
+        } else if (baselineWinRateGlobal >= 0.5) {
+          strategyInsight =
+            'Competitive with random so far, without a clear demonstrated edge';
         } else if (consistencyScore >= 0.5) {
           strategyInsight =
-            baselineCompared >= 20
-              ? 'Realiable and consistent, outperforming random with moderate edge'
-              : 'Consistent so far, but not yet proven vs random';
+            'Consistent results, but currently not outperforming the random baseline';
         } else if (delta > 0.05) {
           strategyInsight =
-            baselineCompared >= 10
-              ? 'Improving recently, showing emerging potential'
-              : 'Early signs of improvement, but very limited data';
+            'Recent results are improving, but no reliable edge is established';
         } else {
           strategyInsight =
-            baselineCompared >= 10
-              ? 'Unproven or below baseline performance'
-              : 'Too little data to assess reliably';
+            'No convincing advantage over the random baseline yet';
         }
 
         const strategyReasons: string[] = [];
@@ -555,29 +550,96 @@ export default function ModelPerformancePage() {
       .sort((a, b) => b.avg_total_hits - a.avg_total_hits);
   }, [rows, strategyMode]);
 
-  const topAverageModel = useMemo(() => {
+  /*
+   * Model roles
+   *
+   * Current contenders are the strategies/models that actively
+   * participate in the Model League and recommendations.
+   *
+   * Strategy Mix is a meta/portfolio system.
+   * Pure Random is the baseline/control.
+   *
+   * Everything else is retained as a legacy experiment for
+   * transparency, but does not influence current rankings,
+   * recommendations or the suggested strategy mix.
+   */
+  const currentContenderKeys = useMemo(
+    () =>
+      new Set([
+        'balanced_hot_cold',
+        'hot_focused',
+        'cold_focused',
+        'overdue',
+        'xgboost_v2',
+      ]),
+    [],
+  );
+
+  const activeContenders = useMemo(() => {
+    return chartRows.filter((model) =>
+      currentContenderKeys.has(model.model_key),
+    );
+  }, [chartRows, currentContenderKeys]);
+
+  const strategyMixModel = useMemo(() => {
     return (
-      [...chartRows].sort((a, b) => b.avg_total_hits - a.avg_total_hits)[0] ??
-      null
+      chartRows.find((model) => model.model_key === 'strategy_mix') ?? null
     );
   }, [chartRows]);
+
+  const pureRandomModel = useMemo(() => {
+    return chartRows.find((model) => model.model_key === 'pure_random') ?? null;
+  }, [chartRows]);
+
+  const legacyModels = useMemo(() => {
+    return chartRows
+      .filter(
+        (model) =>
+          !currentContenderKeys.has(model.model_key) &&
+          model.model_key !== 'strategy_mix' &&
+          model.model_key !== 'pure_random',
+      )
+      .sort((a, b) => b.avg_total_hits - a.avg_total_hits);
+  }, [chartRows, currentContenderKeys]);
+
+  const MIN_LEAGUE_DRAWS = 10;
+
+  const leagueContenders = useMemo(() => {
+    return activeContenders.filter(
+      (model) => model.checked >= MIN_LEAGUE_DRAWS,
+    );
+  }, [activeContenders]);
+
+  const provisionalContenders = useMemo(() => {
+    return activeContenders.filter((model) => model.checked < MIN_LEAGUE_DRAWS);
+  }, [activeContenders]);
+
+  const topAverageModel = useMemo(() => {
+    return (
+      [...leagueContenders].sort(
+        (a, b) => b.avg_total_hits - a.avg_total_hits,
+      )[0] ?? null
+    );
+  }, [leagueContenders]);
 
   const topUpsideModel = useMemo(() => {
     return (
-      [...chartRows].sort((a, b) => b.upside_score - a.upside_score)[0] ?? null
+      [...leagueContenders].sort(
+        (a, b) => b.upside_score - a.upside_score,
+      )[0] ?? null
     );
-  }, [chartRows]);
+  }, [leagueContenders]);
 
   const topConsistencyModel = useMemo(() => {
     return (
-      [...chartRows].sort(
+      [...leagueContenders].sort(
         (a, b) => b.consistency_score - a.consistency_score,
       )[0] ?? null
     );
-  }, [chartRows]);
+  }, [leagueContenders]);
 
   const filtered = useMemo(() => {
-    return chartRows
+    return leagueContenders
       .filter((r) => r.checked >= minChecked)
       .sort((a, b) =>
         rankingMode === 'average'
@@ -588,7 +650,7 @@ export default function ModelPerformancePage() {
               ? b.consistency_score - a.consistency_score
               : b.baseline_weighted_score - a.baseline_weighted_score,
       );
-  }, [chartRows, minChecked, rankingMode]);
+  }, [leagueContenders, minChecked, rankingMode]);
 
   useEffect(() => {
     const LS_KEY = 'drawlytics_model_ranks_prev';
@@ -660,14 +722,14 @@ export default function ModelPerformancePage() {
 
   const bestStrategyModel = useMemo(() => {
     return (
-      [...chartRows].sort((a, b) => b.strategy_score - a.strategy_score)[0] ??
-      null
+      [...leagueContenders].sort(
+        (a, b) => b.strategy_score - a.strategy_score,
+      )[0] ?? null
     );
-  }, [chartRows]);
+  }, [leagueContenders]);
 
   const strategyPortfolio = useMemo(() => {
-    const top = [...chartRows]
-      .filter((model) => model.model_key !== 'pure_random')
+    const top = [...leagueContenders]
       .sort((a, b) => b.strategy_score - a.strategy_score)
       .slice(0, 3);
 
@@ -677,7 +739,7 @@ export default function ModelPerformancePage() {
       ...m,
       weight: totalScore > 0 ? m.strategy_score / totalScore : 0,
     }));
-  }, [chartRows]);
+  }, [leagueContenders]);
 
   useEffect(() => {
     try {
@@ -715,7 +777,7 @@ export default function ModelPerformancePage() {
 
   const recommendedModel = useMemo(() => {
     return (
-      [...chartRows].sort((a, b) => {
+      [...leagueContenders].sort((a, b) => {
         const getScore = (row: ChartRow) => {
           if (strategyMode === 'safe') {
             return row.consistency_score * 0.6 + row.trust_score * 0.4;
@@ -731,7 +793,7 @@ export default function ModelPerformancePage() {
         return getScore(b) - getScore(a);
       })[0] ?? null
     );
-  }, [chartRows, strategyMode]);
+  }, [leagueContenders, strategyMode]);
 
   const heatingUp = useMemo(() => {
     return [...filtered]
@@ -806,9 +868,8 @@ export default function ModelPerformancePage() {
   }, [baselineWinRate]);
 
   const realityCheck = useMemo(() => {
-    const candidates = chartRows.filter(
-      (model) =>
-        model.model_key !== 'pure_random' && model.baseline_compared >= 10,
+    const candidates = leagueContenders.filter(
+      (model) => model.baseline_compared >= 10,
     );
 
     if (candidates.length === 0) return null;
@@ -834,7 +895,7 @@ export default function ModelPerformancePage() {
       model: best,
       verdict,
     };
-  }, [chartRows]);
+  }, [leagueContenders]);
 
   const historyChartMeta = useMemo(() => {
     const activeSeries = comparisonModelKeys
@@ -956,9 +1017,91 @@ export default function ModelPerformancePage() {
       ></div>
 
       <div style={{ textAlign: 'center', color: '#6b7280', marginBottom: 14 }}>
-        Models: {filtered.length} (of {rows.length}) · Total predictions:{' '}
-        {summary.total} · Checked: {summary.checked}
+        Current models: {activeContenders.length} · League eligible:{' '}
+        {leagueContenders.length} · Provisional: {provisionalContenders.length}{' '}
+        · Benchmark models: {rows.length} · Total predictions: {summary.total} ·
+        Checked: {summary.checked}
       </div>
+
+      {provisionalContenders.length > 0 && (
+        <div
+          style={{
+            margin: '0 auto 14px',
+            maxWidth: 980,
+            background: '#fff',
+            border: '1px solid #eef2f7',
+            borderRadius: 16,
+            padding: '12px 14px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 800,
+              color: '#6b7280',
+              marginBottom: 8,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            Provisional models
+          </div>
+
+          {provisionalContenders.map((model) => (
+            <div
+              key={model.model_key}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontWeight: 900,
+                    color: '#111827',
+                  }}
+                >
+                  {model.model_display_name}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 3,
+                    fontSize: 12,
+                    color: '#6b7280',
+                  }}
+                >
+                  {model.checked}/{model.total} checked draws · enters the Model
+                  League after {MIN_LEAGUE_DRAWS} checked draws
+                </div>
+              </div>
+
+              <div
+                style={{
+                  fontSize: 12,
+                  color: '#6b7280',
+                  textAlign: 'right',
+                }}
+              >
+                Observed average
+                <div
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 900,
+                    color: '#111827',
+                  }}
+                >
+                  {formatNum(model.avg_total_hits, 2)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div
         style={{
@@ -2455,6 +2598,138 @@ export default function ModelPerformancePage() {
           </div>
         )}
       </div>
+
+      {legacyModels.length > 0 && (
+        <details
+          style={{
+            margin: '20px auto 0',
+            maxWidth: 980,
+            background: '#fff',
+            border: '1px solid #eef2f7',
+            borderRadius: 16,
+            overflow: 'hidden',
+          }}
+        >
+          <summary
+            style={{
+              cursor: 'pointer',
+              padding: '14px 16px',
+              fontWeight: 900,
+              fontSize: 16,
+              color: '#111827',
+              userSelect: 'none',
+            }}
+          >
+            Legacy experiments ({legacyModels.length})
+          </summary>
+
+          <div
+            style={{
+              padding: '0 16px 14px',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                lineHeight: 1.5,
+                color: '#6b7280',
+                marginBottom: 12,
+              }}
+            >
+              Historical strategy experiments retained for transparency and
+              comparison. They no longer participate in current rankings,
+              recommendations, or the suggested strategy mix.
+            </div>
+
+            <div
+              style={{
+                border: '1px solid #eef2f7',
+                borderRadius: 12,
+                overflow: 'hidden',
+              }}
+            >
+              {legacyModels.map((model, index) => (
+                <div
+                  key={model.model_key}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobile
+                      ? '1fr'
+                      : 'minmax(220px, 1fr) 120px 120px',
+                    gap: isMobile ? 6 : 16,
+                    alignItems: 'center',
+                    padding: '12px 14px',
+                    borderBottom:
+                      index === legacyModels.length - 1
+                        ? 'none'
+                        : '1px solid #f1f5f9',
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontWeight: 800,
+                          color: '#374151',
+                        }}
+                      >
+                        {model.model_display_name}
+                      </span>
+
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 800,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          padding: '3px 7px',
+                          borderRadius: 999,
+                          background: '#f8fafc',
+                          color: '#64748b',
+                          border: '1px solid #e2e8f0',
+                        }}
+                      >
+                        Historical only
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: '#6b7280',
+                    }}
+                  >
+                    Avg hits{' '}
+                    <strong style={{ color: '#374151' }}>
+                      {formatNum(model.avg_total_hits, 2)}
+                    </strong>
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: '#6b7280',
+                    }}
+                  >
+                    Checked{' '}
+                    <strong style={{ color: '#374151' }}>
+                      {model.checked}
+                    </strong>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </details>
+      )}
     </div>
   );
 }
