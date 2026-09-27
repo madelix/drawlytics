@@ -759,8 +759,9 @@ export default function ModelPerformancePage() {
 
   const selectedModel = useMemo(() => {
     if (!selectedModelKey) return null;
-    return filtered.find((r) => r.model_key === selectedModelKey) ?? null;
-  }, [filtered, selectedModelKey]);
+
+    return chartRows.find((r) => r.model_key === selectedModelKey) ?? null;
+  }, [chartRows, selectedModelKey]);
 
   useEffect(() => {
     if (!selectedModelKey) {
@@ -1101,6 +1102,95 @@ export default function ModelPerformancePage() {
             </div>
           ))}
         </div>
+      )}
+
+      {strategyMixModel && (
+        <button
+          type="button"
+          onClick={() =>
+            setSelectedModelKey((prev) =>
+              prev === 'strategy_mix' ? null : 'strategy_mix',
+            )
+          }
+          style={{
+            width: '100%',
+            maxWidth: 980,
+            margin: '0 auto 14px',
+            padding: '12px 14px',
+            background: '#fff',
+            border:
+              selectedModelKey === 'strategy_mix'
+                ? '1px solid #804198'
+                : '1px solid #eef2f7',
+            borderRadius: 16,
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 800,
+              color: '#6b7280',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              marginBottom: 6,
+            }}
+          >
+            Portfolio performance
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontWeight: 900,
+                  color: '#111827',
+                }}
+              >
+                Strategy Mix
+              </div>
+
+              <div
+                style={{
+                  marginTop: 3,
+                  fontSize: 12,
+                  color: '#6b7280',
+                }}
+              >
+                Performance of the combined strategy portfolio · click to
+                inspect
+              </div>
+            </div>
+
+            <div
+              style={{
+                fontSize: 12,
+                color: '#6b7280',
+                textAlign: 'right',
+              }}
+            >
+              Observed average
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 900,
+                  color: '#111827',
+                }}
+              >
+                {formatNum(strategyMixModel.avg_total_hits, 2)}
+              </div>
+            </div>
+          </div>
+        </button>
       )}
 
       <div
