@@ -426,13 +426,13 @@ export default function HonestyDashboardPage() {
               <Database size={20} strokeWidth={2} color="#804198" />
             </div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>
-              Checked predictions
+              Evaluated draws
             </div>
             <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>
               {summary?.checked_predictions?.toLocaleString() ?? '—'}
             </div>
             <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
-              Evaluated against actual results.
+              Official draws included in the current evidence.
             </div>
           </div>
 
@@ -466,7 +466,7 @@ export default function HonestyDashboardPage() {
               {summary?.models_analysed?.toLocaleString() ?? '—'}
             </div>
             <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
-              Active models in this evaluation.
+              Current eligible models.
             </div>
           </div>
         </div>

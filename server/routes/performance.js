@@ -17,6 +17,10 @@ import {
 } from '../services/evidenceEngine.js';
 import { getModelProfile, MODEL_REGISTRY } from '../modelRegistry.js';
 import { getModelPerformanceData } from '../services/modelPerformanceData.js';
+import {
+  getBenchmarkDrawModelScores,
+  summarizeBenchmarkModelScores,
+} from '../services/benchmarkEvidenceData.js';
 
 const router = express.Router();
 
@@ -186,69 +190,74 @@ router.get('/performance/model-history', async (req, res) => {
 router.get('/performance/honesty-summary', async (req, res) => {
   try {
     const lottery = String(req.query.lottery || 'euromillions');
-    const leaderboardHistory = await buildLeaderboardHistory(lottery);
-    const leaderStability = analyseLeaderStability(leaderboardHistory);
 
-    const { rows } = await pool.query(
-      `
-           SELECT
-  p.model_name,
-  p.source,
-  p.status,
-  pdr.draw_date,
-  pdr.draw_sequence,
-  pdr.matched_main,
-  pdr.matched_special AS matched_stars
-FROM predictions p
-INNER JOIN prediction_draw_results pdr
-  ON pdr.prediction_id = p.id
-WHERE LOWER(p.lottery) = LOWER($1)
-  AND p.benchmark_eligible = true;
-      `,
-      [lottery],
-    );
+    const checkedRows = await getBenchmarkDrawModelScores(lottery);
 
-    const checkedRows = rows
-      .filter((row) => String(row.status).trim().toLowerCase() === 'checked')
-      .map((row) => ({
-        model_key: normalizeModelKey(row.model_name, row.source),
-        total_hits:
-          Number(row.matched_main ?? 0) + Number(row.matched_stars ?? 0),
-      }));
-
+    /*
+     * Each entry is one averaged model score per official draw.
+     *
+     * A multi-line Strategy Mix therefore contributes one evidence
+     * point for that draw, just like a one-line base strategy.
+     */
     const hitsByModel = new Map();
 
     for (const row of checkedRows) {
       const hits = hitsByModel.get(row.model_key) ?? [];
-      hits.push(row.total_hits);
+
+      hits.push(Number(row.avg_total_hits ?? 0));
+
       hitsByModel.set(row.model_key, hits);
     }
 
-    const totalsByModel = new Map();
+    const modelStats = summarizeBenchmarkModelScores(checkedRows).map(
+      (row) => ({
+        model_key: row.model_key,
 
-    for (const row of checkedRows) {
-      const current = totalsByModel.get(row.model_key) ?? {
-        totalHits: 0,
-        predictionCount: 0,
-      };
+        avg_total_hits: Number(row.avg_total_hits ?? 0),
 
-      current.totalHits += row.total_hits;
-      current.predictionCount += 1;
-
-      totalsByModel.set(row.model_key, current);
-    }
-
-    const modelStats = [...totalsByModel.entries()].map(
-      ([model_key, stats]) => ({
-        model_key,
-        avg_total_hits: stats.totalHits / stats.predictionCount,
-        checked_predictions: stats.predictionCount,
+        /*
+         * Existing API field retained for compatibility.
+         * This now represents evaluated draws rather than
+         * individual prediction lines.
+         */
+        checked_predictions: Number(row.evaluated_draws ?? 0),
       }),
     );
 
-    const rankedModels = [...modelStats].sort(
-      (a, b) => b.avg_total_hits - a.avg_total_hits,
+    const MIN_HONESTY_DRAWS = 10;
+
+    /*
+     * Honesty evaluates only current Drawlytics systems.
+     *
+     * Legacy / retired experiments remain available historically,
+     * but they must not determine the current honesty verdict.
+     *
+     * XGBoost v2 remains provisional until it has enough evaluated
+     * draws to enter current evidence comparisons.
+     */
+    const currentModelStats = modelStats.filter((model) => {
+      const profile = getModelProfile(model.model_key);
+
+      return (
+        model.model_key !== 'pure_random' &&
+        profile &&
+        profile.legacy !== true &&
+        profile.retired !== true
+      );
+    });
+
+    const eligibleModelStats = currentModelStats.filter(
+      (model) => model.checked_predictions >= MIN_HONESTY_DRAWS,
     );
+
+    const pureRandom = modelStats.find(
+      (model) => model.model_key === 'pure_random',
+    );
+
+    const rankedModels = [
+      ...eligibleModelStats,
+      ...(pureRandom ? [pureRandom] : []),
+    ].sort((a, b) => b.avg_total_hits - a.avg_total_hits);
 
     const pureRandomRank =
       rankedModels.findIndex((model) => model.model_key === 'pure_random') + 1;
@@ -257,28 +266,49 @@ WHERE LOWER(p.lottery) = LOWER($1)
       .filter((model) => model.model_key !== 'pure_random')
       .slice(0, 3);
 
-    const pureRandom = modelStats.find(
-      (model) => model.model_key === 'pure_random',
-    );
+    const currentLeader = rankedModels[0] ?? null;
 
-    const currentLeader = modelStats.reduce(
+    const strongestNonRandom = eligibleModelStats.reduce(
       (best, model) =>
         !best || model.avg_total_hits > best.avg_total_hits ? model : best,
       null,
     );
 
-    const strongestNonRandom = modelStats
-      .filter((model) => model.model_key !== 'pure_random')
-      .reduce(
-        (best, model) =>
-          !best || model.avg_total_hits > best.avg_total_hits ? model : best,
-        null,
-      );
+    const eligibleModelKeys = new Set(
+      eligibleModelStats.map((model) => model.model_key),
+    );
+
+    const honestyLeaderboardKeys = new Set([
+      ...eligibleModelKeys,
+      'pure_random',
+    ]);
+
+    const leaderboardHistory = await buildLeaderboardHistory(
+      lottery,
+      honestyLeaderboardKeys,
+    );
+
+    const leaderStability = analyseLeaderStability(leaderboardHistory);
+
+    const honestyEvidenceRows = checkedRows.filter(
+      (row) =>
+        eligibleModelKeys.has(row.model_key) || row.model_key === 'pure_random',
+    );
+
+    const evaluatedDraws = new Set(
+      honestyEvidenceRows.map(
+        (row) => `${row.draw_date}|${row.draw_sequence ?? 1}`,
+      ),
+    ).size;
 
     const summaryRow = {
-      checked_predictions: checkedRows.length,
-      models_analysed: modelStats.length,
+      checked_predictions: evaluatedDraws,
+      evaluated_draws: evaluatedDraws,
+
+      models_analysed: eligibleModelStats.length,
+
       current_leader: currentLeader?.model_key ?? null,
+
       leader_avg_total_hits: currentLeader?.avg_total_hits ?? null,
     };
 
@@ -320,8 +350,8 @@ WHERE LOWER(p.lottery) = LOWER($1)
         priority: FINDING_PRIORITIES.SAMPLE_SIZE,
         title:
           leaderSampleSize < 25
-            ? `${getModelDisplayName(strongestNonRandom.model_key)} currently leads, but its result is based on only ${leaderSampleSize} checked predictions.`
-            : `${getModelDisplayName(strongestNonRandom.model_key)} is supported by ${leaderSampleSize} checked predictions.`,
+            ? `${getModelDisplayName(strongestNonRandom.model_key)} currently leads, but its result is based on only ${leaderSampleSize} evaluated draws.`
+            : `${getModelDisplayName(strongestNonRandom.model_key)} is supported by ${leaderSampleSize} evaluated draws.`,
       });
     }
 
@@ -330,7 +360,7 @@ WHERE LOWER(p.lottery) = LOWER($1)
       const difference =
         strongestNonRandom.avg_total_hits - pureRandom.avg_total_hits;
 
-      percentageDifference = percentageDifference =
+      percentageDifference =
         pureRandom.avg_total_hits > 0
           ? (difference / pureRandom.avg_total_hits) * 100
           : null;
@@ -350,8 +380,9 @@ WHERE LOWER(p.lottery) = LOWER($1)
     }
 
     if (pureRandomRank > 0) {
-      const modelsBelowRandom = modelStats.length - pureRandomRank;
+      const modelsBelowRandom = rankedModels.length - pureRandomRank;
       const modelsAboveRandom = pureRandomRank - 1;
+      const currentModelCount = eligibleModelStats.length;
 
       findings.push({
         id: 'pure-random-competitiveness',
@@ -360,8 +391,8 @@ WHERE LOWER(p.lottery) = LOWER($1)
         priority: FINDING_PRIORITIES.BASELINE_COMPETITIVENESS,
         title:
           pureRandomRank <= 3
-            ? `Only ${modelsAboveRandom} of the ${modelStats.length} evaluated model${modelStats.length === 1 ? '' : 's'} currently outperform Pure Random.`
-            : `Pure Random currently outperforms ${modelsBelowRandom} of the ${modelStats.length} evaluated models.`,
+            ? `Only ${modelsAboveRandom} of the ${currentModelCount} current model${currentModelCount === 1 ? '' : 's'} currently outperform Pure Random.`
+            : `Pure Random currently outperforms ${modelsBelowRandom} of the ${currentModelCount} current models.`,
       });
     }
 
@@ -401,6 +432,10 @@ WHERE LOWER(p.lottery) = LOWER($1)
           })
         : null;
 
+    const strongestNonRandomDisplayName = strongestNonRandom
+      ? getModelDisplayName(strongestNonRandom.model_key)
+      : null;
+
     if (
       bootstrapConfidence?.status === 'calculated' &&
       bootstrapConfidence.interpretation
@@ -415,8 +450,8 @@ WHERE LOWER(p.lottery) = LOWER($1)
         priority: FINDING_PRIORITIES.BOOTSTRAP_SIGNIFICANCE,
         title:
           bootstrapConfidence.interpretation.level === 'strong'
-            ? `Bootstrap analysis indicates strong evidence that ${currentLeaderDisplayName} currently outperforms Pure Random.`
-            : `Current bootstrap analysis does not provide strong evidence that ${currentLeaderDisplayName} outperforms Pure Random.`,
+            ? `Bootstrap analysis indicates strong evidence that ${strongestNonRandomDisplayName} currently outperforms Pure Random.`
+            : `Current bootstrap analysis does not provide strong evidence that ${strongestNonRandomDisplayName} outperforms Pure Random.`,
       });
     }
 
@@ -440,7 +475,7 @@ WHERE LOWER(p.lottery) = LOWER($1)
         current_leader_key: currentLeaderKey,
         evidence_level: evidenceLevel,
         checked_predictions: checkedPredictions,
-        models_analysed: modelStats.length,
+        models_analysed: modelsAnalysed,
         leader_avg_total_hits:
           summaryRow.leader_avg_total_hits === null
             ? null
@@ -462,56 +497,57 @@ router.get('/performance/random-comparison', async (req, res) => {
   try {
     const lottery = String(req.query.lottery || 'euromillions');
 
-    const { rows } = await pool.query(
-      `
-  SELECT
-  p.model_name,
-  p.source,
-  COALESCE(pdr.matched_main, 0) + COALESCE(pdr.matched_special, 0) AS total_hits
-FROM predictions p
-INNER JOIN prediction_draw_results pdr
-  ON pdr.prediction_id = p.id
-WHERE LOWER(p.lottery) = LOWER($1)
-  AND p.benchmark_eligible = true
-  AND LOWER(TRIM(p.status)) = 'checked';
-  `,
-      [lottery],
-    );
+    const checkedRows = await getBenchmarkDrawModelScores(lottery);
 
-    const normalizedRows = rows.map((row) => ({
-      model_key: normalizeModelKey(row.model_name, row.source),
-      total_hits: row.total_hits,
-    }));
+    /*
+     * Each entry is now one averaged model score per official draw.
+     * A five-line Strategy Mix therefore counts as one evidence unit,
+     * just like a one-line base strategy.
+     */
+    const hitsByModel = new Map();
 
-    const totalsByModel = new Map();
+    for (const row of checkedRows) {
+      const hits = hitsByModel.get(row.model_key) ?? [];
 
-    for (const row of normalizedRows) {
-      const current = totalsByModel.get(row.model_key) ?? {
-        totalHits: 0,
-        predictionCount: 0,
-      };
+      hits.push(Number(row.avg_total_hits ?? 0));
 
-      current.totalHits += Number(row.total_hits);
-      current.predictionCount += 1;
-
-      totalsByModel.set(row.model_key, current);
+      hitsByModel.set(row.model_key, hits);
     }
 
-    const modelStats = [...totalsByModel.entries()].map(
-      ([model_key, stats]) => ({
-        model_key,
-        avg_total_hits: stats.totalHits / stats.predictionCount,
-        checked_predictions: stats.predictionCount,
+    const modelStats = summarizeBenchmarkModelScores(checkedRows).map(
+      (row) => ({
+        model_key: row.model_key,
+
+        avg_total_hits: Number(row.avg_total_hits ?? 0),
+
+        /*
+         * Kept under the existing API name for compatibility.
+         * This now represents evaluated draws rather than raw
+         * prediction lines.
+         */
+        checked_predictions: Number(row.evaluated_draws ?? 0),
       }),
     );
 
-    const strongestModel = modelStats
-      .filter((model) => model.model_key !== 'pure_random')
-      .reduce(
-        (best, model) =>
-          !best || model.avg_total_hits > best.avg_total_hits ? model : best,
-        null,
+    const MIN_RANDOM_COMPARISON_DRAWS = 10;
+
+    const eligibleModels = modelStats.filter((model) => {
+      const profile = getModelProfile(model.model_key);
+
+      return (
+        model.model_key !== 'pure_random' &&
+        model.checked_predictions >= MIN_RANDOM_COMPARISON_DRAWS &&
+        profile &&
+        profile.legacy !== true &&
+        profile.retired !== true
       );
+    });
+
+    const strongestModel = eligibleModels.reduce(
+      (best, model) =>
+        !best || model.avg_total_hits > best.avg_total_hits ? model : best,
+      null,
+    );
 
     const pureRandom = modelStats.find(
       (model) => model.model_key === 'pure_random',

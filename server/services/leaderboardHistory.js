@@ -1,66 +1,57 @@
-import { pool } from '../db.js';
-import { normalizeModelKey } from '../modelNormalization.js';
+// server/services/leaderboardHistory.js
 
-export async function buildLeaderboardHistory(lottery) {
-  const { rows } = await pool.query(
-    `
-  SELECT
-    pdr.draw_date,
-    pdr.draw_sequence,
-    p.model_name,
-    pdr.matched_main,
-    pdr.matched_special AS matched_stars
-  FROM prediction_draw_results pdr
-  INNER JOIN predictions p
-    ON p.id = pdr.prediction_id
-  WHERE LOWER(p.lottery) = LOWER($1)
-  AND p.benchmark_eligible = true
-  AND LOWER(TRIM(p.status)) = 'checked'
-  ORDER BY pdr.draw_date ASC, pdr.draw_sequence ASC;
-  `,
-    [lottery],
-  );
+import { getBenchmarkDrawModelScores } from './benchmarkEvidenceData.js';
 
-  const predictionsByDraw = new Map();
+export async function buildLeaderboardHistory(
+  lottery,
+  allowedModelKeys = null,
+) {
+  const allDrawModelScores = await getBenchmarkDrawModelScores(lottery);
 
-  for (const row of rows) {
-    const drawDate = new Date(row.draw_date).toISOString().slice(0, 10);
-    const drawKey = `${drawDate}:${row.draw_sequence ?? 1}`;
-    const modelKey = normalizeModelKey(row.model_name);
-    const totalHits =
-      Number(row.matched_main ?? 0) + Number(row.matched_stars ?? 0);
+  const drawModelScores =
+    allowedModelKeys instanceof Set
+      ? allDrawModelScores.filter((row) => allowedModelKeys.has(row.model_key))
+      : allDrawModelScores;
 
-    const drawPredictions = predictionsByDraw.get(drawKey) ?? [];
+  const scoresByDraw = new Map();
 
-    drawPredictions.push({
-      model_key: modelKey,
-      total_hits: totalHits,
-    });
+  for (const row of drawModelScores) {
+    const drawKey = `${row.draw_date}:${row.draw_sequence ?? 1}`;
 
-    predictionsByDraw.set(drawKey, drawPredictions);
+    const drawScores = scoresByDraw.get(drawKey) ?? [];
+
+    drawScores.push(row);
+
+    scoresByDraw.set(drawKey, drawScores);
   }
 
   const cumulativeStats = new Map();
   const history = [];
 
-  for (const [drawKey, drawPredictions] of predictionsByDraw.entries()) {
-    for (const prediction of drawPredictions) {
-      const current = cumulativeStats.get(prediction.model_key) ?? {
-        totalHits: 0,
-        predictionCount: 0,
+  for (const [drawKey, drawScores] of scoresByDraw.entries()) {
+    for (const score of drawScores) {
+      const current = cumulativeStats.get(score.model_key) ?? {
+        totalDrawScore: 0,
+        evaluatedDraws: 0,
       };
 
-      current.totalHits += prediction.total_hits;
-      current.predictionCount += 1;
+      current.totalDrawScore += Number(score.avg_total_hits ?? 0);
 
-      cumulativeStats.set(prediction.model_key, current);
+      current.evaluatedDraws += 1;
+
+      cumulativeStats.set(score.model_key, current);
     }
 
     const rankedModels = [...cumulativeStats.entries()]
       .map(([modelKey, stats]) => ({
         model_key: modelKey,
-        avg_total_hits: stats.totalHits / stats.predictionCount,
-        checked_predictions: stats.predictionCount,
+
+        avg_total_hits:
+          stats.evaluatedDraws > 0
+            ? stats.totalDrawScore / stats.evaluatedDraws
+            : 0,
+
+        checked_predictions: stats.evaluatedDraws,
       }))
       .sort(
         (a, b) =>
@@ -71,18 +62,29 @@ export async function buildLeaderboardHistory(lottery) {
 
     const leader = rankedModels[0];
 
-    if (leader) {
-      const [drawDate, drawSequenceRaw] = drawKey.split(':');
-      const drawSequence = Number(drawSequenceRaw || 1);
-
-      history.push({
-        draw_date: drawDate,
-        draw_sequence: drawSequence,
-        leader_model_key: leader.model_key,
-        leader_avg_total_hits: leader.avg_total_hits,
-        leader_checked_predictions: leader.checked_predictions,
-      });
+    if (!leader) {
+      continue;
     }
+
+    const [drawDate, drawSequenceRaw] = drawKey.split(':');
+
+    const drawSequence = Number(drawSequenceRaw || 1);
+
+    history.push({
+      draw_date: drawDate,
+      draw_sequence: drawSequence,
+
+      leader_model_key: leader.model_key,
+
+      leader_avg_total_hits: leader.avg_total_hits,
+
+      /*
+       * Kept for API compatibility.
+       * This now represents evaluated draws,
+       * not raw prediction lines.
+       */
+      leader_checked_predictions: leader.checked_predictions,
+    });
   }
 
   return history;
@@ -111,6 +113,7 @@ export function analyseLeaderStability(history) {
   }
 
   const recentHistory = history.slice(-20);
+
   let leaderChangesLast20 = 0;
 
   for (let index = 1; index < recentHistory.length; index += 1) {
@@ -124,8 +127,11 @@ export function analyseLeaderStability(history) {
 
   return {
     current_leader_key: currentLeaderKey,
+
     consecutive_draws: consecutiveDraws,
+
     leader_changes_last_20: leaderChangesLast20,
+
     evaluated_draws: history.length,
   };
 }
