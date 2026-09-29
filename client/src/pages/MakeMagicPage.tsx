@@ -29,6 +29,7 @@ const STRATEGY_MODEL_KEYS = [
   'hot_focused',
   'cold_focused',
   'overdue',
+  'xgboost_v2',
   'pure_random',
 ] as const;
 
@@ -63,10 +64,13 @@ export function MakeMagicPage() {
 
   const lotteryConfig = getLotteryConfig(selectedLottery);
   const strategies: StrategyOption[] = registryModels
-    .filter((model) =>
-      STRATEGY_MODEL_KEYS.includes(
-        model.model_key as (typeof STRATEGY_MODEL_KEYS)[number],
-      ),
+    .filter(
+      (model) =>
+        STRATEGY_MODEL_KEYS.includes(
+          model.model_key as (typeof STRATEGY_MODEL_KEYS)[number],
+        ) &&
+        (model.model_key !== 'xgboost_v2' ||
+          selectedLottery === 'euromillions'),
     )
     .map((model) => ({
       ...model,
@@ -81,6 +85,7 @@ export function MakeMagicPage() {
     overdue: 1,
     hot_focused: 1,
     cold_focused: 1,
+    xgboost_v2: 1,
     pure_random: 1,
   });
   const [status, setStatus] = useState<SaveStatus>('idle');
@@ -173,6 +178,7 @@ export function MakeMagicPage() {
         overdue: 0,
         hot_focused: 0,
         cold_focused: 0,
+        xgboost_v2: 0,
         pure_random: 0,
       };
 
@@ -183,7 +189,10 @@ export function MakeMagicPage() {
         const normalizedKey = normalizeStrategyMixKey(rawKey);
 
         if (normalizedKey in next) {
-          next[normalizedKey] = Math.max(1, Math.round(item.weight * 5));
+          next[normalizedKey] =
+            normalizedKey === 'xgboost_v2'
+              ? 1
+              : Math.max(1, Math.round(item.weight * 5));
         }
       }
 
@@ -200,6 +209,7 @@ export function MakeMagicPage() {
       overdue: 1,
       hot_focused: 1,
       cold_focused: 1,
+      xgboost_v2: 1,
       pure_random: 1,
     });
 
@@ -251,7 +261,9 @@ export function MakeMagicPage() {
       setError(null);
 
       const entries = Object.entries(strategyLines).filter(
-        ([_, count]) => count > 0,
+        ([strategyKey, count]) =>
+          count > 0 &&
+          (strategyKey !== 'xgboost_v2' || selectedLottery === 'euromillions'),
       );
 
       if (entries.length === 0) {
@@ -389,14 +401,17 @@ export function MakeMagicPage() {
                         <input
                           type="number"
                           min={0}
-                          max={5}
+                          max={s.value === 'xgboost_v2' ? 1 : 5}
                           value={strategyLines[s.value]}
                           onChange={(e) => {
                             const v = Number(e.target.value);
                             if (!Number.isNaN(v)) {
                               setStrategyLines((prev) => ({
                                 ...prev,
-                                [s.value]: Math.min(Math.max(v, 0), 5),
+                                [s.value]: Math.min(
+                                  Math.max(v, 0),
+                                  s.value === 'xgboost_v2' ? 1 : 5,
+                                ),
                               }));
                             }
                           }}

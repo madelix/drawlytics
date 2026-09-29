@@ -6,6 +6,7 @@ import { checkPredictions } from '../services/checkPredictions.js';
 import {
   getPredictionLotteryConfig,
   generatePredictionBatch,
+  resolveLotteryDrawDate,
 } from '../services/predictionGenerator.js';
 const router = express.Router();
 import { runBenchmarkForDraw } from '../services/benchmarkRunner.js';
@@ -498,12 +499,82 @@ router.post('/predictions/generate', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'invalid_lines' });
     }
 
-    const generatedBatch = await generatePredictionBatch({
-      lotteryRaw,
-      strategy,
-      lines,
-      drawDateRaw,
-    });
+    let generatedBatch;
+
+    if (strategy === 'xgboost_v2') {
+      if (canonicalLottery !== 'euromillions') {
+        return res.status(400).json({
+          ok: false,
+          error: 'xgboost_v2_euromillions_only',
+        });
+      }
+
+      if (lines !== 1) {
+        return res.status(400).json({
+          ok: false,
+          error: 'xgboost_v2_single_line_only',
+        });
+      }
+
+      const resolved = await resolveLotteryDrawDate(drawDateRaw, lotteryConfig);
+
+      if (!resolved.ok) {
+        return res.status(400).json({
+          ok: false,
+          error: resolved.error,
+        });
+      }
+
+      const { rows: benchmarkRows } = await pool.query(
+        `
+    SELECT
+      main_numbers,
+      star_numbers,
+      confidence
+    FROM predictions
+    WHERE LOWER(lottery) = LOWER($1)
+      AND draw_date = $2::date
+      AND model_name = 'xgboost_v2'
+      AND source = 'benchmark_ml_runner'
+      AND benchmark_eligible = true
+      AND user_id IS NULL
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+    `,
+        [canonicalLottery, resolved.draw_date],
+      );
+
+      const benchmarkPrediction = benchmarkRows[0];
+
+      if (!benchmarkPrediction) {
+        return res.status(409).json({
+          ok: false,
+          error: 'xgboost_v2_prediction_not_ready',
+          message:
+            'The XGBoost v2 prediction for this draw has not been generated yet.',
+        });
+      }
+
+      generatedBatch = {
+        ok: true,
+        draw_date: resolved.draw_date,
+        predictions: [
+          {
+            main: benchmarkPrediction.main_numbers,
+            stars: benchmarkPrediction.star_numbers,
+            confidence: Number(benchmarkPrediction.confidence ?? 0),
+            model_name: 'xgboost_v2',
+          },
+        ],
+      };
+    } else {
+      generatedBatch = await generatePredictionBatch({
+        lotteryRaw,
+        strategy,
+        lines,
+        drawDateRaw,
+      });
+    }
 
     if (!generatedBatch.ok) {
       return res.status(400).json({
