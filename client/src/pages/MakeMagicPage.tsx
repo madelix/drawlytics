@@ -29,17 +29,6 @@ const STRATEGY_MODEL_KEYS = [
   'hot_focused',
   'cold_focused',
   'overdue',
-  'ai_ensemble',
-  'ai_random_forest',
-  'ai_gradient_boosting',
-  'ai_statistical_analysis',
-  'ai_decision_tree',
-  'ai_q_learning',
-  'ai_neural_network',
-  'ai_lstm',
-  'ai_markov_chain',
-  'ai_bayesian',
-  'ai_meta_learning',
   'pure_random',
 ] as const;
 
@@ -92,17 +81,6 @@ export function MakeMagicPage() {
     overdue: 1,
     hot_focused: 1,
     cold_focused: 1,
-    'ai:ensemble': 1,
-    'ai:random_forest': 1,
-    'ai:gradient_boosting': 1,
-    'ai:statistical_analysis': 1,
-    'ai:decision_tree': 1,
-    'ai:q_learning': 1,
-    'ai:neural_network': 1,
-    'ai:lstm': 1,
-    'ai:markov_chain': 1,
-    'ai:bayesian': 1,
-    'ai:meta_learning': 1,
     pure_random: 1,
   });
   const [status, setStatus] = useState<SaveStatus>('idle');
@@ -110,7 +88,6 @@ export function MakeMagicPage() {
     null,
   );
   const [multiStatus, setMultiStatus] = useState<SaveStatus>('idle');
-  const [allAiStatus, setAllAiStatus] = useState<SaveStatus>('idle');
   const [hasSuggestedMix, setHasSuggestedMix] = useState(false);
   const [hasAppliedSuggestedMix, setHasAppliedSuggestedMix] = useState(false);
   const [isMobileFooter, setIsMobileFooter] = useState(false);
@@ -196,17 +173,6 @@ export function MakeMagicPage() {
         overdue: 0,
         hot_focused: 0,
         cold_focused: 0,
-        'ai:ensemble': 0,
-        'ai:random_forest': 0,
-        'ai:gradient_boosting': 0,
-        'ai:statistical_analysis': 0,
-        'ai:decision_tree': 0,
-        'ai:q_learning': 0,
-        'ai:neural_network': 0,
-        'ai:lstm': 0,
-        'ai:markov_chain': 0,
-        'ai:bayesian': 0,
-        'ai:meta_learning': 0,
         pure_random: 0,
       };
 
@@ -234,19 +200,9 @@ export function MakeMagicPage() {
       overdue: 1,
       hot_focused: 1,
       cold_focused: 1,
-      'ai:ensemble': 0,
-      'ai:random_forest': 0,
-      'ai:gradient_boosting': 0,
-      'ai:statistical_analysis': 0,
-      'ai:decision_tree': 0,
-      'ai:q_learning': 0,
-      'ai:neural_network': 0,
-      'ai:lstm': 0,
-      'ai:markov_chain': 0,
-      'ai:bayesian': 0,
-      'ai:meta_learning': 0,
       pure_random: 1,
     });
+
     setHasAppliedSuggestedMix(false);
   }
 
@@ -324,33 +280,6 @@ export function MakeMagicPage() {
       console.error('Multi generate failed:', err);
       setMultiStatus('error');
       setError(err?.message ?? 'Failed to generate multi-strategy predictions');
-    }
-  }
-  async function handleGenerateAllAiModels() {
-    try {
-      setAllAiStatus('saving');
-      setError(null);
-
-      const aiStrategies = strategies.filter((s) => s.value.startsWith('ai:'));
-
-      for (const s of aiStrategies) {
-        await apiSendJson('/api/predictions/generate', {
-          method: 'POST',
-          body: {
-            lottery: selectedLottery,
-            strategy: s.value,
-            lines: 1,
-            source: 'ai_lab',
-          },
-        });
-      }
-
-      setAllAiStatus('success');
-      setTimeout(() => setAllAiStatus('idle'), 2000);
-    } catch (err: any) {
-      console.error('Generate all AI models failed:', err);
-      setAllAiStatus('error');
-      setError(err?.message ?? 'Failed to generate all AI models');
     }
   }
 
@@ -587,30 +516,6 @@ export function MakeMagicPage() {
                   : multiStatus === 'success'
                     ? 'Saved!'
                     : 'Generate predictions'}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleGenerateAllAiModels}
-                disabled={allAiStatus === 'saving'}
-                style={{
-                  borderRadius: 14,
-                  border: '1px solid #e5e7eb',
-                  padding: '0.6rem 1rem',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  cursor: allAiStatus === 'saving' ? 'default' : 'pointer',
-                  background: '#ffffff',
-                  color: '#111827',
-                  opacity: allAiStatus === 'saving' ? 0.7 : 1,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {allAiStatus === 'saving'
-                  ? 'Running AI lab…'
-                  : allAiStatus === 'success'
-                    ? 'AI lab saved!'
-                    : 'Run AI lab'}
               </button>
             </div>
 
