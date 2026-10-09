@@ -1,10 +1,7 @@
 // server/routes/performance.js
 import express from 'express';
 import { pool } from '../db.js';
-import {
-  normalizeModelKey,
-  getModelDisplayName,
-} from '../modelNormalization.js';
+import { getModelDisplayName } from '../modelNormalization.js';
 import { checkPredictions } from '../services/checkPredictions.js';
 import {
   analyseLeaderStability,
@@ -73,102 +70,23 @@ router.get('/performance/model-history', async (req, res) => {
       });
     }
 
-    const { rows } = await pool.query(
-      `
-      WITH base AS (
-        SELECT
-          p.model_name,
-          p.source,
-          p.status,
-          pdr.draw_date,
-          pdr.draw_sequence,
-          pdr.matched_main,
-          pdr.matched_special AS matched_stars,
-          LOWER(p.model_name) AS model_name_lc
-        FROM predictions p
-        INNER JOIN prediction_draw_results pdr
-          ON pdr.prediction_id = p.id
-        WHERE LOWER(p.lottery) = LOWER($1)
-          AND p.benchmark_eligible = true
-          AND LOWER(TRIM(p.status)) = 'checked'
-      ),
-      normalized AS (
-        SELECT
-          CASE
-            WHEN source IN (
-              'strategy_mix',
-              'benchmark_strategy_mix'
-            )
-              THEN 'strategy_mix'
+    const checkedRows = await getBenchmarkDrawModelScores(lottery);
 
-            WHEN model_name_lc LIKE 'make_magic:%'
-              THEN REPLACE(
-                REPLACE(model_name_lc, 'make_magic:', ''),
-                ':',
-                '_'
-              )
+    const rankedModels = summarizeBenchmarkModelScores(checkedRows)
+      .map((row) => ({
+        model_key: row.model_key,
+        avg_total_hits: Number(row.avg_total_hits ?? 0),
 
-            WHEN model_name_lc LIKE 'ai:%'
-              THEN REPLACE(
-                REPLACE(model_name_lc, 'ai:', 'ai_'),
-                ':',
-                '_'
-              )
-
-            WHEN model_name_lc LIKE '%cold-focused generator%'
-              THEN 'cold_focused'
-
-            WHEN model_name_lc LIKE '%hot-focused generator%'
-              THEN 'hot_focused'
-
-            WHEN model_name_lc LIKE '%balanced hot/cold generator%'
-              THEN 'balanced_hot_cold'
-
-            WHEN model_name_lc LIKE '%pure random generator%'
-              THEN 'pure_random'
-
-            WHEN model_name_lc LIKE '%overdue-focused generator%'
-              THEN 'overdue'
-
-            ELSE REPLACE(
-              REPLACE(
-                REPLACE(
-                  model_name_lc,
-                  ' generator',
-                  ''
-                ),
-                '-focused',
-                ''
-              ),
-              ':',
-              '_'
-            )
-          END AS model_key,
-          draw_date,
-          draw_sequence,
-          COALESCE(matched_main, 0) +
-            COALESCE(matched_stars, 0) AS total_hits
-        FROM base
-      )
-      SELECT
-        draw_date,
-        draw_sequence,
-        model_key,
-        AVG(total_hits)::numeric AS avg_total_hits,
-        COUNT(*)::int AS prediction_count
-      FROM normalized
-      WHERE model_key = $2
-         OR model_key = 'pure_random'
-      GROUP BY
-        draw_date,
-        draw_sequence,
-        model_key
-      ORDER BY
-        draw_date ASC,
-        draw_sequence ASC;
-      `,
-      [lottery, modelKey],
-    );
+        // Existing API field retained for compatibility.
+        // This now represents evaluated draws, not raw prediction lines.
+        checked_predictions: Number(row.evaluated_draws ?? 0),
+      }))
+      .sort(
+        (a, b) =>
+          b.avg_total_hits - a.avg_total_hits ||
+          b.checked_predictions - a.checked_predictions ||
+          a.model_key.localeCompare(b.model_key),
+      );
 
     res.json({
       ok: true,
@@ -738,11 +656,11 @@ WHERE LOWER(p.lottery) = LOWER($1)
 
       const modelHits = checkedRows
         .filter((row) => row.model_key === modelKey)
-        .map((row) => row.total_hits);
+        .map((row) => Number(row.avg_total_hits ?? 0));
 
       const pureRandomHits = checkedRows
         .filter((row) => row.model_key === 'pure_random')
-        .map((row) => row.total_hits);
+        .map((row) => Number(row.avg_total_hits ?? 0));
 
       const bootstrapResult = calculateBootstrapConfidence({
         modelHits,
