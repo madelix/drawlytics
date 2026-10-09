@@ -23,6 +23,7 @@ type ModelProfile = {
   how_it_works: string;
   strengths: string[];
   limitations: string[];
+  supported_lotteries: LotteryKey[];
 };
 
 type ModelPerformance = {
@@ -120,7 +121,24 @@ export default function ModelProfilePage() {
     );
   }
 
-  const isLearning = model.learning_status !== 'not_learning';
+  const behaviourStyle =
+    model.learning_status === 'trained'
+      ? {
+          background: '#f0fdf4',
+          border: '1px solid #bbf7d0',
+          icon: '#16a34a',
+        }
+      : model.learning_status === 'performance_adaptive'
+        ? {
+            background: '#faf5ff',
+            border: '1px solid #e9d5ff',
+            icon: '#804198',
+          }
+        : {
+            background: '#fff',
+            border: '1px solid #eef2f7',
+            icon: '#804198',
+          };
 
   return (
     <main
@@ -196,7 +214,11 @@ export default function ModelProfilePage() {
           </div>
         </div>
         <div style={{ marginTop: 24 }}>
-          <LotterySelector selectedLottery={lottery} onChange={setLottery} />
+          <LotterySelector
+            selectedLottery={lottery}
+            onChange={setLottery}
+            supportedLotteries={model.supported_lotteries}
+          />
         </div>
       </section>
 
@@ -244,13 +266,13 @@ export default function ModelProfilePage() {
 
         <div
           style={{
-            background: isLearning ? '#f0fdf4' : '#fffbeb',
-            border: isLearning ? '1px solid #bbf7d0' : '1px solid #fde68a',
+            background: behaviourStyle.background,
+            border: behaviourStyle.border,
             borderRadius: 16,
             padding: 18,
           }}
         >
-          <Brain size={20} color={isLearning ? '#16a34a' : '#b45309'} />
+          <Brain size={20} color={behaviourStyle.icon} />
 
           <div
             style={{
@@ -262,7 +284,7 @@ export default function ModelProfilePage() {
               marginTop: 14,
             }}
           >
-            Learning status
+            Model behaviour
           </div>
 
           <div
@@ -414,7 +436,7 @@ export default function ModelProfilePage() {
                   marginTop: 6,
                 }}
               >
-                Per checked prediction
+                Per evaluated draw
               </div>
             </div>
 
@@ -434,7 +456,7 @@ export default function ModelProfilePage() {
                   letterSpacing: '0.06em',
                 }}
               >
-                Checked predictions
+                Evaluated draws
               </div>
 
               <div

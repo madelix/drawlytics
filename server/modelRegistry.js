@@ -5,11 +5,12 @@ import { MODEL_REGISTRY as MODEL_METADATA_REGISTRY } from './modelMetadata.js';
 const DEFAULT_MODEL_PROFILE = {
   category: 'Experimental strategy',
 
-  learning_status: 'not_learning',
+  learning_status: 'rule_based',
 
   version: '0.1',
 
-  status: 'experimental',
+  status: 'active',
+  supported_lotteries: ['euromillions', 'uk_lotto', 'set_for_life'],
 
   summary:
     'This strategy is currently being evaluated through canonical benchmark predictions and checked lottery results.',
@@ -174,6 +175,7 @@ const MODEL_PROFILE_OVERRIDES = {
     version: '2',
 
     status: 'active',
+    supported_lotteries: ['euromillions'],
 
     summary:
       'A genuinely trained XGBoost model evaluated prospectively through the canonical EuroMillions benchmark.',
@@ -245,7 +247,15 @@ export const MODEL_REGISTRY = Object.entries(MODEL_METADATA_REGISTRY).map(
        * A retired metadata identity is retired unless a specific
        * profile override deliberately says otherwise.
        */
-      status: metadata.retired ? 'retired' : DEFAULT_MODEL_PROFILE.status,
+      status: metadata.retired
+        ? 'retired'
+        : metadata.legacy
+          ? 'legacy'
+          : DEFAULT_MODEL_PROFILE.status,
+
+      summary: metadata.legacy
+        ? 'Historical Drawlytics strategy retained for transparency and evidence continuity. It is not part of the current model evaluation set.'
+        : DEFAULT_MODEL_PROFILE.summary,
 
       ...override,
     };
