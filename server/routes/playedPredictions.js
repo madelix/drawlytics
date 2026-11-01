@@ -1,34 +1,13 @@
 // server/routes/playedPredictions.js
 import express from 'express';
-import { getAuth } from '@clerk/express';
+import { getCurrentDrawlyticsUser } from '../auth/currentUser.js';
 import { db } from '../db.js';
 import * as schema from '../drizzle/schema.js';
 import { and, eq, inArray, desc } from 'drizzle-orm';
 
 const router = express.Router();
 
-async function getCurrentDrawlyticsUser(req) {
-  const auth = getAuth(req);
-
-  if (!auth.userId) {
-    return null;
-  }
-
-  const [user] = await db
-    .select({
-      id: users.id,
-      clerk_user_id: users.clerk_user_id,
-      email: users.email,
-    })
-    .from(users)
-    .where(eq(users.clerk_user_id, auth.userId))
-    .limit(1);
-
-  return user ?? null;
-}
-
-const { users, predictions, played_predictions, prediction_draw_results } =
-  schema;
+const { predictions, played_predictions, prediction_draw_results } = schema;
 
 function isPgUniqueViolation(err) {
   return err && typeof err === 'object' && err.code === '23505';
