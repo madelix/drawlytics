@@ -32,6 +32,15 @@ The platform must distinguish between:
 - statistical support,
 - and a genuinely validated result.
 
+### No fabricated analytical data
+
+Drawlytics must never use invented draw results, fabricated model results,
+dummy benchmark evidence or synthetic lottery history for analytics,
+performance claims or statistical evidence.
+
+Testing analytical behaviour must use verified official draw data and genuine
+model outputs.
+
 ### One source of truth
 
 Model names, descriptions, categories, colours, implementation status and
@@ -76,9 +85,8 @@ play a prediction. Drawlytics can therefore continue testing strategies and
 models automatically without personal prediction activity affecting
 platform-level evidence.
 
-The initial legacy benchmark seed still requires a historical audit, and the
-remaining Honesty and Model Profile evidence queries must be verified as
-benchmark-only.
+The initial legacy benchmark seed still requires a historical audit and
+classification.
 
 ### Clear page ownership
 
@@ -339,7 +347,7 @@ XGBoost v2:
 ### Foundation cleanup (remaining)
 
 - [x] Centralise model display names and key normalisation.
-- [ ] Centralise remaining model metadata.
+- [x] Centralise remaining model metadata.
 - [x] Extract model personality logic from the Performance page.
 - [x] Standardise evidence, confidence and sample-maturity terminology.
 - [ ] Create reusable metric and evidence display components.
@@ -360,7 +368,7 @@ XGBoost v2:
 - [ ] Experiment/change log.
 - [ ] Planned improvements.
 - [ ] Links into the full Performance history view.
-- [ ] Audit every model description against its actual implementation.
+- [x] Audit every model description against its actual implementation.
 
 ### Model Performance
 
@@ -377,14 +385,14 @@ XGBoost v2:
 - [ ] Replace browser-local rank comparisons with persisted historical data.
 - [ ] Improve long-term performance-vs-random reporting.
 - [ ] Build the Benchmark Observatory / Model League around canonical benchmark evidence.
-- [ ] Show benchmark sample size prominently for every model and strategy.
+- [x] Show benchmark sample size prominently for every model and strategy.
 - [ ] Show prospective-only performance separately from legacy historical evidence.
-- [ ] Distinguish Strategies, Trained Models, Meta/Portfolio systems and Controls.
+- [ ] Define and display canonical model categories: Strategy, Trained Model, Meta / Portfolio and Control.
 - [ ] Add within-lottery Pure Random comparisons and observed-vs-expected reporting.
 - [ ] Show recent versus long-term benchmark performance.
 - [ ] Surface high-hit and high-upside result frequency.
 - [ ] Make benchmark evidence explorable without relying on My Predictions.
-- [ ] Keep XGBoost v2 evidence completely separate from Legacy XGBoost (Heuristic).
+- [x] Keep XGBoost v2 evidence completely separate from Legacy XGBoost (Heuristic).
 
 ### Model Honesty
 
@@ -404,7 +412,7 @@ XGBoost v2:
 
 - [x] Single-strategy generation.
 - [x] Multi-strategy generation.
-- [x] Generate all AI-labelled models.
+- [x] Preserve generation support for legacy AI-labelled heuristic models where required for historical compatibility.
 - [x] Suggested strategy mix.
 - [ ] Named strategy experiments.
 - [ ] Save experiment configuration.
@@ -413,8 +421,8 @@ XGBoost v2:
 - [x] Separate genuine ML implementations from heuristic simulations.
 - [x] Introduce the first genuinely trained model: XGBoost v2 for EuroMillions.
 - [x] Retire the legacy XGBoost heuristic from future benchmark generation while preserving its historical evidence.
-- [ ] Audit remaining AI-labelled models and strategies against their actual implementations.
-- [ ] Fix strategies that currently fall through to random generation rather than implementing their advertised logic.
+- [x] Audit remaining AI-labelled models and strategies against their actual implementations.
+- [x] Fix strategies that currently fall through to random generation rather than implementing their advertised logic.
 - [ ] Add additional genuinely trained models only where technically justified.
 
 ### Global benchmark and personal prediction separation
@@ -432,10 +440,9 @@ XGBoost v2:
 - [x] Prevent benchmark checking before an exact-date official result exists.
 - [x] Use only historical draws before the target draw when generating benchmark predictions.
 - [x] Deploy XGBoost v2 as a separate prospective canonical ML benchmark.
-- [ ] Complete the audit of Honesty so all global evidence is benchmark-only.
-- [ ] Complete the audit of Model Profile evidence so all global evidence is benchmark-only.
+- [x] Complete the audit of Honesty so all global evidence is benchmark-only.
+- [x] Complete the audit of Model Profile evidence so all global evidence is benchmark-only.
 - [ ] Audit and classify/freeze the initial legacy benchmark seed.
-- [ ] Add tests proving personal predictions cannot alter global analytics.
 - [ ] Add database-level uniqueness protection for canonical benchmark identities where appropriate.
 - [ ] Remove temporary internal benchmark/ML routes once they are no longer required.
 
@@ -474,7 +481,6 @@ XGBoost v2:
 
 ### Engineering
 
-- [ ] Add automated tests for model-key normalisation.
 - [ ] Add tests for evidence calculations.
 - [ ] Add tests for bootstrap interpretation.
 - [ ] Add tests for performance rankings.
@@ -485,13 +491,14 @@ XGBoost v2:
 - [ ] Add migration and backup procedures.
 - [ ] Establish production monitoring and error reporting.
 - [ ] Add automated tests for model-key and display-name normalisation.
+- [x] Repair fresh-database migrations so `predictions.user_id` and `predictions.source` are created correctly.
 - [ ] Reconcile Drizzle migration history with the current production database schema.
 - [ ] Centralise reusable benchmark and performance SQL and remove remaining duplicated performance queries.
 - [ ] Add automated tests for benchmark idempotency.
 - [ ] Add automated tests proving benchmark generation cannot use target or future draw data.
 - [ ] Add automated tests proving personal predictions cannot affect global benchmark analytics.
 - [ ] Add production monitoring for failed benchmark lifecycle and ML cron runs.
-- [ ] Define canonical model categories: Strategy, Trained Model, Meta/Portfolio and Control.
+- [ ] Define canonical model categories: Strategy, Trained Model, Meta / Portfolio and Control.
 
 ## Marketing & Website
 
@@ -572,9 +579,10 @@ Predictions generated and saved by individual users belong to their personal
 prediction history and must not alter Drawlytics' global claims about model
 performance or statistical evidence.
 
-The current implementation does not yet fully enforce this boundary because
-global analytics can still consume user-generated prediction results. Separating
-these datasets is therefore a beta-readiness requirement.
+The core global evidence boundary is now enforced.
+Performance, Honesty and Model Profile evidence use canonical benchmark data rather than user-generated prediction activity.
+Personal predictions remain available for user-specific history and future My Performance analytics without affecting Drawlytics' global model evidence.
+The remaining legacy-data task is to audit and classify the initial historical benchmark seed.
 
 Personal prediction results should be retained so they can support future
 user-specific analytics such as My Performance without contaminating the
@@ -665,16 +673,17 @@ UK Lotto can now produce two distinct draw results associated with the same
 calendar date. A single played set of numbers may therefore need to be
 evaluated against both eligible draws.
 
-The current Drawlytics implementation was designed around the assumption that
-one lottery has only one draw result per date. This assumption is no longer
-safe.
+The original Drawlytics implementation assumed that one lottery could have only
+one draw result per date. That assumption has now been removed from the core
+draw identity, result-checking and historical-analysis paths.
 
-#### Current known problem
+#### Historical problem and remaining UX work
 
-The Draw History page currently displays only one UK Lotto result row when two
-draws share the same date.
+The core data and checking paths now retain both same-date UK Lotto draws.
+The main remaining user-facing gap is presenting both evaluations clearly
+together when viewing a prediction.
 
-This is statistically incorrect because:
+The original failure mode was statistically incorrect because:
 
 - one valid draw result is hidden or overwritten,
 - frequency calculations may omit a draw,
