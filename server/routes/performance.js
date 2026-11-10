@@ -583,29 +583,11 @@ router.get(
       const modelKey = String(req.params.modelKey || '').trim();
       const lottery = String(req.query.lottery || 'euromillions');
 
-      const { rows } = await pool.query(
-        `
-      SELECT
-  p.model_name,
-  p.source,
-  p.status,
-  pdr.matched_main,
-  pdr.matched_special AS matched_stars
-FROM predictions p
-INNER JOIN prediction_draw_results pdr
-  ON pdr.prediction_id = p.id
-WHERE LOWER(p.lottery) = LOWER($1)
-    AND p.benchmark_eligible = true
-  AND p.user_id IS NULL
-  AND LOWER(TRIM(p.status)) = 'checked';
-      `,
-        [lottery],
-      );
+      const drawModelScores = await getBenchmarkDrawModelScores(lottery);
 
-      const checkedRows = rows.map((row) => ({
-        model_key: normalizeModelKey(row.model_name, row.source),
-        total_hits:
-          Number(row.matched_main ?? 0) + Number(row.matched_stars ?? 0),
+      const checkedRows = drawModelScores.map((row) => ({
+        model_key: row.model_key,
+        total_hits: Number(row.avg_total_hits),
       }));
 
       const statsByModel = new Map();
@@ -665,11 +647,11 @@ WHERE LOWER(p.lottery) = LOWER($1)
 
       const modelHits = checkedRows
         .filter((row) => row.model_key === modelKey)
-        .map((row) => Number(row.avg_total_hits ?? 0));
+        .map((row) => row.total_hits);
 
       const pureRandomHits = checkedRows
         .filter((row) => row.model_key === 'pure_random')
-        .map((row) => Number(row.avg_total_hits ?? 0));
+        .map((row) => row.total_hits);
 
       const bootstrapResult = calculateBootstrapConfidence({
         modelHits,
