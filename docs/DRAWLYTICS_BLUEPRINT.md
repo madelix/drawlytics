@@ -48,6 +48,14 @@ personality logic should not be duplicated across pages.
 
 ### Global analytics and personal data are separate
 
+Prospective benchmark evidence must come from an unowned, benchmark-eligible
+prediction with verified automated provenance, generated before the target
+draw's cutoff using only earlier official draws.
+
+Creation timestamps alone do not establish prospective status. Legacy or
+unverified evidence must remain separately labelled, and personal predictions
+must never be included in either global evidence group.
+
 Drawlytics must distinguish between platform-level benchmark data and
 user-owned prediction data.
 
@@ -500,6 +508,7 @@ XGBoost v2:
 - [ ] Add automated tests proving personal predictions cannot affect global benchmark analytics.
 - [ ] Add production monitoring for failed benchmark lifecycle and ML cron runs.
 - [x] Define canonical model categories: Strategy, Trained Model, Meta / Portfolio and Control.
+- [x] Fix Model Profile performance loading and bootstrap inputs; use shared draw-level canonical benchmark evidence and exclude user-owned predictions from global analytics.
 
 ## Marketing & Website
 

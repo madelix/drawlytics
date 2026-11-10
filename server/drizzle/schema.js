@@ -135,6 +135,9 @@ export const predictions = pgTable('predictions', {
   user_id: integer('user_id'),
   source: text('source'),
   benchmark_eligible: boolean('benchmark_eligible').default(false).notNull(),
+  benchmark_evidence_class: text('benchmark_evidence_class')
+    .default('unverified')
+    .notNull(),
 });
 
 /* =========================

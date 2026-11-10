@@ -1,0 +1,1 @@
+ALTER TABLE "predictions" ADD COLUMN "benchmark_evidence_class" text DEFAULT 'unverified' NOT NULL;
