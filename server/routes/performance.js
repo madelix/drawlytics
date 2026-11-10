@@ -1,7 +1,10 @@
 // server/routes/performance.js
 import express from 'express';
 import { pool } from '../db.js';
-import { getModelDisplayName } from '../modelNormalization.js';
+import {
+  getModelDisplayName,
+  normalizeModelKey,
+} from '../modelNormalization.js';
 import { checkPredictions } from '../services/checkPredictions.js';
 import {
   analyseLeaderStability,
