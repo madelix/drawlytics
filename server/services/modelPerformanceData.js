@@ -31,7 +31,8 @@ export async function getModelPerformanceData(
       INNER JOIN prediction_draw_results pdr
         ON pdr.prediction_id = p.id
       WHERE LOWER(p.lottery) = LOWER($1)
-        AND p.benchmark_eligible = true
+                AND p.benchmark_eligible = true
+        AND p.user_id IS NULL
         AND (
           $2::date IS NULL
           OR pdr.draw_date < $2::date

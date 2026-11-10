@@ -32,6 +32,7 @@ export async function getBenchmarkDrawModelScores(
       ON pdr.prediction_id = p.id
     WHERE LOWER(p.lottery) = LOWER($1)
       AND p.benchmark_eligible = true
+      AND p.user_id IS NULL
       AND LOWER(TRIM(p.status)) = 'checked'
       AND (
         $2::date IS NULL

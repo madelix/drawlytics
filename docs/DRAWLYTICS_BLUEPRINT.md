@@ -387,7 +387,7 @@ XGBoost v2:
 - [ ] Build the Benchmark Observatory / Model League around canonical benchmark evidence.
 - [x] Show benchmark sample size prominently for every model and strategy.
 - [ ] Show prospective-only performance separately from legacy historical evidence.
-- [ ] Define and display canonical model categories: Strategy, Trained Model, Meta / Portfolio and Control.
+- [x] Define and display canonical model categories: Strategy, Trained Model, Meta / Portfolio and Control.
 - [ ] Add within-lottery Pure Random comparisons and observed-vs-expected reporting.
 - [ ] Show recent versus long-term benchmark performance.
 - [ ] Surface high-hit and high-upside result frequency.
