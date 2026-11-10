@@ -38,7 +38,12 @@ router.get('/performance/models', async (req, res) => {
   try {
     const lottery = String(req.query.lottery || 'euromillions');
 
-    const models = await getModelPerformanceData(lottery);
+    const performanceData = await getModelPerformanceData(lottery);
+
+    const models = performanceData.map((model) => ({
+      ...model,
+      category: getModelProfile(model.model_key)?.category ?? null,
+    }));
 
     res.json({
       ok: true,

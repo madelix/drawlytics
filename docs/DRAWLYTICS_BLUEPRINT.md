@@ -499,7 +499,7 @@ XGBoost v2:
 - [ ] Add automated tests proving benchmark generation cannot use target or future draw data.
 - [ ] Add automated tests proving personal predictions cannot affect global benchmark analytics.
 - [ ] Add production monitoring for failed benchmark lifecycle and ML cron runs.
-- [ ] Define canonical model categories: Strategy, Trained Model, Meta / Portfolio and Control.
+- [x] Define canonical model categories: Strategy, Trained Model, Meta / Portfolio and Control.
 
 ## Marketing & Website
 

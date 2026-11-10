@@ -4,6 +4,7 @@ import { apiGetJson, apiSendJson } from './apiClient';
 export type ModelPerformanceRow = {
   model_key: string;
   model_display_name: string;
+  category: string | null;
 
   total_predictions: number;
   checked_predictions: number;

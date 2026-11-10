@@ -118,6 +118,7 @@ function buildHistoryPath(
 type ChartRow = {
   model_key: string;
   model_display_name: string;
+  category: string | null;
 
   checked: number;
   total: number;
@@ -508,6 +509,7 @@ export default function ModelPerformancePage() {
         return {
           model_key: r.model_key,
           model_display_name: r.model_display_name,
+          category: r.category,
 
           checked: r.checked_predictions,
           total: r.total_predictions,
@@ -2426,6 +2428,21 @@ export default function ModelPerformancePage() {
                           marginTop: 8,
                         }}
                       >
+                        {r.category && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              padding: '3px 8px',
+                              borderRadius: 999,
+                              background: '#f3f4f6',
+                              color: '#4b5563',
+                            }}
+                          >
+                            {r.category}
+                          </span>
+                        )}
+
                         {r.model_key === 'strategy_mix' && (
                           <span
                             style={{
@@ -2623,9 +2640,24 @@ export default function ModelPerformancePage() {
                             #{rank}
                           </span>
 
-                          <span style={{ color: '#111827' }}>
-                            {r.model_display_name}
-                          </span>
+                          <div>
+                            <div style={{ color: '#111827' }}>
+                              {r.model_display_name}
+                            </div>
+
+                            {r.category && (
+                              <div
+                                style={{
+                                  marginTop: 4,
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                  color: '#6b7280',
+                                }}
+                              >
+                                {r.category}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
 
