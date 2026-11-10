@@ -1,6 +1,9 @@
 // server/modelRegistry.js
 
-import { MODEL_REGISTRY as MODEL_METADATA_REGISTRY } from './modelMetadata.js';
+import {
+  MODEL_REGISTRY as MODEL_METADATA_REGISTRY,
+  MODEL_CATEGORIES,
+} from './modelMetadata.js';
 
 const DEFAULT_MODEL_PROFILE = {
   category: 'Experimental strategy',
@@ -258,6 +261,8 @@ export const MODEL_REGISTRY = Object.entries(MODEL_METADATA_REGISTRY).map(
         : DEFAULT_MODEL_PROFILE.summary,
 
       ...override,
+
+      category: MODEL_CATEGORIES[metadata.category],
     };
   },
 );

@@ -11,6 +11,12 @@
  * `displayName` describes the implementation truthfully.
  * `legacyName` preserves the older user-facing identity where relevant.
  */
+export const MODEL_CATEGORIES = Object.freeze({
+  strategy: 'Strategy',
+  trained_model: 'Trained Model',
+  meta_portfolio: 'Meta / Portfolio',
+  control: 'Control',
+});
 
 export const MODEL_REGISTRY = {
   strategy_mix: {

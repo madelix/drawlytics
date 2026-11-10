@@ -460,6 +460,7 @@ XGBoost v2:
 - [x] Remove the temporary lifetime saved-prediction limit for beta.
 - [ ] User-specific saved strategies.
 - [ ] User-specific experiments.
+- [ ] My Numbers: allow users to save their own chosen number sets and track how those exact numbers perform over time against verified official draw results.
 - [ ] Personal dashboard.
 - [ ] Personal performance history.
 - [ ] Subscription or usage-tier preparation.
