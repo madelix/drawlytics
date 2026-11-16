@@ -26,9 +26,16 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
+        "--lottery",
+        choices=("euromillions", "uk_lotto", "set_for_life"),
+        default=LOTTERY,
+        help="Lottery to train and predict for. Defaults to EuroMillions.",
+    )
+
+    parser.add_argument(
         "--draw-date",
         help=(
-            "Optional target EuroMillions draw date in YYYY-MM-DD format. "
+            "Optional target draw date in YYYY-MM-DD format. "
             "Database mode resolves the next draw automatically when omitted."
         ),
     )
@@ -74,29 +81,19 @@ def validate_draw_date(draw_date: str) -> str:
 
 def resolve_target_draw_date(
     connection: psycopg.Connection,
+    lottery: str = LOTTERY,
 ) -> str:
-    """
-    Resolve the next EuroMillions draw from the official
-    Tuesday/Friday schedule.
+    """Resolve the next scheduled draw using the London cutoff."""
+    del connection
 
-    The database is deliberately not used to discover future
-    draw dates because euromillions_draws may contain only
-    completed/known draw rows.
-
-    On a draw day, today's draw remains eligible until the
-    19:20 Europe/London cutoff. After that, the next scheduled
-    Tuesday or Friday is returned.
-    """
-    del connection  # Kept in the signature for compatibility.
+    draw_weekdays = {
+        "euromillions": {1, 4},
+        "uk_lotto": {2, 5},
+        "set_for_life": {0, 3},
+    }[lottery]
 
     london_now = datetime.now(LONDON_TIMEZONE)
     candidate = london_now.date()
-
-    # Python weekday:
-    # Monday = 0
-    # Tuesday = 1
-    # Friday = 4
-    draw_weekdays = {1, 4}
 
     if (
         candidate.weekday() in draw_weekdays
@@ -112,11 +109,14 @@ def resolve_target_draw_date(
     return candidate.isoformat()
 
 
+
+
 def acquire_benchmark_lock(
     connection: psycopg.Connection,
     target_draw_date: str,
+    lottery: str = LOTTERY,
 ) -> None:
-    lock_key = f"{LOTTERY}:{MODEL_NAME}:{target_draw_date}"
+    lock_key = f"{lottery}:{MODEL_NAME}:{target_draw_date}"
 
     with connection.cursor() as cursor:
         cursor.execute(
@@ -132,46 +132,48 @@ def acquire_benchmark_lock(
 def load_historical_draws_from_database(
     connection: psycopg.Connection,
     target_draw_date: str,
+    lottery: str = LOTTERY,
 ) -> list[dict[str, Any]]:
+    table, number_columns, sort_columns = {
+        "euromillions": (
+            "euromillions_draws",
+            ("n1", "n2", "n3", "n4", "n5", "s1", "s2"),
+            "draw_date ASC",
+        ),
+        "uk_lotto": (
+            "uk_lotto_draws",
+            ("n1", "n2", "n3", "n4", "n5", "n6", "bonus_ball"),
+            "draw_date ASC, draw_sequence ASC",
+        ),
+        "set_for_life": (
+            "set_for_life_draws",
+            ("n1", "n2", "n3", "n4", "n5", "life_ball"),
+            "draw_date ASC",
+        ),
+    }[lottery]
+
+    columns = ("draw_date", *number_columns)
+
     with connection.cursor() as cursor:
         cursor.execute(
-            """
-            SELECT
-                draw_date,
-                n1,
-                n2,
-                n3,
-                n4,
-                n5,
-                s1,
-                s2
-            FROM euromillions_draws
+            f"""
+            SELECT {", ".join(columns)}
+            FROM {table}
             WHERE draw_date < %s::date
-            ORDER BY draw_date ASC
+            ORDER BY {sort_columns}
             """,
             (target_draw_date,),
         )
 
-        columns = [
-            "draw_date",
-            "n1",
-            "n2",
-            "n3",
-            "n4",
-            "n5",
-            "s1",
-            "s2",
-        ]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        return [
-            dict(zip(columns, row))
-            for row in cursor.fetchall()
-        ]
+
 
 
 def benchmark_prediction_exists(
     connection: psycopg.Connection,
     target_draw_date: str,
+    lottery: str = LOTTERY,
 ) -> bool:
     with connection.cursor() as cursor:
         cursor.execute(
@@ -186,7 +188,7 @@ def benchmark_prediction_exists(
             LIMIT 1
             """,
             (
-                LOTTERY,
+                lottery,
                 target_draw_date,
                 MODEL_NAME,
                 BENCHMARK_SOURCE,
@@ -235,39 +237,62 @@ def prepare_database_draws_for_model(
 def generate_prediction(
     draws: list[dict[str, Any]],
     target_draw_date: str,
+    lottery: str = LOTTERY,
 ) -> dict[str, Any]:
+    main_count, main_max = {
+        "euromillions": (5, 50),
+        "uk_lotto": (6, 59),
+        "set_for_life": (5, 47),
+    }[lottery]
+
     main_result = train_and_predict(
         draws=draws,
-        keys=["n1", "n2", "n3", "n4", "n5"],
+        keys=[f"n{index}" for index in range(1, main_count + 1)],
         number_min=1,
-        number_max=50,
-        pick_count=5,
+        number_max=main_max,
+        pick_count=main_count,
         pool="main",
         target_draw_date=target_draw_date,
     )
 
-    special_result = train_and_predict(
-        draws=draws,
-        keys=["s1", "s2"],
-        number_min=1,
-        number_max=12,
-        pick_count=2,
-        pool="special",
-        target_draw_date=target_draw_date,
-    )
+    special_result = None
+
+    if lottery == "euromillions":
+        special_result = train_and_predict(
+            draws=draws,
+            keys=["s1", "s2"],
+            number_min=1,
+            number_max=12,
+            pick_count=2,
+            pool="special",
+            target_draw_date=target_draw_date,
+        )
+    elif lottery == "set_for_life":
+        special_result = train_and_predict(
+            draws=draws,
+            keys=["life_ball"],
+            number_min=1,
+            number_max=10,
+            pick_count=1,
+            pool="life_ball",
+            target_draw_date=target_draw_date,
+        )
 
     return {
         "main_numbers": main_result["numbers"],
-        "special_numbers": special_result["numbers"],
+        "special_numbers": special_result["numbers"] if special_result else [],
         "main_model": main_result,
         "special_model": special_result,
     }
+
+
 
 
 def insert_benchmark_prediction(
     connection: psycopg.Connection,
     target_draw_date: str,
     prediction: dict[str, Any],
+    lottery: str = LOTTERY,
 ) -> int:
     with connection.cursor() as cursor:
         cursor.execute(
@@ -307,7 +332,7 @@ def insert_benchmark_prediction(
             RETURNING id
             """,
             (
-                LOTTERY,
+                lottery,
                 target_draw_date,
                 MODEL_NAME,
                 prediction["main_numbers"],
@@ -349,11 +374,12 @@ def run_file_mode(args: argparse.Namespace) -> None:
     prediction = generate_prediction(
         draws,
         target_draw_date,
+        lottery=args.lottery,
     )
 
     result = {
         "ok": True,
-        "lottery": LOTTERY,
+        "lottery": args.lottery,
         "model": MODEL_NAME,
         "draw_date": target_draw_date,
         "historical_draws": len(draws),
@@ -370,25 +396,23 @@ def run_file_mode(args: argparse.Namespace) -> None:
 
 def run_database_mode(args: argparse.Namespace) -> None:
     database_url = get_database_url()
+    lottery = args.lottery
 
     with psycopg.connect(database_url) as connection:
         if args.draw_date:
-            target_draw_date = validate_draw_date(
-                args.draw_date
-            )
+            target_draw_date = validate_draw_date(args.draw_date)
         else:
             target_draw_date = resolve_target_draw_date(
-                connection
+                connection,
+                lottery=lottery,
             )
 
-        acquire_benchmark_lock(
-            connection,
-            target_draw_date,
-        )
+        acquire_benchmark_lock(connection, target_draw_date, lottery=lottery)
 
         if benchmark_prediction_exists(
             connection,
             target_draw_date,
+            lottery=lottery,
         ):
             connection.rollback()
 
@@ -396,7 +420,7 @@ def run_database_mode(args: argparse.Namespace) -> None:
                 json.dumps(
                     {
                         "ok": True,
-                        "lottery": LOTTERY,
+                        "lottery": lottery,
                         "model": MODEL_NAME,
                         "draw_date": target_draw_date,
                         "status": "already_exists",
@@ -406,11 +430,10 @@ def run_database_mode(args: argparse.Namespace) -> None:
             )
             return
 
-        historical_draws = (
-            load_historical_draws_from_database(
-                connection,
-                target_draw_date,
-            )
+        historical_draws = load_historical_draws_from_database(
+            connection,
+            target_draw_date,
+            lottery=lottery,
         )
 
         if len(historical_draws) < 21:
@@ -427,11 +450,12 @@ def run_database_mode(args: argparse.Namespace) -> None:
         prediction = generate_prediction(
             model_draws,
             target_draw_date,
+            lottery=lottery,
         )
 
         result = {
             "ok": True,
-            "lottery": LOTTERY,
+            "lottery": lottery,
             "model": MODEL_NAME,
             "draw_date": target_draw_date,
             "historical_draws": len(model_draws),
@@ -443,7 +467,6 @@ def run_database_mode(args: argparse.Namespace) -> None:
 
         if args.dry_run:
             connection.rollback()
-
             result["status"] = "dry_run"
             result["prediction_id"] = None
         else:
@@ -451,10 +474,10 @@ def run_database_mode(args: argparse.Namespace) -> None:
                 connection,
                 target_draw_date,
                 prediction,
+                lottery=lottery,
             )
 
             connection.commit()
-
             result["status"] = "saved"
             result["prediction_id"] = prediction_id
 

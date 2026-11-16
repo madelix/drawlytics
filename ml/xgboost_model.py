@@ -68,12 +68,12 @@ def load_draws(
     for draw in draws:
         draw_date = pd.Timestamp(draw["draw_date"])
 
-    if draw_date.tzinfo is None:
-      draw_date = draw_date.tz_localize("UTC")
-    else:
-     draw_date = draw_date.tz_convert("UTC")
+        if draw_date.tzinfo is None:
+            draw_date = draw_date.tz_localize("UTC")
+        else:
+            draw_date = draw_date.tz_convert("UTC")
 
-    if draw_date >= target:
+        if draw_date >= target:
             raise ValueError(
                 "Look-ahead protection triggered by "
                 f"draw {draw['draw_date']}."
