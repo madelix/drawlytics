@@ -1,3 +1,4 @@
+import { getModelDisplayName } from '../utils/modelDisplay';
 import { useEffect, useState } from 'react';
 import {
   BarChart3,
@@ -22,6 +23,10 @@ import { LotterySelector } from '../components/LotterySelector';
 
 export default function HonestyDashboardPage() {
   const [summary, setSummary] = useState<HonestySummary | null>(null);
+  const [evidenceByClass, setEvidenceByClass] =
+    useState<
+      Awaited<ReturnType<typeof getHonestySummary>>['evidence_by_class']
+    >(undefined);
   const [randomComparison, setRandomComparison] =
     useState<RandomComparison | null>(null);
   const [selectedLottery, setSelectedLottery] =
@@ -45,6 +50,7 @@ export default function HonestyDashboardPage() {
         ]);
 
         setSummary(summaryResponse.summary);
+        setEvidenceByClass(summaryResponse.evidence_by_class);
         setRandomComparison(comparisonResponse.comparison);
       } catch (e: any) {
         setError(e?.message ?? 'Failed to load honesty summary');
@@ -130,6 +136,106 @@ export default function HonestyDashboardPage() {
 
       {error && (
         <p style={{ color: '#b91c1c', textAlign: 'center' }}>{error}</p>
+      )}
+
+      {!loading && !error && evidenceByClass && (
+        <section
+          aria-labelledby="honesty-evidence-heading"
+          style={{
+            background: '#fff',
+            border: '1px solid #eef2f7',
+            borderRadius: 16,
+            padding: '16px 18px',
+            margin: '16px 0 14px',
+          }}
+        >
+          <h2 id="honesty-evidence-heading" style={{ margin: '0 0 12px' }}>
+            Benchmark evidence
+          </h2>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: 12,
+            }}
+          >
+            {[
+              {
+                label: 'Prospective',
+                description:
+                  'Scheduled predictions saved before the draw cutoff.',
+                group: evidenceByClass.prospective,
+              },
+              {
+                label: 'Unverified history',
+                description:
+                  'Predictions whose pre-draw status has yet to be verified.',
+                group: evidenceByClass.unverified,
+              },
+            ].map(({ label, description, group }) => (
+              <div
+                key={label}
+                style={{
+                  border: '1px solid #eef2f7',
+                  borderRadius: 12,
+                  padding: 14,
+                  minWidth: 0,
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: '1rem' }}>{label}</h3>
+                <p style={{ margin: '6px 0', color: '#6b7280' }}>
+                  {description}
+                </p>
+                <strong>
+                  {group.evaluated_draws} evaluated{' '}
+                  {group.evaluated_draws === 1 ? 'draw' : 'draws'}
+                </strong>
+
+                {group.models.length > 0 && (
+                  <details style={{ marginTop: 10 }}>
+                    <summary style={{ cursor: 'pointer' }}>
+                      View model averages
+                    </summary>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table
+                        aria-label={`${label} model averages`}
+                        style={{
+                          width: '100%',
+                          marginTop: 8,
+                          textAlign: 'left',
+                        }}
+                      >
+                        <thead>
+                          <tr>
+                            <th scope="col">Model</th>
+                            <th scope="col">Draws</th>
+                            <th scope="col">Avg. hits</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.models.map((model) => (
+                            <tr key={model.model_key}>
+                              <th scope="row" style={{ fontWeight: 400 }}>
+                                {getModelDisplayName(model.model_key)}
+                              </th>
+                              <td>{model.evaluated_draws}</td>
+                              <td>{model.avg_total_hits.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <p style={{ margin: '12px 0 0', color: '#6b7280' }}>
+            The overall Honesty summary below uses both groups.
+          </p>
+        </section>
       )}
 
       <section

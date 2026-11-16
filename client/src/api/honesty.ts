@@ -44,12 +44,26 @@ export type HonestySummary = {
   }[];
 };
 
+type HonestyEvidenceGroup = {
+  evaluated_draws: number;
+  models: {
+    model_key: string;
+    evaluated_draws: number;
+    avg_main_hits: number;
+    avg_special_hits: number;
+    avg_total_hits: number;
+  }[];
+};
+
 export type HonestySummaryResponse = {
   ok: boolean;
   lottery: string;
   summary: HonestySummary;
+  evidence_by_class?: {
+    prospective: HonestyEvidenceGroup;
+    unverified: HonestyEvidenceGroup;
+  };
 };
-
 export async function getHonestySummary(params: {
   lottery: string;
 }): Promise<HonestySummaryResponse> {
