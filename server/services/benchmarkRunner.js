@@ -67,7 +67,13 @@ function buildSuggestedMixPlan(recommendation) {
   }));
 }
 
-async function insertBenchmarkPrediction(client, generatedBatch, line, source) {
+async function insertBenchmarkPrediction(
+  client,
+  generatedBatch,
+  line,
+  source,
+  classifyProspective = false,
+) {
   const { confidence, model_name } = line;
 
   const { rows } = await client.query(
@@ -86,7 +92,8 @@ async function insertBenchmarkPrediction(client, generatedBatch, line, source) {
       status,
       user_id,
       source,
-      benchmark_eligible
+      benchmark_eligible,
+      benchmark_evidence_class
     )
     VALUES (
       $1,
@@ -95,14 +102,21 @@ async function insertBenchmarkPrediction(client, generatedBatch, line, source) {
       $4::smallint[],
       $5::smallint[],
       $6,
-      NOW(),
+      statement_timestamp(),
       NULL,
       NULL,
       NULL,
       'pending',
       NULL,
       $7,
-      true
+      true,
+      CASE
+        WHEN $8::boolean
+          AND (statement_timestamp() AT TIME ZONE 'Europe/London')
+            < ($2::date + TIME '19:20')
+        THEN 'prospective'
+        ELSE 'unverified'
+      END
     )
     RETURNING *
     `,
@@ -114,6 +128,7 @@ async function insertBenchmarkPrediction(client, generatedBatch, line, source) {
       line.stars,
       confidence,
       source,
+      classifyProspective,
     ],
   );
 
@@ -213,6 +228,7 @@ export async function runBenchmarkForDraw({
   lottery,
   drawDate = null,
   dryRun = false,
+  classifyProspective = false,
 }) {
   const normalizedLottery = normalizeLotteryKey(lottery);
 
@@ -320,6 +336,7 @@ export async function runBenchmarkForDraw({
         batch,
         line,
         BENCHMARK_SOURCE,
+        classifyProspective,
       );
 
       generated.push({
@@ -398,6 +415,7 @@ export async function runBenchmarkForDraw({
             batch,
             line,
             SUGGESTED_MIX_SOURCE,
+            classifyProspective,
           );
 
           generated.push({

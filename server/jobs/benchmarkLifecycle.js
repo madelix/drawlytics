@@ -37,6 +37,7 @@ async function run() {
   for (const lottery of LOTTERIES) {
     try {
       const generationResult = await runBenchmarkForDraw({
+        classifyProspective: true,
         lottery,
         dryRun: false,
       });
