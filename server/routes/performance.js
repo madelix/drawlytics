@@ -392,9 +392,25 @@ router.get('/performance/honesty-summary', async (req, res) => {
       .sort((a, b) => b.priority - a.priority)
       .slice(0, 4);
 
+    const [prospectiveRows, unverifiedRows] = await Promise.all([
+      getBenchmarkDrawModelScores(lottery, null, 'prospective'),
+      getBenchmarkDrawModelScores(lottery, null, 'unverified'),
+    ]);
+
+    const summarizeEvidenceClass = (rows) => ({
+      evaluated_draws: new Set(
+        rows.map((row) => `${row.draw_date}|${row.draw_sequence}`),
+      ).size,
+      models: summarizeBenchmarkModelScores(rows),
+    });
+
     res.json({
       ok: true,
       lottery,
+      evidence_by_class: {
+        prospective: summarizeEvidenceClass(prospectiveRows),
+        unverified: summarizeEvidenceClass(unverifiedRows),
+      },
       summary: {
         headline,
         current_leader: currentLeaderDisplayName,

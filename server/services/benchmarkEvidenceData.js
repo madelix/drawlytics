@@ -17,6 +17,7 @@ import { normalizeModelKey } from '../modelNormalization.js';
 export async function getBenchmarkDrawModelScores(
   lottery,
   beforeDrawDate = null,
+  evidenceClass = null,
 ) {
   const { rows } = await pool.query(
     `
@@ -38,12 +39,16 @@ export async function getBenchmarkDrawModelScores(
         $2::date IS NULL
         OR pdr.draw_date < $2::date
       )
+      AND (
+        $3::text IS NULL
+        OR p.benchmark_evidence_class = $3::text
+      )
     ORDER BY
       pdr.draw_date ASC,
       pdr.draw_sequence ASC,
       p.id ASC
     `,
-    [lottery, beforeDrawDate],
+    [lottery, beforeDrawDate, evidenceClass],
   );
 
   const draws = new Map();
