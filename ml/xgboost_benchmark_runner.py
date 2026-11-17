@@ -54,6 +54,12 @@ def parse_args() -> argparse.Namespace:
         help="Generate the prediction without saving it.",
     )
 
+    parser.add_argument(
+        "--prospective",
+        action="store_true",
+        help="Allow prospective classification for an automatically selected draw.",
+    )
+
     return parser.parse_args()
 
 
@@ -293,6 +299,7 @@ def insert_benchmark_prediction(
     target_draw_date: str,
     prediction: dict[str, Any],
     lottery: str = LOTTERY,
+    classify_prospective: bool = False,
 ) -> int:
     with connection.cursor() as cursor:
         cursor.execute(
@@ -311,7 +318,8 @@ def insert_benchmark_prediction(
                 status,
                 user_id,
                 source,
-                benchmark_eligible
+                benchmark_eligible,
+                benchmark_evidence_class
             )
             VALUES (
                 %s,
@@ -320,14 +328,21 @@ def insert_benchmark_prediction(
                 %s::smallint[],
                 %s::smallint[],
                 %s,
-                NOW(),
+                statement_timestamp(),
                 NULL,
                 NULL,
                 NULL,
                 'pending',
                 NULL,
                 %s,
-                true
+                true,
+                CASE
+                    WHEN %s::boolean
+                        AND (statement_timestamp() AT TIME ZONE 'Europe/London')
+                            < (%s::date + %s::time)
+                    THEN 'prospective'
+                    ELSE 'unverified'
+                END
             )
             RETURNING id
             """,
@@ -339,6 +354,9 @@ def insert_benchmark_prediction(
                 prediction["special_numbers"],
                 0,
                 BENCHMARK_SOURCE,
+                classify_prospective,
+                target_draw_date,
+                DRAW_CUTOFF_TIME,
             ),
         )
 
@@ -475,6 +493,7 @@ def run_database_mode(args: argparse.Namespace) -> None:
                 target_draw_date,
                 prediction,
                 lottery=lottery,
+                classify_prospective=args.prospective and args.draw_date is None,
             )
 
             connection.commit()

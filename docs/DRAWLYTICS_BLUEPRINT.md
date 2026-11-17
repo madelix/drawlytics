@@ -509,6 +509,8 @@ XGBoost v2:
 - [ ] Add production monitoring for failed benchmark lifecycle and ML cron runs.
 - [x] Define canonical model categories: Strategy, Trained Model, Meta / Portfolio and Control.
 - [x] Fix Model Profile performance loading and bootstrap inputs; use shared draw-level canonical benchmark evidence and exclude user-owned predictions from global analytics.
+- [x] Extend XGBoost v2 to train on UK Lotto and Set For Life draw history. Dry runs passed for both lotteries.
+- [x] Enable UK Lotto and Set For Life in the scheduled Railway XGBoost v2 runner. Verified that the runner saved predictions for both lotteries and that the next scheduled run skipped duplicates across all three lotteries.
 
 ## Marketing & Website
 
