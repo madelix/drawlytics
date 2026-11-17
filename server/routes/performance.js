@@ -41,7 +41,20 @@ router.get('/performance/models', async (req, res) => {
   try {
     const lottery = String(req.query.lottery || 'euromillions');
 
-    const performanceData = await getModelPerformanceData(lottery);
+    const evidenceClass = req.query.evidence_class ?? null;
+
+    if (evidenceClass !== null && evidenceClass !== 'prospective') {
+      return res.status(400).json({
+        ok: false,
+        error: 'invalid_evidence_class',
+      });
+    }
+
+    const performanceData = await getModelPerformanceData(
+      lottery,
+      null,
+      evidenceClass,
+    );
 
     const models = performanceData.map((model) => ({
       ...model,

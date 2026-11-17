@@ -48,11 +48,16 @@ export type ModelsPerformanceResponse = {
 
 export async function getModelPerformance(params?: {
   lottery?: string;
+  evidenceClass?: 'prospective';
 }): Promise<ModelsPerformanceResponse> {
   const lottery = params?.lottery ?? 'euromillions';
 
   const qs = new URLSearchParams();
   qs.set('lottery', lottery);
+
+  if (params?.evidenceClass) {
+    qs.set('evidence_class', params.evidenceClass);
+  }
 
   return apiGetJson<ModelsPerformanceResponse>(
     `/api/performance/models?${qs.toString()}`,

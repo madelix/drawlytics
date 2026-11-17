@@ -249,6 +249,7 @@ export default function ModelPerformancePage() {
   const [loading, setLoading] = useState(false);
   const [selectedLottery, setSelectedLottery] =
     useState<LotteryKey>('euromillions');
+  const [prospectiveOnly, setProspectiveOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [rows, setRows] = useState<ModelPerformanceRow[]>([]);
@@ -289,23 +290,6 @@ export default function ModelPerformancePage() {
     Record<string, 'up' | 'down' | 'flat' | 'new'>
   >({});
 
-  async function load() {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const data = await getModelPerformance({
-        lottery: selectedLottery,
-      });
-
-      setRows(data.models || []);
-    } catch (e: any) {
-      setError(e?.message ?? 'Failed to load model performance');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function loadHistory(modelKey: string) {
     setHistoryError(null);
 
@@ -328,9 +312,39 @@ export default function ModelPerformancePage() {
   }
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLottery]);
+    let active = true;
+
+    async function loadPerformance() {
+      setLoading(true);
+      setError(null);
+      setRows([]);
+
+      try {
+        const data = await getModelPerformance({
+          lottery: selectedLottery,
+          ...(prospectiveOnly ? { evidenceClass: 'prospective' } : {}),
+        });
+
+        if (active) setRows(data.models || []);
+      } catch (error) {
+        if (active) {
+          setError(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load model performance',
+          );
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void loadPerformance();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedLottery, prospectiveOnly]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 700px)');
@@ -2303,6 +2317,46 @@ export default function ModelPerformancePage() {
       </div>
 
       <div
+        role="group"
+        aria-label="Benchmark evidence"
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          flexWrap: 'wrap',
+          gap: 8,
+          marginBottom: 12,
+        }}
+      >
+        {[
+          { label: 'All evidence', value: false },
+          { label: 'Prospective only', value: true },
+        ].map(({ label, value }) => {
+          const active = prospectiveOnly === value;
+
+          return (
+            <button
+              key={label}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setProspectiveOnly(value)}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 999,
+                border: '1px solid #e5e7eb',
+                background: active ? '#111827' : '#fff',
+                color: active ? '#fff' : '#111827',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: 12,
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
         style={{
           display: 'flex',
           justifyContent: 'center',
@@ -2368,7 +2422,16 @@ export default function ModelPerformancePage() {
           overflow: 'hidden',
         }}
       >
-        {isMobile ? (
+        {prospectiveOnly && !loading && !error && rows.length === 0 ? (
+          <p
+            role="status"
+            style={{ padding: 16, margin: 0, textAlign: 'center' }}
+          >
+            No prospective draws have been evaluated for this lottery yet.{' '}
+            Results will appear here once a prediction saved before the cutoff
+            has been checked against the official draw.
+          </p>
+        ) : isMobile ? (
           <div style={{ display: 'grid', gap: 10, padding: 12 }}>
             {filtered.map((r) => {
               const rank =

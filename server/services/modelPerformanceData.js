@@ -8,6 +8,7 @@ import { getPredictionLotteryConfig } from './predictionGenerator.js';
 export async function getModelPerformanceData(
   lottery = 'euromillions',
   beforeDrawDate = null,
+  evidenceClass = null,
 ) {
   const lotteryConfig = getPredictionLotteryConfig(lottery);
 
@@ -32,10 +33,14 @@ export async function getModelPerformanceData(
         ON pdr.prediction_id = p.id
       WHERE LOWER(p.lottery) = LOWER($1)
                 AND p.benchmark_eligible = true
-        AND p.user_id IS NULL
+                AND p.user_id IS NULL
         AND (
           $2::date IS NULL
           OR pdr.draw_date < $2::date
+        )
+        AND (
+          $5::text IS NULL
+          OR p.benchmark_evidence_class = $5::text
         )
     ),
 
@@ -312,7 +317,13 @@ export async function getModelPerformanceData(
 
       COUNT(*) DESC
     `,
-    [lottery, beforeDrawDate, topPrizeMainCount, topPrizeSpecialCount],
+    [
+      lottery,
+      beforeDrawDate,
+      topPrizeMainCount,
+      topPrizeSpecialCount,
+      evidenceClass,
+    ],
   );
 
   return rows.map((row) => {
