@@ -13,6 +13,7 @@ import { Suspense, lazy, useEffect, useLayoutEffect, useState } from 'react';
 
 import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
 
+import MyDashboardPage from './pages/MyDashboardPage';
 import MyPredictionsPage from './pages/MyPredictionsPage';
 import { MakeMagicPage } from './pages/MakeMagicPage';
 import ModelPerformancePage from './pages/ModelPerformancePage';
@@ -304,7 +305,7 @@ function AppHeader() {
 /* ──────────────────────────────────────────────
    ROOT APP
    ────────────────────────────────────────────── */
-function ProtectedPredictionsRoute() {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
 
   if (!isLoaded) {
@@ -315,7 +316,7 @@ function ProtectedPredictionsRoute() {
     return <Navigate to="/" replace />;
   }
 
-  return <MyPredictionsPage />;
+  return <>{children}</>;
 }
 
 export default function App() {
@@ -343,7 +344,22 @@ export default function App() {
           <Route path="/models/:modelKey" element={<ModelProfilePage />} />
           <Route path="/performance" element={<ModelPerformancePage />} />
           <Route path="/honesty" element={<HonestyDashboardPage />} />
-          <Route path="/predictions" element={<ProtectedPredictionsRoute />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <MyDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/predictions"
+            element={
+              <ProtectedRoute>
+                <MyPredictionsPage />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </Suspense>
     </>
