@@ -324,6 +324,7 @@ router.get('/predictions', async (req, res) => {
     }
 
     const userId = currentUser.id;
+    const playedOnly = req.query.played === 'true';
     const limitRaw = Number(req.query.limit ?? 20);
     const offsetRaw = Number(req.query.offset ?? 0);
 
@@ -344,6 +345,81 @@ router.get('/predictions', async (req, res) => {
         ? getPredictionLotteryConfig(lotteryRaw).key
         : null;
 
+    if (playedOnly) {
+      const pageSize = 5;
+
+      const { rows } = await pool.query(
+        `
+        WITH played_lines AS (
+          SELECT
+            p.id,
+            p.lottery,
+            p.draw_date,
+            p.model_name,
+            p.source,
+            p.main_numbers,
+            p.star_numbers,
+            p.confidence,
+            p.status,
+            p.matched_main,
+            p.matched_stars,
+            p.result_label,
+            MAX(played.played_at) AS played_at
+          FROM predictions p
+          JOIN played_predictions played ON played.prediction_id = p.id
+          WHERE p.user_id = $1
+            AND (
+              $2::text IS NULL
+              OR lower(replace(p.lottery, ' ', '_')) = $2::text
+            )
+          GROUP BY p.id
+        ),
+        page AS (
+          SELECT *
+          FROM played_lines
+          ORDER BY played_at DESC NULLS LAST, id DESC
+          LIMIT $3 OFFSET $4
+        )
+        SELECT
+          (SELECT COUNT(*)::int FROM played_lines) AS total,
+          COALESCE((
+            SELECT json_agg(
+              to_jsonb(page) || jsonb_build_object(
+                'draw_results', COALESCE((
+                  SELECT jsonb_agg(
+                    jsonb_build_object(
+                      'draw_date', r.draw_date,
+                      'draw_sequence', r.draw_sequence,
+                      'matched_main', r.matched_main,
+                      'matched_special', r.matched_special
+                    )
+                    ORDER BY r.draw_date, r.draw_sequence
+                  )
+                  FROM prediction_draw_results r
+                  WHERE r.prediction_id = page.id
+                ), '[]'::jsonb)
+              )
+              ORDER BY page.played_at DESC NULLS LAST, page.id DESC
+            )
+            FROM page
+          ), '[]'::json) AS predictions
+        `,
+        [userId, lotteryFilter, pageSize, offset],
+      );
+
+      const { predictions, total } = rows[0];
+
+      return res.json({
+        ok: true,
+        predictions,
+        pagination: {
+          limit: pageSize,
+          offset,
+          total,
+          hasMore: offset + predictions.length < total,
+        },
+      });
+    }
     const dateRows = await pool.query(
       `
   SELECT DISTINCT draw_date

@@ -1,37 +1,35 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  getLatestPlayedResults,
-  type LatestPlayedResult,
-} from '../api/dashboard';
-import { getLotteryConfig } from '../config/lotteries';
+import { getPlayedLinesPage } from '../api/dashboard';
+import { PlayedLineCard } from '../components/PlayedLineCard';
 
 export default function MyDashboardPage() {
-  const [latestResults, setLatestResults] = useState<LatestPlayedResult[]>([]);
-  const [loadingResults, setLoadingResults] = useState(true);
-  const [resultsError, setResultsError] = useState<string | null>(null);
+  const [playedOffset, setPlayedOffset] = useState(0);
+  const [playedPage, setPlayedPage] = useState<Awaited<
+    ReturnType<typeof getPlayedLinesPage>
+  > | null>(null);
+  const [playedError, setPlayedError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+    setPlayedPage(null);
+    setPlayedError(null);
 
-    async function loadLatestResults() {
+    async function loadPlayedPage() {
       try {
-        const results = await getLatestPlayedResults();
-        if (active) setLatestResults(results);
+        const page = await getPlayedLinesPage(playedOffset);
+        if (active) setPlayedPage(page);
       } catch {
-        if (active)
-          setResultsError('Your latest played results could not be loaded.');
-      } finally {
-        if (active) setLoadingResults(false);
+        if (active) setPlayedError('Your played lines could not be loaded.');
       }
     }
 
-    void loadLatestResults();
+    void loadPlayedPage();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [playedOffset]);
 
   return (
     <div
@@ -88,59 +86,65 @@ export default function MyDashboardPage() {
 
       <section
         className="dl-config-card"
-        aria-labelledby="latest-played-heading"
+        aria-labelledby="played-lines-heading"
         style={{ marginTop: 20, padding: '1.25rem', textAlign: 'left' }}
       >
-        <h2 id="latest-played-heading" style={{ margin: 0 }}>
-          Latest played result
+        <h2 id="played-lines-heading" style={{ margin: '0 0 14px' }}>
+          My played lines
         </h2>
 
-        {loadingResults ? (
-          <p role="status">Loading your played results…</p>
-        ) : resultsError ? (
-          <p role="alert">{resultsError}</p>
-        ) : latestResults.length === 0 ? (
+        {playedError ? (
+          <p role="alert">{playedError}</p>
+        ) : !playedPage ? (
+          <p role="status">Loading your played lines…</p>
+        ) : playedPage.pagination.total === 0 ? (
           <p>
-            Your result will appear here once a line you’ve marked as played has
-            been checked against the official draw.
+            Mark a line as played in{' '}
+            <Link to="/predictions">My Predictions</Link> to see it here.
           </p>
         ) : (
-          latestResults.map((result) => {
-            const lottery = getLotteryConfig(result.lottery);
-            const dateLabel = new Date(
-              `${result.draw_date}T00:00:00Z`,
-            ).toLocaleDateString('en-GB', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-              timeZone: 'UTC',
-            });
+          <>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {playedPage.predictions.map((line) => (
+                <PlayedLineCard key={line.id} line={line} />
+              ))}
+            </div>
 
-            return (
-              <div
-                key={`${result.lottery}-${result.draw_date}-${result.draw_sequence}`}
-                style={{ marginTop: 16 }}
+            <div className="dl-pagination-bar" style={{ width: '100%' }}>
+              <button
+                type="button"
+                className="dl-pagination-btn"
+                disabled={playedOffset === 0}
+                style={{ opacity: playedOffset === 0 ? 0.5 : 1 }}
+                onClick={() =>
+                  setPlayedOffset(
+                    Math.max(0, playedOffset - playedPage.pagination.limit),
+                  )
+                }
               >
-                <h3 style={{ margin: 0, fontSize: '1rem' }}>
-                  {lottery.label} · {dateLabel}
-                  {result.lottery === 'uk_lotto' &&
-                    ` · Draw ${result.draw_sequence}`}
-                </h3>
+                ← Previous
+              </button>
 
-                <p style={{ margin: '6px 0' }}>
-                  {result.checked_lines} played{' '}
-                  {result.checked_lines === 1 ? 'line' : 'lines'} checked
-                </p>
-
-                <p style={{ margin: 0 }}>
-                  <strong>Best played line</strong> · Main matches:{' '}
-                  {result.matched_main}
-                  {' · '}
-                  {lottery.specialLabel}: {result.matched_special}
-                </p>
+              <div>
+                Showing {playedOffset + 1}–
+                {playedOffset + playedPage.predictions.length} of{' '}
+                {playedPage.pagination.total} played{' '}
+                {playedPage.pagination.total === 1 ? 'line' : 'lines'}
               </div>
-            );
-          })
+
+              <button
+                type="button"
+                className="dl-pagination-btn"
+                disabled={!playedPage.pagination.hasMore}
+                style={{ opacity: playedPage.pagination.hasMore ? 1 : 0.5 }}
+                onClick={() =>
+                  setPlayedOffset(playedOffset + playedPage.pagination.limit)
+                }
+              >
+                Next →
+              </button>
+            </div>
+          </>
         )}
       </section>
     </div>

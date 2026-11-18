@@ -10,7 +10,7 @@ import { getMainGroup, getSecondaryGroup } from '../utils/lotteryNumbers';
 import { LotterySelector } from '../components/LotterySelector';
 import { apiGetJson } from '../api/apiClient';
 
-type PredictionRow = {
+export type PredictionRow = {
   id: number;
   lottery: string;
   model_name: string;

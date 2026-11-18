@@ -18,3 +18,23 @@ export async function getLatestPlayedResults(): Promise<LatestPlayedResult[]> {
 
   return response.results;
 }
+
+type PlayedLinesPage = {
+  ok: boolean;
+  predictions: import('../pages/MyPredictionsPage').PredictionRow[];
+  pagination: {
+    limit: number;
+    offset: number;
+    total: number;
+    hasMore: boolean;
+  };
+};
+
+export function getPlayedLinesPage(offset = 0): Promise<PlayedLinesPage> {
+  const search = new URLSearchParams({
+    played: 'true',
+    offset: String(offset),
+  });
+
+  return apiGetJson<PlayedLinesPage>(`/api/predictions?${search}`);
+}
