@@ -263,6 +263,55 @@ router.post('/ml-history', async (req, res) => {
 /**
  * GET /api/predictions
  */
+router.get('/predictions/latest-result', async (req, res) => {
+  try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({ ok: false, error: 'unauthenticated' });
+    }
+
+    const { rows } = await pool.query(
+      `
+      WITH personal_results AS (
+        SELECT
+          p.id,
+          p.lottery,
+          r.draw_date,
+          r.draw_sequence,
+          r.matched_main,
+          r.matched_special
+        FROM predictions p
+        JOIN prediction_draw_results r ON r.prediction_id = p.id
+                WHERE p.user_id = $1
+          AND EXISTS (
+            SELECT 1
+            FROM played_predictions played
+            WHERE played.prediction_id = p.id
+          )
+      )
+      SELECT DISTINCT ON (lottery, draw_sequence)
+        lottery,
+        draw_date::text AS draw_date,
+        draw_sequence,
+        COUNT(*) OVER (PARTITION BY lottery, draw_sequence)::int AS checked_lines,
+        matched_main,
+        matched_special
+      FROM personal_results
+      WHERE draw_date = (SELECT MAX(draw_date) FROM personal_results)
+      ORDER BY lottery, draw_sequence,
+               matched_main DESC, matched_special DESC, id ASC
+      `,
+      [currentUser.id],
+    );
+
+    return res.json({ ok: true, results: rows });
+  } catch (error) {
+    console.error('GET /predictions/latest-result failed:', error);
+    return res.status(500).json({ ok: false, error: 'latest_result_failed' });
+  }
+});
+
 router.get('/predictions', async (req, res) => {
   try {
     const currentUser = await getCurrentDrawlyticsUser(req);
