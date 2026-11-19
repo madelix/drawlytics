@@ -312,6 +312,123 @@ router.get('/predictions/latest-result', async (req, res) => {
   }
 });
 
+router.post('/my-numbers', async (req, res) => {
+  try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({ ok: false, error: 'unauthenticated' });
+    }
+
+    const { name, lottery, main_numbers, special_numbers } = req.body ?? {};
+
+    if (typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ ok: false, error: 'name_required' });
+    }
+
+    const lotteryKey =
+      typeof lottery === 'string'
+        ? lottery
+            .trim()
+            .toLowerCase()
+            .replace(/[\s-]+/g, '_')
+        : '';
+
+    const config = getPredictionLotteryConfig(lotteryKey);
+
+    if (config.key !== lotteryKey) {
+      return res.status(400).json({ ok: false, error: 'invalid_lottery' });
+    }
+
+    function isValidGroup(numbers, count, min, max) {
+      return (
+        Array.isArray(numbers) &&
+        numbers.length === count &&
+        numbers.every((n) => Number.isInteger(n) && n >= min && n <= max) &&
+        new Set(numbers).size === count
+      );
+    }
+
+    if (
+      !isValidGroup(
+        main_numbers,
+        config.mainCount,
+        config.mainMin,
+        config.mainMax,
+      )
+    ) {
+      return res.status(400).json({ ok: false, error: 'invalid_main_numbers' });
+    }
+
+    // UK Lotto players choose six main numbers and no special number.
+    const specials =
+      special_numbers === undefined && config.specialCount === 0
+        ? []
+        : special_numbers;
+
+    if (
+      !isValidGroup(
+        specials,
+        config.specialCount,
+        config.specialMin,
+        config.specialMax,
+      )
+    ) {
+      return res
+        .status(400)
+        .json({ ok: false, error: 'invalid_special_numbers' });
+    }
+
+    const { rows } = await pool.query(
+      `
+        INSERT INTO saved_number_sets
+          (user_id, name, lottery, main_numbers, special_numbers)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, name, lottery, main_numbers, special_numbers, created_at
+      `,
+      [
+        currentUser.id,
+        name.trim(),
+        config.key,
+        [...main_numbers].sort((a, b) => a - b),
+        [...specials].sort((a, b) => a - b),
+      ],
+    );
+
+    return res.status(201).json({ ok: true, set: rows[0] });
+  } catch (error) {
+    console.error('POST /my-numbers failed:', error);
+    return res.status(500).json({ ok: false, error: 'save_number_set_failed' });
+  }
+});
+
+router.get('/my-numbers', async (req, res) => {
+  try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({ ok: false, error: 'unauthenticated' });
+    }
+
+    const { rows } = await pool.query(
+      `
+        SELECT id, name, lottery, main_numbers, special_numbers, created_at
+        FROM saved_number_sets
+        WHERE user_id = $1
+        ORDER BY created_at DESC, id DESC
+      `,
+      [currentUser.id],
+    );
+
+    return res.json({ ok: true, sets: rows });
+  } catch (error) {
+    console.error('GET /my-numbers failed:', error);
+    return res
+      .status(500)
+      .json({ ok: false, error: 'saved_number_sets_failed' });
+  }
+});
+
 router.get('/predictions', async (req, res) => {
   try {
     const currentUser = await getCurrentDrawlyticsUser(req);
