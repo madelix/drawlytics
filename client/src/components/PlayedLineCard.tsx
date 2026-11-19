@@ -1,6 +1,7 @@
 import { getLotteryConfig } from '../config/lotteries';
 import type { PredictionRow } from '../pages/MyPredictionsPage';
-import { getModelDisplayName } from '../utils/modelDisplay';
+import { getModelColour } from '../config/modelPresentation';
+import { getModelDisplayName, normalizeModelKey } from '../utils/modelDisplay';
 
 export function PlayedLineCard({ line }: { line: PredictionRow }) {
   const lottery = getLotteryConfig(line.lottery);
@@ -29,6 +30,19 @@ export function PlayedLineCard({ line }: { line: PredictionRow }) {
         <div>
           <small>{lottery.label}</small>
           <h3 style={{ margin: '4px 0', fontSize: '1rem' }}>
+            <span
+              aria-hidden="true"
+              style={{
+                display: 'inline-block',
+                width: 9,
+                height: 9,
+                marginRight: 8,
+                borderRadius: '50%',
+                background: getModelColour(
+                  normalizeModelKey(line.model_name, line.source),
+                ),
+              }}
+            />
             {getModelDisplayName(line.model_name, line.source)} — draw{' '}
             {dateLabel}
           </h3>
