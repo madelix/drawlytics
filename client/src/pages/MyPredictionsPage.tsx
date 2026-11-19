@@ -1628,26 +1628,33 @@ export default function MyPredictionsPage() {
                             }}
                           >
                             <div
-                              style={{
-                                textAlign: isMobile ? 'left' : 'right',
-                                display: isMobile ? 'flex' : 'block',
-                                alignItems: isMobile ? 'baseline' : undefined,
-                                gap: isMobile ? 6 : undefined,
-                              }}
+                              style={{ textAlign: isMobile ? 'left' : 'right' }}
                             >
                               <div
-                                style={{
-                                  fontSize: '0.75rem',
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.06em',
-                                  color: '#6b7280',
-                                }}
+                                style={
+                                  isMobile
+                                    ? {
+                                        display: 'flex',
+                                        alignItems: 'baseline',
+                                        gap: 6,
+                                      }
+                                    : undefined
+                                }
                               >
-                                Confidence
-                              </div>
+                                <div
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.06em',
+                                    color: '#6b7280',
+                                  }}
+                                >
+                                  Confidence
+                                </div>
 
-                              <div style={{ fontWeight: 600 }}>
-                                {`${Math.round(Number(p.confidence) || 0)}%`}
+                                <div style={{ fontWeight: 600 }}>
+                                  {`${Math.round(Number(p.confidence) || 0)}%`}
+                                </div>
                               </div>
 
                               {normalizeLotteryKey(p.lottery) === 'uk_lotto' &&
@@ -1686,9 +1693,11 @@ export default function MyPredictionsPage() {
                                     / {p.matched_stars ?? 0}{' '}
                                     {secondaryGroup?.shortLabel.toLowerCase() ??
                                       'stars'}
-                                    {p.result_label
-                                      ? ` • ${p.result_label}`
-                                      : ''}
+                                    {p.result_label &&
+                                      (!isMobile ||
+                                        p.result_label !==
+                                          `${p.matched_main ?? 0}+${p.matched_stars ?? 0}`) &&
+                                      ` • ${p.result_label}`}
                                   </div>
                                 )
                               )}

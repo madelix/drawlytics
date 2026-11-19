@@ -39,3 +39,37 @@
     text-align: right;
   }
 }
+
+.dl-played-line-numbers > .dl-played-line-summary {
+  margin-left: auto;
+  text-align: right;
+}
+
+.dl-played-line-hits {
+  margin: 2px 0 0;
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 700px) {
+  .dl-played-line-numbers > .dl-played-line-summary {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .dl-played-line-confidence {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .dl-played-line-hits {
+    margin-top: 4px;
+  }
+
+  .dl-played-line-hit-code {
+    display: none;
+  }
+}

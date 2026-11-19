@@ -111,24 +111,44 @@ export function PlayedLineCard({ line }: { line: PredictionRow }) {
           );
         })}
 
-        <div style={{ marginLeft: 'auto' }}>
-          <small>Confidence</small>
-          <div>
-            <strong>{Math.round(line.confidence)}%</strong>
+        <div className="dl-played-line-summary">
+          <div className="dl-played-line-confidence">
+            <small>Confidence</small>
+            <div>
+              <strong>{Math.round(line.confidence)}%</strong>
+            </div>
           </div>
+
+          {results.map((result) => {
+            const main = result.matched_main;
+            const special = result.matched_special;
+            const hitCode = `${main}+${special}`;
+
+            return (
+              <p
+                key={`${result.draw_date}-${result.draw_sequence}`}
+                className="dl-played-line-hits"
+              >
+                {results.length > 1 && `Draw ${result.draw_sequence} · `}
+                Hits: {main} main / {special}{' '}
+                {lottery.specialLabel.toLowerCase()}
+                {results.length === 1 && line.result_label && (
+                  <span
+                    className={
+                      line.result_label === hitCode
+                        ? 'dl-played-line-hit-code'
+                        : undefined
+                    }
+                  >
+                    {' • '}
+                    {line.result_label}
+                  </span>
+                )}
+              </p>
+            );
+          })}
         </div>
       </div>
-
-      {results.map((result) => (
-        <p
-          key={`${result.draw_date}-${result.draw_sequence}`}
-          style={{ margin: '8px 0 0', fontSize: '0.85rem' }}
-        >
-          {results.length > 1 && `Draw ${result.draw_sequence} · `}
-          Main hits: {result.matched_main} · {lottery.specialLabel}:{' '}
-          {result.matched_special}
-        </p>
-      ))}
     </article>
   );
 }
