@@ -61,14 +61,44 @@ export function PlayedLineCard({ line }: { line: PredictionRow }) {
                   marginTop: 4,
                 }}
               >
-                {numbers.map((number) => (
-                  <span
-                    key={number}
-                    className={`dl-draw-pill dl-draw-pill--${isMain ? 'main' : 'star'}`}
-                  >
-                    {number}
-                  </span>
-                ))}
+                {numbers.map((number) => {
+                  const matchingDraws = results.filter((result) => {
+                    const winningNumbers = isMain
+                      ? result.winning_main_numbers
+                      : result.winning_special_numbers;
+
+                    return winningNumbers?.includes(number);
+                  });
+
+                  const isHit = matchingDraws.length > 0;
+                  const hitLabel =
+                    results.length > 1
+                      ? matchingDraws
+                          .map((draw) => `Hit in draw ${draw.draw_sequence}`)
+                          .join(', ')
+                      : 'Hit';
+
+                  return (
+                    <span
+                      key={number}
+                      className={`dl-draw-pill dl-draw-pill--${isMain ? 'main' : 'star'}`}
+                      title={isHit ? hitLabel : undefined}
+                      style={
+                        isHit
+                          ? {
+                              background: '#dcfce7',
+                              borderColor: '#22c55e',
+                              color: '#14532d',
+                              fontWeight: 700,
+                              boxShadow: '0 0 0 2px rgba(34,197,94,0.15) inset',
+                            }
+                          : undefined
+                      }
+                    >
+                      {number}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           );

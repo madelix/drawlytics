@@ -28,6 +28,8 @@ export type PredictionRow = {
     draw_sequence: number;
     matched_main: number;
     matched_special: number;
+    winning_main_numbers?: number[] | null;
+    winning_special_numbers?: number[] | null;
   }>;
 };
 

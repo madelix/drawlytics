@@ -385,17 +385,37 @@ router.get('/predictions', async (req, res) => {
           COALESCE((
             SELECT json_agg(
               to_jsonb(page) || jsonb_build_object(
-                'draw_results', COALESCE((
+                                'draw_results', COALESCE((
                   SELECT jsonb_agg(
                     jsonb_build_object(
                       'draw_date', r.draw_date,
                       'draw_sequence', r.draw_sequence,
                       'matched_main', r.matched_main,
-                      'matched_special', r.matched_special
+                      'matched_special', r.matched_special,
+                      'winning_main_numbers', CASE
+                        WHEN em.id IS NOT NULL THEN ARRAY[em.n1, em.n2, em.n3, em.n4, em.n5]
+                        WHEN uk.id IS NOT NULL THEN ARRAY[uk.n1, uk.n2, uk.n3, uk.n4, uk.n5, uk.n6]
+                        WHEN sfl.id IS NOT NULL THEN ARRAY[sfl.n1, sfl.n2, sfl.n3, sfl.n4, sfl.n5]
+                      END,
+                      'winning_special_numbers', CASE
+                        WHEN em.id IS NOT NULL THEN ARRAY[em.s1, em.s2]
+                        WHEN uk.id IS NOT NULL THEN ARRAY[uk.bonus_ball]
+                        WHEN sfl.id IS NOT NULL THEN ARRAY[sfl.life_ball]
+                      END
                     )
                     ORDER BY r.draw_date, r.draw_sequence
                   )
                   FROM prediction_draw_results r
+                  LEFT JOIN euromillions_draws em
+                    ON r.lottery = 'euromillions'
+                   AND em.draw_date = r.draw_date
+                  LEFT JOIN uk_lotto_draws uk
+                    ON r.lottery = 'uk_lotto'
+                   AND uk.draw_date = r.draw_date
+                   AND uk.draw_sequence = r.draw_sequence
+                  LEFT JOIN set_for_life_draws sfl
+                    ON r.lottery = 'set_for_life'
+                   AND sfl.draw_date = r.draw_date
                   WHERE r.prediction_id = page.id
                 ), '[]'::jsonb)
               )
