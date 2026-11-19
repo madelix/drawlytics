@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPlayedLinesPage } from '../api/dashboard';
 import { PlayedLineCard } from '../components/PlayedLineCard';
+import { MostPlayedModelCard } from '../components/MostPlayedModelCard';
 
 export default function MyDashboardPage() {
   const [playedOffset, setPlayedOffset] = useState(0);
@@ -147,6 +148,8 @@ export default function MyDashboardPage() {
           </>
         )}
       </section>
+
+      {playedPage && <MostPlayedModelCard page={playedPage} />}
     </div>
   );
 }

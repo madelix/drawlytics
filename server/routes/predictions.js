@@ -382,6 +382,14 @@ router.get('/predictions', async (req, res) => {
         )
         SELECT
           (SELECT COUNT(*)::int FROM played_lines) AS total,
+          (
+            SELECT COALESCE(json_agg(model_counts), '[]'::json)
+            FROM (
+              SELECT model_name, source, COUNT(*)::int AS played_count
+              FROM played_lines
+              GROUP BY model_name, source
+            ) AS model_counts
+          ) AS played_model_counts,
           COALESCE((
             SELECT json_agg(
               to_jsonb(page) || jsonb_build_object(
@@ -427,11 +435,12 @@ router.get('/predictions', async (req, res) => {
         [userId, lotteryFilter, pageSize, offset],
       );
 
-      const { predictions, total } = rows[0];
+      const { predictions, total, played_model_counts } = rows[0];
 
       return res.json({
         ok: true,
         predictions,
+        played_model_counts,
         pagination: {
           limit: pageSize,
           offset,

@@ -22,6 +22,11 @@ export async function getLatestPlayedResults(): Promise<LatestPlayedResult[]> {
 type PlayedLinesPage = {
   ok: boolean;
   predictions: import('../pages/MyPredictionsPage').PredictionRow[];
+  played_model_counts: {
+    model_name: string;
+    source: string | null;
+    played_count: number;
+  }[];
   pagination: {
     limit: number;
     offset: number;
