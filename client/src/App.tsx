@@ -155,7 +155,7 @@ function AppHeader() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Show when="signed-out">
-            <SignInButton mode="modal">
+            <SignInButton mode="modal" fallbackRedirectUrl="/dashboard">
               <button
                 type="button"
                 aria-label="Sign in"
