@@ -25,8 +25,6 @@ export function MostPlayedModelCard({ page }: { page: PlayedPage }) {
   })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
   const leaders = models.filter((model) => model.count === models[0].count);
-  const visibleModels = showAll ? models : leaders;
-
   return (
     <section
       className="dl-config-card"
@@ -40,85 +38,133 @@ export function MostPlayedModelCard({ page }: { page: PlayedPage }) {
       </h2>
 
       <ul
-        id="played-model-breakdown"
         style={{
+          display: 'grid',
+          gridTemplateColumns:
+            'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
+          gap: 12,
           listStyle: 'none',
           margin: 0,
           padding: 0,
-          display: 'grid',
-          gap: 12,
         }}
       >
-        {visibleModels.map((model) => {
-          const share = (model.count / total) * 100;
-
-          return (
-            <li key={model.key}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '2px 12px',
-                }}
-              >
-                <strong>
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      display: 'inline-block',
-                      width: 9,
-                      height: 9,
-                      borderRadius: '50%',
-                      background: model.colour,
-                      marginRight: 8,
-                    }}
-                  />
-                  {model.name}
-                </strong>
-                <small>
-                  {model.count} of {total} {total === 1 ? 'line' : 'lines'}
-                  {' · '}
-                  {Number(share.toFixed(1))}%
-                </small>
-              </div>
-
-              <div
+        {leaders.map((model) => (
+          <li
+            key={model.key}
+            style={{
+              padding: '14px 16px',
+              border: '1px solid #e5e7eb',
+              borderRadius: 14,
+              background: '#fff',
+            }}
+          >
+            <strong style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span
                 aria-hidden="true"
                 style={{
-                  height: 6,
-                  marginTop: 5,
-                  borderRadius: 999,
-                  background: '#eef2f7',
-                  overflow: 'hidden',
+                  width: 10,
+                  height: 10,
+                  flexShrink: 0,
+                  borderRadius: '50%',
+                  background: model.colour,
                 }}
-              >
-                <div
-                  style={{
-                    width: `${share}%`,
-                    height: '100%',
-                    borderRadius: 999,
-                    background: model.colour,
-                  }}
-                />
-              </div>
-            </li>
-          );
-        })}
+              />
+              {model.name}
+            </strong>
+
+            <div
+              style={{
+                marginTop: 10,
+                fontSize: '1.65rem',
+                fontWeight: 750,
+                lineHeight: 1.15,
+              }}
+            >
+              {model.count} {model.count === 1 ? 'line' : 'lines'}
+            </div>
+
+            <small style={{ display: 'block', marginTop: 4, color: '#4b5563' }}>
+              {Number(((model.count / total) * 100).toFixed(1))}% of your played
+              lines
+            </small>
+          </li>
+        ))}
       </ul>
 
       {models.length > leaders.length && (
-        <button
-          type="button"
-          className="dl-pagination-btn"
-          aria-expanded={showAll}
-          aria-controls="played-model-breakdown"
-          onClick={() => setShowAll((current) => !current)}
-          style={{ marginTop: 14 }}
-        >
-          {showAll ? 'Show fewer models' : 'Show all models'}
-        </button>
+        <>
+          <button
+            type="button"
+            aria-expanded={showAll}
+            aria-controls="played-model-breakdown"
+            onClick={() => setShowAll((current) => !current)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              marginTop: 8,
+              padding: '8px 0',
+              background: 'transparent',
+              border: 0,
+              color: '#21409a',
+              font: 'inherit',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {showAll ? 'Hide breakdown' : `View all ${models.length} models`}
+            <span aria-hidden="true">{showAll ? '▴' : '▾'}</span>
+          </button>
+
+          <div id="played-model-breakdown" hidden={!showAll}>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              {models.map((model) => {
+                const share = (model.count / total) * 100;
+
+                return (
+                  <li key={model.key} style={{ padding: '7px 0' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '2px 12px',
+                      }}
+                    >
+                      <strong>{model.name}</strong>
+                      <small>
+                        {model.count} {model.count === 1 ? 'line' : 'lines'}
+                        {' · '}
+                        {Number(share.toFixed(1))}%
+                      </small>
+                    </div>
+
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        height: 6,
+                        marginTop: 5,
+                        background: '#eef2f7',
+                        borderRadius: 999,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${share}%`,
+                          height: '100%',
+                          background: model.colour,
+                          borderRadius: 999,
+                        }}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </>
       )}
     </section>
   );
