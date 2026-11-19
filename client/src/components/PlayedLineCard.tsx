@@ -1,3 +1,4 @@
+import './PlayedLineCard.css';
 import { getLotteryConfig } from '../config/lotteries';
 import type { PredictionRow } from '../pages/MyPredictionsPage';
 import { getModelColour } from '../config/modelPresentation';
@@ -50,15 +51,7 @@ export function PlayedLineCard({ line }: { line: PredictionRow }) {
         <small style={{ textTransform: 'capitalize' }}>{line.status}</small>
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'start',
-          flexWrap: 'wrap',
-          gap: '12px 20px',
-          marginTop: 8,
-        }}
-      >
+      <div className="dl-played-line-numbers">
         {lottery.numberGroups.map((group) => {
           const isMain = group.key === 'main';
           const numbers = isMain ? line.main_numbers : line.star_numbers;

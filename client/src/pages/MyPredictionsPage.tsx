@@ -1571,7 +1571,13 @@ export default function MyPredictionsPage() {
                           </div>
 
                           {p.star_numbers.length > 0 && (
-                            <div>
+                            <div
+                              style={
+                                isMobile
+                                  ? { marginLeft: 'auto', textAlign: 'right' }
+                                  : undefined
+                              }
+                            >
                               <div
                                 style={{
                                   fontSize: '0.75rem',

@@ -1,0 +1,41 @@
+.dl-played-line-numbers {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-top: 8px;
+}
+
+@media (max-width: 700px) {
+  .dl-played-line-numbers {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 8px;
+  }
+
+  /* Give the main numbers the full row when there are no special balls. */
+  .dl-played-line-numbers > :first-child:nth-last-child(2) {
+    grid-column: 1 / -1;
+  }
+
+  /* Align the Lucky Stars or Life Ball label and balls to the right. */
+  .dl-played-line-numbers > :nth-child(2):not(:last-child) {
+    text-align: right;
+  }
+
+  .dl-played-line-numbers > :nth-child(2):not(:last-child) > div {
+    justify-content: flex-end;
+  }
+
+  /* The ball wrapper already provides spacing through its flex gap. */
+  .dl-played-line-numbers .dl-draw-pill {
+    margin: 0;
+  }
+
+  /* Put Confidence below the numbers, aligned to the right. */
+  .dl-played-line-numbers > :last-child {
+    grid-column: 1 / -1;
+    justify-self: end;
+    text-align: right;
+  }
+}
