@@ -117,6 +117,27 @@ export const users = pgTable(
 );
 
 /* =========================
+   My Numbers
+========================= */
+export const saved_number_sets = pgTable('saved_number_sets', {
+  id: serial('id').primaryKey(),
+
+  user_id: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+
+  name: text('name').notNull(),
+  lottery: varchar('lottery', { length: 32 }).notNull(),
+
+  main_numbers: smallint('main_numbers').array().notNull(),
+  special_numbers: smallint('special_numbers').array().notNull(),
+
+  created_at: timestamp('created_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+/* =========================
    Predictions
 ========================= */
 export const predictions = pgTable('predictions', {
