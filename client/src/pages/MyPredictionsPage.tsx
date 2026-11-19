@@ -1531,11 +1531,8 @@ export default function MyPredictionsPage() {
 
                         <div
                           style={{
-                            display: isMobile ? 'grid' : 'flex',
-                            gridTemplateColumns: isMobile
-                              ? 'minmax(0, 1fr) auto'
-                              : undefined,
-                            flexWrap: isMobile ? undefined : 'wrap',
+                            display: 'flex',
+                            flexWrap: 'wrap',
                             gap: isMobile ? '0.85rem 1rem' : '0.75rem',
                             alignItems: 'flex-start',
                           }}
@@ -1551,7 +1548,7 @@ export default function MyPredictionsPage() {
                               }}
                             >
                               {mainGroup?.label ?? 'Main numbers'}
-                              {mainHitCount != null
+                              {!isMobile && mainHitCount != null
                                 ? ` (hits: ${mainHitCount})`
                                 : ''}
                             </div>
@@ -1585,7 +1582,7 @@ export default function MyPredictionsPage() {
                                 }}
                               >
                                 {secondaryGroup?.label ?? 'Stars'}
-                                {starHitCount != null
+                                {!isMobile && starHitCount != null
                                   ? ` (hits: ${starHitCount})`
                                   : ''}
                               </div>
