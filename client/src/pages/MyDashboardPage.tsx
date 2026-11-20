@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPlayedLinesPage } from '../api/dashboard';
 import { PlayedLineCard } from '../components/PlayedLineCard';
+import { PersonalModelPerformanceCard } from '../components/PersonalModelPerformanceCard';
 import { MostPlayedModelCard } from '../components/MostPlayedModelCard';
 import { MyNumbersForm } from '../components/MyNumbersForm';
 import { getSavedNumberSets, type SavedNumberSet } from '../api/myNumbers';
@@ -112,6 +113,8 @@ export default function MyDashboardPage() {
           );
         })}
       </nav>
+
+      <PersonalModelPerformanceCard />
 
       <section
         className="dl-config-card"

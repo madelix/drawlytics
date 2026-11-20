@@ -1,0 +1,132 @@
+.dl-personal-performance {
+  margin-top: 20px;
+  padding: 1.25rem;
+  text-align: left;
+}
+
+.dl-personal-performance h2 {
+  margin: 0 0 0.35rem;
+}
+
+.dl-personal-performance p {
+  margin: 0.5rem 0;
+  color: #475569;
+}
+
+.dl-personal-lottery-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.dl-personal-lottery-buttons button {
+  padding: 0.5rem 0.85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.dl-personal-lottery-buttons button[aria-pressed='true'] {
+  border-color: #111827;
+  background: #111827;
+  color: #fff;
+}
+
+.dl-personal-performance-table {
+  width: 100%;
+  border-spacing: 0;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dl-personal-performance-caption {
+  padding-bottom: 0.5rem;
+  color: #475569;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.dl-personal-performance-table th,
+.dl-personal-performance-table td {
+  padding: 0.75rem;
+  text-align: right;
+}
+
+.dl-personal-performance-table th:first-child {
+  text-align: left;
+}
+
+.dl-personal-performance-table thead th {
+  background: #f4f4fa;
+  color: #475569;
+  font-size: 0.8rem;
+}
+
+.dl-personal-performance-table tbody th,
+.dl-personal-performance-table tbody td {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dl-personal-model-dot {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-right: 0.45rem;
+  border-radius: 50%;
+}
+
+.dl-personal-model-sample {
+  display: block;
+  margin-top: 0.25rem;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+@media (max-width: 640px) {
+  .dl-personal-performance-table,
+  .dl-personal-performance-table caption,
+  .dl-personal-performance-table tbody {
+    display: block;
+  }
+
+  .dl-personal-performance-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .dl-personal-performance-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.65rem 0.4rem;
+    padding: 0.85rem 0;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .dl-personal-performance-table tbody th,
+  .dl-personal-performance-table tbody td {
+    padding: 0;
+    border: 0;
+    text-align: left;
+  }
+
+  .dl-personal-performance-table tbody th {
+    grid-column: 1 / -1;
+  }
+
+  .dl-personal-performance-table td::before {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: #475569;
+    font-size: 0.75rem;
+    content: attr(data-label);
+  }
+}

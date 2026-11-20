@@ -43,3 +43,27 @@ export function getPlayedLinesPage(offset = 0): Promise<PlayedLinesPage> {
 
   return apiGetJson<PlayedLinesPage>(`/api/predictions?${search}`);
 }
+
+export type PersonalModelPerformanceRow = {
+  model_key: string;
+  checked_lines: number;
+  shared_draws: number;
+  compared_line_results: number;
+  personal_average: number | null;
+  benchmark_average: number | null;
+  difference: number | null;
+};
+
+export async function getPersonalModelPerformance(
+  lottery: LotteryKey,
+): Promise<PersonalModelPerformanceRow[]> {
+  const search = new URLSearchParams({ lottery });
+
+  const response = await apiGetJson<{
+    ok: boolean;
+    lottery: LotteryKey;
+    models: PersonalModelPerformanceRow[];
+  }>(`/api/predictions/personal-performance?${search}`);
+
+  return response.models;
+}

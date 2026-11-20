@@ -468,9 +468,9 @@ XGBoost v2:
 - [x] Remove the temporary lifetime saved-prediction limit for beta.
 - [ ] User-specific saved strategies.
 - [ ] User-specific experiments.
-- [ ] My Numbers: allow users to save their own chosen number sets and track how those exact numbers perform over time against verified official draw results.
+- [x] My Numbers: allow users to save their own chosen number sets and track how those exact numbers perform over time against verified official draw results.
 - [ ] Personal dashboard.
-- [ ] Personal performance history.
+- [ ] Personal performance history: show each model’s average hits per checked line the user marked as played, alongside its global benchmark for the same lottery and draws. Include the difference, the number of checked lines and the number of shared draws.
 - [ ] Subscription or usage-tier preparation.
 - [ ] Privacy and data-deletion controls.
 - [ ] Support multiple external authentication identities for one Drawlytics user where required.

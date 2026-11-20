@@ -11,6 +11,7 @@ import {
 const router = express.Router();
 import { runBenchmarkForDraw } from '../services/benchmarkRunner.js';
 import { loadSavedNumberComparison } from '../services/compareSavedNumbers.js';
+import { getPersonalModelPerformance } from '../services/personalModelPerformance.js';
 
 /**
  * TEMPORARY
@@ -461,6 +462,35 @@ router.get('/my-numbers', async (req, res) => {
     return res
       .status(500)
       .json({ ok: false, error: 'saved_number_sets_failed' });
+  }
+});
+
+router.get('/predictions/personal-performance', async (req, res) => {
+  try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({ ok: false, error: 'unauthenticated' });
+    }
+
+    const lottery = req.query.lottery ?? 'euromillions';
+
+    if (
+      typeof lottery !== 'string' ||
+      getPredictionLotteryConfig(lottery).key !== lottery
+    ) {
+      return res.status(400).json({ ok: false, error: 'invalid_lottery' });
+    }
+
+    const models = await getPersonalModelPerformance(currentUser.id, lottery);
+
+    return res.json({ ok: true, lottery, models });
+  } catch (error) {
+    console.error('GET /predictions/personal-performance failed:', error);
+    return res.status(500).json({
+      ok: false,
+      error: 'personal_performance_failed',
+    });
   }
 });
 
