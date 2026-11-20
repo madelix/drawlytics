@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { getPlayedLinesPage } from '../api/dashboard';
 import { PlayedLineCard } from '../components/PlayedLineCard';
 import { MostPlayedModelCard } from '../components/MostPlayedModelCard';
+import { MyNumbersForm } from '../components/MyNumbersForm';
+import { getSavedNumberSets, type SavedNumberSet } from '../api/myNumbers';
+import { getLotteryConfig } from '../config/lotteries';
 
 export default function MyDashboardPage() {
   const [playedOffset, setPlayedOffset] = useState(0);
@@ -10,6 +13,30 @@ export default function MyDashboardPage() {
     ReturnType<typeof getPlayedLinesPage>
   > | null>(null);
   const [playedError, setPlayedError] = useState<string | null>(null);
+  const [savedSets, setSavedSets] = useState<SavedNumberSet[]>([]);
+  const [setsLoading, setSetsLoading] = useState(true);
+  const [setsError, setSetsError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSavedSets() {
+      try {
+        const sets = await getSavedNumberSets();
+        if (active) setSavedSets(sets);
+      } catch {
+        if (active) setSetsError(true);
+      } finally {
+        if (active) setSetsLoading(false);
+      }
+    }
+
+    void loadSavedSets();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -148,7 +175,80 @@ export default function MyDashboardPage() {
           </>
         )}
       </section>
+      <section
+        className="dl-config-card"
+        aria-labelledby="my-numbers-heading"
+        style={{ marginTop: 20, padding: '1.25rem', textAlign: 'left' }}
+      >
+        <h2 id="my-numbers-heading" style={{ margin: '0 0 14px' }}>
+          My Numbers
+        </h2>
 
+        {setsLoading ? (
+          <p role="status">Loading your number sets…</p>
+        ) : (
+          <>
+            {setsError && (
+              <p role="alert">
+                Your saved sets could not be loaded. Refresh to try again.
+              </p>
+            )}
+
+            {savedSets.map((set) => {
+              const lottery = getLotteryConfig(set.lottery);
+
+              return (
+                <article key={set.id} style={{ marginBottom: 16 }}>
+                  <small>{lottery.label}</small>
+                  <h3 style={{ margin: '4px 0 8px', overflowWrap: 'anywhere' }}>
+                    {set.name}
+                  </h3>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      justifyContent: 'space-between',
+                      gap: '8px 20px',
+                    }}
+                  >
+                    {lottery.numberGroups.map((group) => {
+                      const isMain = group.key === 'main';
+                      const numbers = isMain
+                        ? set.main_numbers
+                        : set.special_numbers;
+                      if (!numbers.length) return null;
+
+                      return (
+                        <div
+                          key={group.key}
+                          style={{ textAlign: isMain ? 'left' : 'right' }}
+                        >
+                          <small>{group.label}</small>
+                          <div>
+                            {numbers.map((number) => (
+                              <span
+                                key={number}
+                                className={`dl-draw-pill dl-draw-pill--${isMain ? 'main' : 'star'}`}
+                              >
+                                {number}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </article>
+              );
+            })}
+
+            <MyNumbersForm
+              onSaved={(set) => setSavedSets((previous) => [set, ...previous])}
+            />
+          </>
+        )}
+      </section>
       {playedPage && <MostPlayedModelCard page={playedPage} />}
     </div>
   );
