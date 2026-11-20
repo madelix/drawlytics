@@ -6,6 +6,7 @@ import { MostPlayedModelCard } from '../components/MostPlayedModelCard';
 import { MyNumbersForm } from '../components/MyNumbersForm';
 import { getSavedNumberSets, type SavedNumberSet } from '../api/myNumbers';
 import { getLotteryConfig } from '../config/lotteries';
+import { SavedSetComparisonCard } from '../components/SavedSetComparisonCard';
 
 export default function MyDashboardPage() {
   const [playedOffset, setPlayedOffset] = useState(0);
@@ -239,6 +240,7 @@ export default function MyDashboardPage() {
                       );
                     })}
                   </div>
+                  <SavedSetComparisonCard set={set} />
                 </article>
               );
             })}

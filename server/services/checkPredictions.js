@@ -1,5 +1,6 @@
 // server/services/checkPredictions.js
 import { pool } from '../db.js';
+import { countMatches } from './countMatches.js';
 
 function getPredictionLotteryConfig(lotteryRaw) {
   const lottery = String(lotteryRaw ?? 'euromillions')
@@ -153,13 +154,6 @@ AND lower(replace(lottery, ' ', '_')) IN (
 
   const toNums = (arr) =>
     Array.isArray(arr) ? arr.map((n) => Number(n)).filter(Number.isFinite) : [];
-
-  const countMatches = (a, b) => {
-    const setB = new Set(b);
-    let c = 0;
-    for (const x of a) if (setB.has(x)) c++;
-    return c;
-  };
 
   const toYYYYMMDD = (d) => {
     const dt = new Date(d);

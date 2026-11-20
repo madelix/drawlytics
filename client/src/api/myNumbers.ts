@@ -29,3 +29,29 @@ export async function saveNumberSet(
   });
   return response.set;
 }
+
+export type SavedSetDrawResult = {
+  draw_date: string;
+  draw_sequence: number;
+  main_numbers: number[];
+  special_numbers: number[];
+  matched_main: number;
+  matched_special: number;
+};
+
+export type SavedSetComparison = {
+  draws_compared: number;
+  latest: SavedSetDrawResult | null;
+  best: SavedSetDrawResult | null;
+};
+
+export async function getSavedSetComparison(
+  setId: number,
+): Promise<SavedSetComparison> {
+  const response = await apiGetJson<{
+    ok: true;
+    comparison: SavedSetComparison;
+  }>(`${path}/${setId}/comparison`);
+
+  return response.comparison;
+}

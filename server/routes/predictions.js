@@ -10,6 +10,7 @@ import {
 } from '../services/predictionGenerator.js';
 const router = express.Router();
 import { runBenchmarkForDraw } from '../services/benchmarkRunner.js';
+import { loadSavedNumberComparison } from '../services/compareSavedNumbers.js';
 
 /**
  * TEMPORARY
@@ -399,6 +400,40 @@ router.post('/my-numbers', async (req, res) => {
   } catch (error) {
     console.error('POST /my-numbers failed:', error);
     return res.status(500).json({ ok: false, error: 'save_number_set_failed' });
+  }
+});
+
+router.get('/my-numbers/:id/comparison', async (req, res) => {
+  try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({ ok: false, error: 'unauthenticated' });
+    }
+
+    const setId = Number(req.params.id);
+    if (!Number.isInteger(setId) || setId < 1 || setId > 2147483647) {
+      return res.status(400).json({ ok: false, error: 'invalid_set_id' });
+    }
+
+    const { rows } = await pool.query(
+      `
+        SELECT lottery, main_numbers, special_numbers
+        FROM saved_number_sets
+        WHERE id = $1 AND user_id = $2
+      `,
+      [setId, currentUser.id],
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: 'set_not_found' });
+    }
+
+    const comparison = await loadSavedNumberComparison(pool, rows[0]);
+    return res.json({ ok: true, comparison });
+  } catch (error) {
+    console.error('GET /my-numbers/:id/comparison failed:', error);
+    return res.status(500).json({ ok: false, error: 'comparison_failed' });
   }
 });
 
