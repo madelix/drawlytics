@@ -1068,3 +1068,120 @@ body {
     margin: 0;
   }
 }
+
+/* Landing page layout */
+.dl-page.dl-page--landing {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'brand'
+    'headline'
+    'intro'
+    'example'
+    'actions'
+    'performance'
+    'footer';
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 70rem;
+  margin-inline: auto;
+  padding: clamp(1rem, 4vw, 3rem);
+  gap: 1.25rem;
+  align-items: start;
+  justify-items: stretch;
+}
+
+.dl-page--landing .dl-landing-header {
+  grid-area: brand;
+  margin: 0 0 0.5rem;
+  text-align: left;
+}
+
+.dl-page--landing .dl-logo {
+  display: block;
+  width: clamp(10rem, 28vw, 14rem);
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+}
+
+.dl-page--landing .dl-landing-tagline {
+  margin: 0.35rem 0 0;
+}
+
+.dl-page--landing .dl-hero-title {
+  grid-area: headline;
+  margin: 0;
+  max-width: 18ch;
+  font-size: clamp(2rem, 4.5vw, 3.75rem);
+  line-height: 1.08;
+  text-align: left;
+  text-wrap: balance;
+}
+
+.dl-page--landing .dl-hero-copy {
+  grid-area: intro;
+  margin: 0;
+  max-width: 48ch;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.dl-page--landing .dl-landing-match {
+  grid-area: example;
+  margin: 0;
+  max-width: none;
+}
+
+.dl-page--landing .dl-cta-wrap {
+  grid-area: actions;
+  margin: 0;
+  justify-self: start;
+}
+
+.dl-page--landing .dl-landing-performance {
+  grid-area: performance;
+  max-width: none;
+  margin: 0.5rem 0 0;
+}
+
+.dl-page--landing .dl-footnote {
+  grid-area: footer;
+  margin: 0;
+  text-align: center;
+}
+
+@media (min-width: 960px) {
+  .dl-page.dl-page--landing {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    grid-template-areas:
+      'brand       brand'
+      'headline    example'
+      'intro       example'
+      'actions     example'
+      'performance performance'
+      'footer      footer';
+    column-gap: 2.5rem;
+  }
+
+  .dl-page--landing .dl-landing-match {
+    align-self: center;
+  }
+
+  .dl-page--landing .dl-landing-match-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.35rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dl-page--landing .dl-cta-wrap {
+    width: 100%;
+  }
+
+  .dl-page--landing .dl-cta-btn {
+    box-sizing: border-box;
+    width: 100%;
+    text-align: center;
+  }
+}
