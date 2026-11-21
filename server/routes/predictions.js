@@ -438,6 +438,46 @@ router.get('/my-numbers/:id/comparison', async (req, res) => {
   }
 });
 
+router.delete('/my-numbers/:id', async (req, res) => {
+  try {
+    const currentUser = await getCurrentDrawlyticsUser(req);
+
+    if (!currentUser) {
+      return res.status(401).json({ ok: false, error: 'unauthenticated' });
+    }
+
+    const id = Number(req.params.id);
+
+    if (
+      !/^\d+$/.test(req.params.id) ||
+      !Number.isInteger(id) ||
+      id < 1 ||
+      id > 2147483647
+    ) {
+      return res.status(400).json({ ok: false, error: 'invalid_set_id' });
+    }
+
+    const { rowCount } = await pool.query(
+      `
+        DELETE FROM saved_number_sets
+        WHERE id = $1 AND user_id = $2
+      `,
+      [id, currentUser.id],
+    );
+
+    if (rowCount === 0) {
+      return res.status(404).json({ ok: false, error: 'set_not_found' });
+    }
+
+    return res.status(204).end();
+  } catch (error) {
+    console.error('DELETE /my-numbers/:id failed:', error);
+    return res
+      .status(500)
+      .json({ ok: false, error: 'delete_number_set_failed' });
+  }
+});
+
 router.get('/my-numbers', async (req, res) => {
   try {
     const currentUser = await getCurrentDrawlyticsUser(req);

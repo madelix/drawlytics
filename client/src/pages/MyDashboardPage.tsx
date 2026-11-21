@@ -5,7 +5,11 @@ import { PlayedLineCard } from '../components/PlayedLineCard';
 import { PersonalModelPerformanceCard } from '../components/PersonalModelPerformanceCard';
 import { MostPlayedModelCard } from '../components/MostPlayedModelCard';
 import { MyNumbersForm } from '../components/MyNumbersForm';
-import { getSavedNumberSets, type SavedNumberSet } from '../api/myNumbers';
+import {
+  deleteNumberSet,
+  getSavedNumberSets,
+  type SavedNumberSet,
+} from '../api/myNumbers';
 import { getLotteryConfig } from '../config/lotteries';
 import { SavedSetComparisonCard } from '../components/SavedSetComparisonCard';
 
@@ -19,6 +23,27 @@ export default function MyDashboardPage() {
   const [setsLoading, setSetsLoading] = useState(true);
   const [setsError, setSetsError] = useState(false);
   const numberSetDialog = useRef<HTMLDialogElement>(null);
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deletingSet, setDeletingSet] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  async function handleDeleteSet(id: number) {
+    if (deletingSet || confirmDeleteId !== id) return;
+
+    setDeletingSet(true);
+    setDeleteError('');
+
+    try {
+      await deleteNumberSet(id);
+      setSavedSets((previous) => previous.filter((set) => set.id !== id));
+      setConfirmDeleteId(null);
+    } catch {
+      setDeleteError('Could not delete this set. Please try again.');
+    } finally {
+      setDeletingSet(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -226,9 +251,80 @@ export default function MyDashboardPage() {
               return (
                 <article key={set.id} style={{ marginBottom: 16 }}>
                   <small>{lottery.label}</small>
-                  <h3 style={{ margin: '4px 0 8px', overflowWrap: 'anywhere' }}>
-                    {set.name}
-                  </h3>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      margin: '4px 0 8px',
+                    }}
+                  >
+                    <h3 style={{ margin: 0, overflowWrap: 'anywhere' }}>
+                      {set.name}
+                    </h3>
+
+                    {confirmDeleteId !== set.id && (
+                      <button
+                        type="button"
+                        aria-label={`Delete ${set.name}`}
+                        disabled={deletingSet}
+                        onClick={() => {
+                          setDeleteError('');
+                          setConfirmDeleteId(set.id);
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 0,
+                          color: '#475569',
+                          padding: '0.4rem 0.5rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+
+                  {confirmDeleteId === set.id && (
+                    <div
+                      role="group"
+                      aria-label={`Confirm deletion of ${set.name}`}
+                      style={{ marginBottom: 12 }}
+                    >
+                      <p
+                        style={{ margin: '0 0 8px', overflowWrap: 'anywhere' }}
+                      >
+                        Delete <strong>“{set.name}”</strong>?
+                      </p>
+
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          type="button"
+                          autoFocus
+                          disabled={deletingSet}
+                          onClick={() => {
+                            setConfirmDeleteId(null);
+                            setDeleteError('');
+                          }}
+                        >
+                          Cancel
+                        </button>
+
+                        <button
+                          type="button"
+                          className="dl-pagination-btn"
+                          disabled={deletingSet}
+                          onClick={() => void handleDeleteSet(set.id)}
+                          style={{ background: '#991b1b', color: '#fff' }}
+                        >
+                          {deletingSet ? 'Deleting…' : 'Delete set'}
+                        </button>
+                      </div>
+
+                      {deleteError && <p role="alert">{deleteError}</p>}
+                    </div>
+                  )}
 
                   <div
                     style={{

@@ -188,19 +188,21 @@ export function MyNumbersForm({ onSaved }: Props) {
                       <button
                         key={value}
                         type="button"
+                        className={`dl-draw-pill dl-draw-pill--${isMain ? 'main' : 'star'}`}
                         aria-pressed={picked}
                         disabled={unavailable}
                         onClick={() => toggleNumber(value)}
                         style={{
+                          boxSizing: 'border-box',
                           width: '2.65rem',
                           height: '2.65rem',
+                          margin: 0,
                           padding: 0,
-                          borderRadius: '50%',
-                          border: `1px solid ${picked ? accent : '#cbd5e1'}`,
-                          background: picked ? accent : '#fff',
-                          color: picked ? '#fff' : '#1f2937',
-                          font: 'inherit',
+                          fontSize: '1rem',
                           fontWeight: picked ? 700 : 500,
+                          boxShadow: picked
+                            ? `inset 0 0 0 2px ${accent}`
+                            : undefined,
                           opacity: unavailable ? 0.5 : 1,
                           cursor: unavailable ? 'default' : 'pointer',
                         }}

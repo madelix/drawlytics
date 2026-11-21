@@ -55,3 +55,7 @@ export async function getSavedSetComparison(
 
   return response.comparison;
 }
+
+export async function deleteNumberSet(id: number): Promise<void> {
+  await apiSendJson(`/api/my-numbers/${id}`, { method: 'DELETE' });
+}
