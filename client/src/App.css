@@ -990,3 +990,81 @@ body {
   font-size: 0.9rem;
   color: var(--dl-text-subtle);
 }
+
+/* Landing page: historical match and model performance */
+.dl-page--landing .dl-landing-match,
+.dl-page--landing .dl-landing-performance {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 44rem;
+  min-width: 0;
+  padding: clamp(1rem, 4vw, 2rem);
+  border-radius: 16px;
+}
+
+.dl-landing-match {
+  border: 1px solid #ddd6fe;
+  background: linear-gradient(155deg, #f6f3ff, #fff 55%);
+}
+
+.dl-landing-match .dl-preview-note {
+  margin: 0 0 0.4rem;
+  color: #624496;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.dl-landing-match h2,
+.dl-landing-performance h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 3.5vw, 2rem);
+  line-height: 1.2;
+}
+
+.dl-landing-match-row {
+  padding-top: 1rem;
+}
+
+.dl-landing-match-row + .dl-landing-match-row {
+  margin-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.dl-landing-match-row h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.dl-landing-match-row small {
+  color: #475569;
+}
+
+.dl-page--landing .dl-landing-performance {
+  background: #172554;
+  color: #fff;
+}
+
+.dl-landing-performance p {
+  margin: 0.75rem 0 1rem;
+  color: #e0e7ff;
+  line-height: 1.6;
+}
+
+.dl-landing-performance-link {
+  color: #fff;
+  font-weight: 600;
+  text-underline-offset: 0.2em;
+}
+
+@media (min-width: 640px) {
+  .dl-landing-match-row {
+    display: grid;
+    grid-template-columns: 10rem minmax(0, 1fr);
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .dl-landing-match-row h3 {
+    margin: 0;
+  }
+}

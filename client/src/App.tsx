@@ -11,8 +11,6 @@ import {
 import { Show, SignInButton, UserButton, useAuth } from '@clerk/react';
 import { Suspense, lazy, useEffect, useLayoutEffect, useState } from 'react';
 
-import useEuromillionsFrequency from './hooks/useEuromillionsFrequency';
-
 import MyDashboardPage from './pages/MyDashboardPage';
 import MyPredictionsPage from './pages/MyPredictionsPage';
 import { MakeMagicPage } from './pages/MakeMagicPage';
@@ -35,22 +33,6 @@ const AllDrawsPage = lazy(() =>
 
 // Logo lives in /public
 const logo = '/Drawlytics.png';
-
-type NumberCount = {
-  number: number;
-  count: number;
-};
-
-type FrequencyData = {
-  main: NumberCount[];
-  stars: NumberCount[];
-};
-
-type FrequencyHookResult = {
-  data: FrequencyData | null;
-  loading: boolean;
-  error: boolean | null;
-};
 
 /* ──────────────────────────────────────────────
    Global header (inner pages only)
@@ -371,29 +353,6 @@ export default function App() {
    ────────────────────────────────────────────── */
 
 function LandingPage() {
-  const { data, loading, error } =
-    useEuromillionsFrequency() as FrequencyHookResult;
-
-  // Fallback sample data for preview card
-  const fallbackMains: NumberCount[] = [
-    { number: 23, count: 215 },
-    { number: 42, count: 213 },
-    { number: 44, count: 212 },
-    { number: 19, count: 212 },
-    { number: 21, count: 210 },
-  ];
-
-  const fallbackStars: NumberCount[] = [
-    { number: 3, count: 377 },
-    { number: 2, count: 375 },
-    { number: 11, count: 360 },
-    { number: 9, count: 355 },
-    { number: 7, count: 350 },
-  ];
-
-  const mainsPreview = data?.main?.slice(0, 5) ?? fallbackMains;
-  const starsPreview = data?.stars?.slice(0, 5) ?? fallbackStars;
-
   return (
     <div className="dl-page dl-page--landing">
       {/* Logo + tagline */}
@@ -402,84 +361,138 @@ function LandingPage() {
         <p className="dl-landing-tagline">Data-driven clarity for every draw</p>
       </header>
 
-      <h1 className="dl-hero-title">
-        Where lottery data meets meaningful insight
-      </h1>
+      <h1 className="dl-hero-title">How would your numbers have done?</h1>
 
       <p className="dl-hero-copy">
-        Drawlytics transforms official EuroMillions, UK Lotto and Set For Life
-        results into measurable insight — analysing draw history, numerical
-        behaviour and model performance. Designed for players who value
-        understanding over luck.
+        Pick your numbers and find their closest match in official EuroMillions,
+        UK Lotto or Set For Life draw history. Then see how the strategies you
+        follow compare with Pure Random.
       </p>
 
-      <div className="dl-cta-wrap">
+      <section
+        className="dl-preview-card dl-landing-match"
+        aria-labelledby="landing-match-heading"
+      >
+        <p className="dl-preview-note">EuroMillions · Historical example</p>
+        <h2 id="landing-match-heading">3 main numbers and 1 Lucky Star</h2>
+
+        {[
+          {
+            label: 'Example set',
+            main: [11, 14, 15, 32, 48],
+            stars: [2, 10],
+            isDraw: false,
+          },
+          {
+            label: 'Draw on 19 April 2016',
+            main: [11, 14, 15, 27, 44],
+            stars: [2, 7],
+            isDraw: true,
+          },
+        ].map((row) => (
+          <div key={row.label} className="dl-landing-match-row">
+            <h3>{row.label}</h3>
+
+            <div
+              style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem' }}
+            >
+              {[
+                {
+                  label: 'Main numbers',
+                  kind: 'main',
+                  numbers: row.main,
+                  hits: [11, 14, 15],
+                },
+                {
+                  label: 'Lucky Stars',
+                  kind: 'star',
+                  numbers: row.stars,
+                  hits: [2],
+                },
+              ].map((group) => (
+                <div key={group.kind}>
+                  <small>{group.label}</small>
+                  <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                    {group.numbers.map((number) => {
+                      const matched = row.isDraw && group.hits.includes(number);
+
+                      return (
+                        <span
+                          key={number}
+                          className={`dl-draw-pill dl-draw-pill--${group.kind}`}
+                          aria-label={
+                            matched ? `${number}, matched` : undefined
+                          }
+                          style={{
+                            margin: 0,
+                            ...(matched && {
+                              background: '#dcfce7',
+                              borderColor: '#22c55e',
+                              color: '#14532d',
+                              fontWeight: 700,
+                            }),
+                          }}
+                        >
+                          {number}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <div
+        className="dl-cta-wrap"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.75rem 1.25rem',
+        }}
+      >
         <a
           href="https://tally.so/r/OD1k5g"
           target="_blank"
           rel="noreferrer"
           className="dl-cta-btn"
         >
-          Join the Beta
+          Request beta access
+        </a>
+
+        <a
+          href="/draws"
+          style={{
+            color: '#21409a',
+            fontWeight: 600,
+            textUnderlineOffset: '0.2em',
+          }}
+        >
+          Explore draw history <span aria-hidden="true">→</span>
         </a>
       </div>
 
-      <ul className="dl-feature-list">
-        <li>Multi-lottery support: EuroMillions, UK Lotto, Set For Life.</li>
-        <li>Number frequency &amp; gap analysis.</li>
-        <li>Model playground &amp; performance tracking.</li>
-        <li>&ldquo;My predictions&rdquo; (coming in beta).</li>
-      </ul>
+      <section
+        className="dl-preview-card dl-landing-performance"
+        aria-labelledby="landing-performance-heading"
+      >
+        <h2 id="landing-performance-heading">
+          How does Balanced Hot/Cold compare with Pure Random?
+        </h2>
 
-      <section className="dl-preview-card">
-        <div className="dl-preview-header">
-          <span className="dl-preview-title">Preview from the live API</span>
-          {!error && (
-            <span className="dl-preview-status">
-              <span className="dl-status-dot" /> Online
-            </span>
-          )}
-          {error && (
-            <span className="dl-preview-status dl-preview-status--error">
-              <span className="dl-status-dot dl-status-dot--error" /> Offline
-            </span>
-          )}
-        </div>
-
-        <p className="dl-preview-note">
-          EuroMillions: top numbers (live sample)
+        <p>
+          See how many numbers each strategy matched on the same official draws.
+          Compare their average hits and see how many draws each comparison
+          covers.
         </p>
 
-        <table className="dl-preview-table">
-          <thead>
-            <tr>
-              <th>Main numbers</th>
-              <th>Stars</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: 5 }).map((_, idx) => {
-              const main = mainsPreview[idx];
-              const star = starsPreview[idx];
-
-              return (
-                <tr key={idx}>
-                  <td>
-                    #{main.number} → {main.count}
-                  </td>
-                  <td>
-                    ★ {star.number} → {star.count}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        <p className="dl-preview-note">
-          Beta users will get full history per lottery, more models, and saved
-          predictions — this is just a small live preview.
-        </p>
+        <a href="/performance" className="dl-landing-performance-link">
+          Explore model performance <span aria-hidden="true">→</span>
+        </a>
       </section>
 
       <footer className="dl-footnote">

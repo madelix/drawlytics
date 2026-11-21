@@ -344,7 +344,7 @@ XGBoost v2:
 - [x] Display every official UK Lotto result in Draw History.
 - [x] Check eligible predictions against both same-date draws.
 - [x] Recalculate any analytics affected by omitted draw records.
-- [ ] Display both UK Lotto draw results together when viewing a prediction.
+- [x] Display both UK Lotto draw results together when viewing a prediction.
 
 ### Foundation cleanup (completed)
 
@@ -471,7 +471,17 @@ XGBoost v2:
 - [x] My Numbers: allow users to save their own chosen number sets and track how those exact numbers perform over time against verified official draw results.
 - [ ] Personal dashboard.
 - [x] Personal performance history: show each model’s average hits per checked line the user marked as played, alongside its global benchmark for the same lottery and draws. Include the difference, the number of checked lines and the number of shared draws.
-- [ ] Subscription or usage-tier preparation.
+- [ ] Account access tiers and free beta limits
+  - [ ] Add `access_tier` to the Drawlytics `users` table through a Drizzle migration. Default existing accounts and new signups to `free`.
+  - [ ] Grant the project owner’s existing account permanent `full` access using its unique Clerk user ID. Keep product access, billing status and administrator permissions separate.
+  - [ ] Update the authenticated usage endpoint to return the signed-in account’s tier, current saved prediction count and limit. Verify the owner sees `full` with an unlimited allowance before enabling enforcement.
+  - [ ] Enforce a maximum of 50 currently saved prediction lines per free account across all lotteries and models combined. Each generated line occupies one slot, including trained-model lines. Deleting a line frees its slot. Full accounts have unlimited saved lines.
+  - [ ] Apply the cap to prediction storage only. My Numbers sets have a separate purpose. Checking results, comparing models and viewing existing history remain available at the cap. The beta has no daily generation quota.
+  - [ ] Enforce capacity on the server for every user-facing prediction save path, including simultaneous requests. Save a Strategy Mix in full or decline the whole mix and report how many additional slots it needs.
+  - [ ] Preserve all existing predictions when enabling the cap. Free accounts already above 50 keep their history and can save again once there is room for the requested lines.
+  - [ ] Show usage near the save action, for example “41 of 50 prediction lines saved”. When space is needed, show unplayed lines first and explain that deleting a played line also removes it from personal model-performance history.
+  - [ ] Verify free and full account behaviour, including the 50th line, a batch that will not fit, concurrent saves, deletion freeing a slot and an existing account above the cap. Enable direct Clerk signup after these checks pass.
+  - [ ] Later, allow a paid subscription to grant full product access while preserving the owner’s permanent grant if billing status changes.
 - [ ] Privacy and data-deletion controls.
 - [ ] Support multiple external authentication identities for one Drawlytics user where required.
 
@@ -532,7 +542,7 @@ XGBoost v2:
 - [x] Support multiple UK Lotto draws on the same calendar date.
 - [x] Backfill missing second draws (10 Jun 2026 – 22 Jul 2026).
 - [x] Evaluate a single UK Lotto prediction against both official draws.
-- [ ] Group same-date UK Lotto results into a single card in the Draws page.
+- [x] Group same-date UK Lotto results into a single card in the Draws page.
 
 ---
 
