@@ -287,18 +287,67 @@ export default function MyDashboardPage() {
                   </div>
 
                   {confirmDeleteId === set.id && (
-                    <div
-                      role="group"
-                      aria-label={`Confirm deletion of ${set.name}`}
-                      style={{ marginBottom: 12 }}
+                    <dialog
+                      ref={(dialog) => {
+                        if (dialog && !dialog.open) dialog.showModal();
+                      }}
+                      aria-labelledby="delete-set-title"
+                      aria-describedby="delete-set-description"
+                      onCancel={(event) => {
+                        event.preventDefault();
+                        if (!deletingSet) {
+                          setConfirmDeleteId(null);
+                          setDeleteError('');
+                        }
+                      }}
+                      style={{
+                        boxSizing: 'border-box',
+                        width: 'min(420px, calc(100% - 2rem))',
+                        margin: 'auto',
+                        padding: '1.25rem',
+                        background: '#ffffff',
+                        color: '#111827',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 16,
+                        boxShadow: '0 20px 50px rgba(15, 23, 42, 0.25)',
+                        textAlign: 'left',
+                      }}
+                      className="dl-delete-set-dialog"
                     >
-                      <p
-                        style={{ margin: '0 0 8px', overflowWrap: 'anywhere' }}
+                      <style>{`
+                        .dl-delete-set-dialog::backdrop {
+                          background: rgba(15, 23, 42, 0.45);
+                        }
+                      `}</style>
+
+                      <h2
+                        id="delete-set-title"
+                        style={{ margin: 0, fontSize: '1.1rem' }}
                       >
-                        Delete <strong>“{set.name}”</strong>?
+                        Delete saved number set?
+                      </h2>
+
+                      <p
+                        id="delete-set-description"
+                        style={{
+                          color: '#6b7280',
+                          lineHeight: 1.5,
+                          overflowWrap: 'anywhere',
+                        }}
+                      >
+                        This will permanently delete “{set.name}”.
                       </p>
 
-                      <div style={{ display: 'flex', gap: 8 }}>
+                      {deleteError && <p role="alert">{deleteError}</p>}
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'flex-end',
+                          gap: '0.5rem',
+                          marginTop: '1rem',
+                        }}
+                      >
                         <button
                           type="button"
                           autoFocus
@@ -307,23 +356,37 @@ export default function MyDashboardPage() {
                             setConfirmDeleteId(null);
                             setDeleteError('');
                           }}
+                          style={{
+                            border: '1px solid #e5e7eb',
+                            background: '#ffffff',
+                            color: '#374151',
+                            borderRadius: 10,
+                            padding: '0.55rem 0.9rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
                         >
                           Cancel
                         </button>
 
                         <button
                           type="button"
-                          className="dl-pagination-btn"
                           disabled={deletingSet}
                           onClick={() => void handleDeleteSet(set.id)}
-                          style={{ background: '#991b1b', color: '#fff' }}
+                          style={{
+                            border: '1px solid #b91c1c',
+                            background: '#b91c1c',
+                            color: '#ffffff',
+                            borderRadius: 10,
+                            padding: '0.55rem 0.9rem',
+                            fontWeight: 700,
+                            cursor: deletingSet ? 'wait' : 'pointer',
+                          }}
                         >
-                          {deletingSet ? 'Deleting…' : 'Delete set'}
+                          {deletingSet ? 'Deleting…' : 'Delete'}
                         </button>
                       </div>
-
-                      {deleteError && <p role="alert">{deleteError}</p>}
-                    </div>
+                    </dialog>
                   )}
 
                   <div
