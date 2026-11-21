@@ -4,7 +4,6 @@ import {
   LOTTERIES,
   getLotteryConfig,
   type LotteryKey,
-  type NumberGroup,
 } from '../config/lotteries';
 
 type Props = {
@@ -25,15 +24,6 @@ export function MyNumbersForm({ onSaved }: Props) {
     if (key === lottery) return;
     setLottery(key);
     setEntries({});
-    setError('');
-  }
-
-  function updateNumber(group: NumberGroup, index: number, value: string) {
-    setEntries((previous) => {
-      const values = [...(previous[group.key] ?? [])];
-      values[index] = value;
-      return { ...previous, [group.key]: values };
-    });
     setError('');
   }
 
@@ -148,43 +138,82 @@ export function MyNumbersForm({ onSaved }: Props) {
           />
         </label>
 
-        {groups.map((group) => (
-          <fieldset
-            key={group.key}
-            style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}
-          >
-            <legend style={{ padding: 0, marginBottom: 6 }}>
-              {group.label} ({group.min}–{group.max})
-            </legend>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {Array.from({ length: group.count }, (_, index) => (
-                <input
-                  key={index}
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]+"
-                  maxLength={String(group.max).length}
-                  required
-                  aria-label={`${group.label}, number ${index + 1}`}
-                  value={entries[group.key]?.[index] ?? ''}
-                  onChange={(event) =>
-                    updateNumber(group, index, event.target.value)
-                  }
-                  style={{
-                    boxSizing: 'border-box',
-                    width: '2.6rem',
-                    height: '2.6rem',
-                    borderRadius: '50%',
-                    textAlign: 'center',
-                    fontSize: '1rem',
-                    border: `1px solid ${group.key === 'main' ? '#c4b5fd' : '#93c5fd'}`,
-                    background: group.key === 'main' ? '#f5f3ff' : '#eff6ff',
-                  }}
-                />
-              ))}
-            </div>
-          </fieldset>
-        ))}
+        {groups.map((group) => {
+          const selected = entries[group.key] ?? [];
+          const isFull = selected.length === group.count;
+          const isMain = group.key === 'main';
+          const accent = isMain ? '#6d28d9' : '#1d4ed8';
+
+          function toggleNumber(value: string) {
+            setEntries((previous) => {
+              const current = previous[group.key] ?? [];
+
+              if (current.includes(value)) {
+                return {
+                  ...previous,
+                  [group.key]: current.filter((item) => item !== value),
+                };
+              }
+
+              if (current.length >= group.count) return previous;
+              return { ...previous, [group.key]: [...current, value] };
+            });
+            setError('');
+          }
+
+          return (
+            <fieldset
+              key={group.key}
+              style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}
+            >
+              <legend style={{ padding: 0, marginBottom: 8 }}>
+                <strong>{group.label}</strong>
+                <span
+                  aria-live="polite"
+                  style={{ marginLeft: 8, color: '#475569' }}
+                >
+                  {selected.length} of {group.count}
+                </span>
+              </legend>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {Array.from(
+                  { length: group.max - group.min + 1 },
+                  (_, index) => {
+                    const value = String(group.min + index);
+                    const picked = selected.includes(value);
+                    const unavailable = isFull && !picked;
+
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={picked}
+                        disabled={unavailable}
+                        onClick={() => toggleNumber(value)}
+                        style={{
+                          width: '2.65rem',
+                          height: '2.65rem',
+                          padding: 0,
+                          borderRadius: '50%',
+                          border: `1px solid ${picked ? accent : '#cbd5e1'}`,
+                          background: picked ? accent : '#fff',
+                          color: picked ? '#fff' : '#1f2937',
+                          font: 'inherit',
+                          fontWeight: picked ? 700 : 500,
+                          opacity: unavailable ? 0.5 : 1,
+                          cursor: unavailable ? 'default' : 'pointer',
+                        }}
+                      >
+                        {value}
+                      </button>
+                    );
+                  },
+                )}
+              </div>
+            </fieldset>
+          );
+        })}
 
         {error && <div role="alert">{error}</div>}
 

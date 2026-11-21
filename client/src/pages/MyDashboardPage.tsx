@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPlayedLinesPage } from '../api/dashboard';
 import { PlayedLineCard } from '../components/PlayedLineCard';
@@ -18,6 +18,7 @@ export default function MyDashboardPage() {
   const [savedSets, setSavedSets] = useState<SavedNumberSet[]>([]);
   const [setsLoading, setSetsLoading] = useState(true);
   const [setsError, setSetsError] = useState(false);
+  const numberSetDialog = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -184,9 +185,30 @@ export default function MyDashboardPage() {
         aria-labelledby="my-numbers-heading"
         style={{ marginTop: 20, padding: '1.25rem', textAlign: 'left' }}
       >
-        <h2 id="my-numbers-heading" style={{ margin: '0 0 14px' }}>
-          My Numbers
-        </h2>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 8,
+            marginBottom: 14,
+          }}
+        >
+          <h2 id="my-numbers-heading" style={{ margin: 0 }}>
+            My Numbers
+          </h2>
+
+          <button
+            type="button"
+            className="dl-pagination-btn"
+            aria-haspopup="dialog"
+            disabled={setsLoading}
+            onClick={() => numberSetDialog.current?.showModal()}
+          >
+            Add a new set
+          </button>
+        </div>
 
         {setsLoading ? (
           <p role="status">Loading your number sets…</p>
@@ -248,9 +270,63 @@ export default function MyDashboardPage() {
               );
             })}
 
-            <MyNumbersForm
-              onSaved={(set) => setSavedSets((previous) => [set, ...previous])}
-            />
+            <dialog
+              ref={numberSetDialog}
+              aria-labelledby="number-set-dialog-title"
+              style={{
+                boxSizing: 'border-box',
+                width: 'min(44rem, calc(100% - 2rem))',
+                maxHeight: '85dvh',
+                overflowY: 'auto',
+                overscrollBehavior: 'contain',
+                margin: 'auto',
+                padding: '1.25rem',
+                border: '1px solid #d1d5db',
+                borderRadius: 16,
+                background: '#fff',
+                color: '#111827',
+                boxShadow: '0 16px 48px rgba(15, 23, 42, 0.2)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  marginBottom: 16,
+                }}
+              >
+                <h2 id="number-set-dialog-title" style={{ margin: 0 }}>
+                  Add a new set
+                </h2>
+
+                <button
+                  type="button"
+                  aria-label="Close number picker"
+                  onClick={() => numberSetDialog.current?.close()}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    border: 0,
+                    borderRadius: '50%',
+                    background: '#f4f4fa',
+                    color: '#374151',
+                    fontSize: '1.4rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              <MyNumbersForm
+                onSaved={(set) => {
+                  setSavedSets((previous) => [set, ...previous]);
+                  numberSetDialog.current?.close();
+                }}
+              />
+            </dialog>
           </>
         )}
       </section>
