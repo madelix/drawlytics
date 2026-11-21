@@ -194,8 +194,14 @@ export function MyNumbersForm({ onSaved }: Props) {
                         onClick={() => toggleNumber(value)}
                         style={{
                           boxSizing: 'border-box',
+                          flex: '0 0 2.65rem',
                           width: '2.65rem',
+                          minWidth: '2.65rem',
+                          maxWidth: '2.65rem',
                           height: '2.65rem',
+                          minHeight: '2.65rem',
+                          maxHeight: '2.65rem',
+                          borderRadius: '50%',
                           margin: 0,
                           padding: 0,
                           fontSize: '1rem',
