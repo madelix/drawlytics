@@ -1,6 +1,7 @@
 // server/routes/predictions.js
 import express from 'express';
 import { getCurrentDrawlyticsUser } from '../auth/currentUser.js';
+import { getPredictionAllowance } from '../services/predictionAllowance.js';
 import { pool } from '../db.js';
 import { checkPredictions } from '../services/checkPredictions.js';
 import {
@@ -789,16 +790,12 @@ router.get('/predictions/usage', async (req, res) => {
       [userId],
     );
 
-    const ownerClerkId = process.env.DRAWLYTICS_OWNER_CLERK_USER_ID?.trim();
-    const hasFullAccess =
-      Boolean(ownerClerkId) && currentUser.clerk_user_id === ownerClerkId;
+    const allowance = getPredictionAllowance(currentUser.clerk_user_id);
 
     return res.json({
       ok: true,
       used: rows?.[0]?.used ?? 0,
-      tier: hasFullAccess ? 'full' : 'free',
-      limit: hasFullAccess ? null : 50,
-      limits_disabled: hasFullAccess,
+      ...allowance,
     });
   } catch (err) {
     console.error('GET /predictions/usage failed:', err);
@@ -948,73 +945,82 @@ router.post('/predictions/generate', async (req, res) => {
     const generatedLines = generatedBatch.predictions;
 
     const saved = [];
+    const { limit } = getPredictionAllowance(currentUser.clerk_user_id);
+    const client = await pool.connect();
 
-    for (let i = 0; i < lines; i++) {
-      const line = generatedLines[i];
-      const { confidence, model_name } = line;
+    try {
+      await client.query('BEGIN');
 
-      const { rows } = await pool.query(
-        `
-        INSERT INTO predictions (
-  lottery,
-  draw_date,
-  model_name,
-  main_numbers,
-  star_numbers,
-  confidence,
-  created_at,
-  matched_main,
-  matched_stars,
-  result_label,
-  status,
-user_id,
-source,
-benchmark_eligible
-)
-VALUES (
-  $1,
-  $2,
-  $3,
-  $4::smallint[],
-  $5::smallint[],
-  $6,
-  NOW(),
-  NULL,
-  NULL,
-  NULL,
-  'pending',
-  $7,
-  $8,
-  false
-)
-        RETURNING
-  id,
-  lottery,
-  draw_date,
-  model_name,
-  main_numbers,
-  star_numbers,
-  confidence,
-  status,
-  created_at,
-  matched_main,
-  matched_stars,
-  result_label,
-  source
-        `,
-        [
-          lotteryConfig.key,
-          draw_date,
-          model_name,
-          line.main,
-          line.stars,
-          confidence,
+      if (limit !== null) {
+        // Two requests from the same user must check their allowance in turn.
+        await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [
           userId,
-          source,
-        ],
-      );
+        ]);
 
-      saved.push(rows[0]);
+        const { rows } = await client.query(
+          'SELECT COUNT(*)::int AS used FROM predictions WHERE user_id = $1',
+          [userId],
+        );
+
+        const used = rows[0].used;
+        const remaining = Math.max(0, limit - used);
+
+        if (lines > remaining) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({
+            ok: false,
+            error: 'prediction_limit_reached',
+            used,
+            limit,
+            remaining,
+            message:
+              remaining === 0
+                ? `Your account holds up to ${limit} saved lines. Delete a saved line to make room.`
+                : `You have room for ${remaining} more. Request fewer lines or delete saved lines to make room.`,
+          });
+        }
+      }
+
+      for (let i = 0; i < lines; i++) {
+        const line = generatedLines[i];
+        const { rows } = await client.query(
+          `
+          INSERT INTO predictions (
+            lottery, draw_date, model_name, main_numbers, star_numbers,
+            confidence, created_at, matched_main, matched_stars, result_label,
+            status, user_id, source, benchmark_eligible
+          )
+          VALUES (
+            $1, $2, $3, $4::smallint[], $5::smallint[],
+            $6, NOW(), NULL, NULL, NULL,
+            'pending', $7, $8, false
+          )
+          RETURNING
+            id, lottery, draw_date, model_name, main_numbers, star_numbers,
+            confidence, status, created_at, matched_main, matched_stars,
+            result_label, source
+          `,
+          [
+            lotteryConfig.key,
+            draw_date,
+            line.model_name,
+            line.main,
+            line.stars,
+            line.confidence,
+            userId,
+            source,
+          ],
+        );
+
+        saved.push(rows[0]);
+      }
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
 
     return res.json({
