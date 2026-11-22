@@ -97,7 +97,18 @@ export async function apiSendJson<T>(
         `API returned HTML (likely wrong server). ${options.method} ${path} status ${res.status}`,
       );
     }
-    throw new Error(text || `${options.method} ${path} failed (${res.status})`);
+    let message = text || `${options.method} ${path} failed (${res.status})`;
+
+    try {
+      const details = JSON.parse(text);
+      if (typeof details?.message === 'string' && details.message.trim()) {
+        message = details.message.trim();
+      }
+    } catch {
+      // Plain-text errors already contain the message.
+    }
+
+    throw new Error(message);
   }
 
   if (!text) return {} as T;
