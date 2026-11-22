@@ -1206,13 +1206,11 @@ body {
   }
 }
 
-@media (max-width: 959px) {
-  .dl-page--landing .dl-landing-match-row > div {
-    width: 100%;
-  }
+.dl-page--landing .dl-landing-match-row > div {
+  width: 100%;
+}
 
-  .dl-page--landing .dl-landing-match-row > div > div:last-child {
-    margin-inline-start: auto;
-    text-align: right;
-  }
+.dl-page--landing .dl-landing-match-row > div > div:last-child {
+  margin-inline-start: auto;
+  text-align: right;
 }

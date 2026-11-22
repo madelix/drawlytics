@@ -560,6 +560,8 @@ have been checked for overlap:
 - exportable performance reports,
 - additional supported lotteries.
 
+- [ ] Add Powerball support after the public beta. Verify the official results source, draw schedule and UK entry cutoff. Support 5 main numbers (1–69) and 1 Powerball (1–26) across draw history, saved sets, prediction checking and model comparisons.
+
 ---
 
 ## Decision log
