@@ -317,7 +317,19 @@ export default function App() {
       <AppHeader />
       <Suspense fallback={<div style={{ padding: 24 }}>Loading…</div>}>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          <Route
+            path="/"
+            element={
+              <>
+                <Show when="signed-in">
+                  <Navigate to="/dashboard" replace />
+                </Show>
+                <Show when="signed-out">
+                  <LandingPage />
+                </Show>
+              </>
+            }
+          />
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/gaps" element={<GapsPage />} />
           <Route path="/draws" element={<AllDrawsPage />} />
