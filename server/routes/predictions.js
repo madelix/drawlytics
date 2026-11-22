@@ -789,11 +789,16 @@ router.get('/predictions/usage', async (req, res) => {
       [userId],
     );
 
+    const ownerClerkId = process.env.DRAWLYTICS_OWNER_CLERK_USER_ID?.trim();
+    const hasFullAccess =
+      Boolean(ownerClerkId) && currentUser.clerk_user_id === ownerClerkId;
+
     return res.json({
       ok: true,
       used: rows?.[0]?.used ?? 0,
-      limit: null,
-      limits_disabled: true,
+      tier: hasFullAccess ? 'full' : 'free',
+      limit: hasFullAccess ? null : 50,
+      limits_disabled: hasFullAccess,
     });
   } catch (err) {
     console.error('GET /predictions/usage failed:', err);
